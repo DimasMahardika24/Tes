@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Super Mario 2P Online</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
+    body { background: #0d1117; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 10px; }
+    .card { width: 100%; max-width: 500px; background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); position: relative; overflow: hidden; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .title { font-size: 18px; font-weight: 800; color: #58a6ff; display: flex; align-items: center; gap: 6px; }
+    
+    /* Overlay Menu Awal */
+    .menu-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #161b22; z-index: 10; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; gap: 14px; }
+    .menu-title { font-size: 22px; font-weight: 800; color: #58a6ff; margin-bottom: 10px; text-align: center; }
+    .btn-menu { width: 80%; max-width: 250px; padding: 12px; border: none; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; transition: 0.2s; text-align: center; }
+    .btn-host { background: #238636; color: #fff; }
+    .btn-join-mode { background: #1f6feb; color: #fff; }
+    .btn-menu:active { transform: scale(0.96); }
+    .join-box { display: none; width: 80%; max-width: 250px; flex-direction: column; gap: 8px; }
+    .join-box input { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #fff; padding: 10px; border-radius: 6px; font-size: 13px; outline: none; text-align: center; }
+    
+    .status { font-size: 12px; color: #e3b341; margin-bottom: 10px; font-weight: 600; text-align: center; background: #0d1117; padding: 6px; border-radius: 8px; border: 1px solid #21262d; }
+    .game-wrapper { width: 100%; aspect-ratio: 16/9; background: #5c94fc; border-radius: 12px; overflow: hidden; border: 2px solid #30363d; position: relative; box-shadow: inset 0 0 20px rgba(0,0,0,0.2); }
+    canvas { width: 100%; height: 100%; display: block; }
+    .touch-controls { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+    .dpad, .actions { display: flex; gap: 10px; }
+    .btn-game { width: 52px; height: 52px; background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 12px; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; touch-action: manipulation; box-shadow: 0 4px 0 #0d1117; }
+    .btn-game:active { transform: translateY(3px); box-shadow: 0 1px 0 #0d1117; background: #2ea043; color: #fff; }
+    .btn-jump { width: 80px; background: #da3633; color: #fff; box-shadow: 0 4px 0 #8e1513; }
+    .btn-jump:active { background: #b62321; box-shadow: 0 1px 0 #8e1513; }
+  </style>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+<div class="card">
+  <!-- Menu Overlay awal masuk -->
+  <div class="menu-overlay" id="menuOverlay">
+    <div class="menu-title">🍄 MARIO 2P ONLINE</div>
+    <button class="btn-menu btn-host" id="btnChooseHost">🎮 BUAT ROOM (HOST)</button>
+    <button class="btn-menu btn-join-mode" id="btnChooseJoin">🔗 GABUNG ROOM (JOIN)</button>
+    
+    <div class="join-box" id="joinBox">
+      <input type="text" id="roomIdInput" placeholder="Masukkan ID Room lawan...">
+      <button class="btn-menu btn-join-mode" style="width:100%" id="btnConnect">MASUK GAME</button>
+    </div>
+  </div>
+
+  <div class="header">
+    <div class="title">🍄 Mario 2P Online</div>
+    <div id="roleTag" style="font-size:12px; color:#58a6ff; font-weight:bold;">Waiting...</div>
+  </div>
+
+  <div class="status" id="status">Pilih Mode Bermain...</div>
+
+  <div class="game-wrapper">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="touch-controls">
+    <div class="dpad">
+      <div class="btn-game" id="btnLeft">◀</div>
+      <div class="btn-game" id="btnRight">▶</div>
+    </div>
+    <div class="actions">
+      <div class="btn-game btn-jump" id="btnJump">LOMPAT</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 440; canvas.height = 247;
+
+  let peer, conn;
+  let myRole = 'p1';
+  let myChar, opponentChar;
+  let platforms, coinsList, enemies, movingPlatform;
+  let score = 0, coinsCount = 0;
+  const gravity = 0.45;
+
+  // Handler Menu UI
+  const menuOverlay = document.getElementById('menuOverlay');
+  const btnChooseHost = document.getElementById('btnChooseHost');
+  const btnChooseJoin = document.getElementById('btnChooseJoin');
+  const joinBox = document.getElementById('joinBox');
+  const roleTag = document.getElementById('roleTag');
+
+  btnChooseJoin.onclick = () => {
+    btnChooseHost.style.display = 'none';
+    btnChooseJoin.style.display = 'none';
+    joinBox.style.display = 'flex';
+  };
+
+  // 1. Pilih Mode HOST
+  btnChooseHost.onclick = () => {
+    myRole = 'p1';
+    roleTag.textContent = 'HOST (Mario)';
+    const randomRoomId = Math.floor(100000 + Math.random() * 900000).toString();
+    peer = new Peer('mario2p-' + randomRoomId);
+
+    peer.on('open', (id) => {
+      const cleanId = id.replace('mario2p-', '');
+      document.getElementById('status').textContent = 'Kode Room Kamu: ' + cleanId + ' (Bagikan ke P2)';
+      menuOverlay.style.display = 'none';
+      init();
+    });
+
+    peer.on('connection', (connection) => {
+      conn = connection;
+      setupDataListener();
+      document.getElementById('status').textContent = '🎮 P2 Terhubung! Selamat Bermain';
+    });
+  };
+
+  // 2. Pilih Mode JOIN
+  document.getElementById('btnConnect').onclick = () => {
+    const targetId = document.getElementById('roomIdInput').value.trim();
+    if(!targetId) return alert('Masukkan ID Room lawan!');
+    
+    myRole = 'p2';
+    roleTag.textContent = 'JOINER (Luigi)';
+    peer = new Peer(); // Random Peer ID
+    
+    peer.on('open', () => {
+      conn = peer.connect('mario2p-' + targetId);
+      setupDataListener();
+      document.getElementById('status').textContent = '🎮 Terhubung ke Host! Selamat Bermain';
+      menuOverlay.style.display = 'none';
+      init();
+    });
+  };
+
+  function setupDataListener(){
+    conn.on('data', (data) => {
+      if(data && typeof data.x === 'number'){
+        opponentChar.targetX = data.x;
+        opponentChar.targetY = data.y;
+        opponentChar.vx = data.vx;
+        opponentChar.facing = data.facing;
+      }
+    });
+  }
+
+  // Engine Setup
+  function init(){
+    const spawnX = myRole === 'p1' ? 30 : 60;
+    myChar = { 
+      x: spawnX, y: 140, w: 18, h: 24, vx: 0, vy: 0, 
+      grounded: false, facing: 'right', spawnX: spawnX, spawnY: 140 
+    };
+    
+    opponentChar = { 
+      x: myRole === 'p1' ? 60 : 30, y: 140, targetX: 60, targetY: 140, 
+      w: 18, h: 24, vx: 0, facing: 'right' 
+    };
+
+    platforms = [
+      { x: 0, y: 210, w: 320, h: 40 },
+      { x: 380, y: 210, w: 500, h: 40 },
+      { x: 90, y: 160, w: 60, h: 14 },
+      { x: 200, y: 130, w: 80, h: 14 },
+      { x: 420, y: 160, w: 70, h: 14 },
+      { x: 530, y: 120, w: 80, h: 14 }
+    ];
+
+    movingPlatform = { x: 315, y: 170, w: 55, h: 12, vx: 1, minX: 310, maxX: 375 };
+
+    coinsList = [
+      { x: 110, y: 135, taken: false },
+      { x: 220, y: 105, taken: false },
+      { x: 245, y: 105, taken: false },
+      { x: 445, y: 135, taken: false },
+      { x: 560, y: 95, taken: false }
+    ];
+
+    enemies = [
+      { x: 210, y: 194, w: 16, h: 16, vx: -0.8, minX: 180, maxX: 300, alive: true },
+      { x: 450, y: 194, w: 16, h: 16, vx: 0.8, minX: 400, maxX: 550, alive: true }
+    ];
+
+    keys = { left: false, right: false };
+    loop();
+  }
+
+  function respawn(){
+    myChar.x = myChar.spawnX;
+    myChar.y = myChar.spawnY;
+    myChar.vx = 0;
+    myChar.vy = 0;
+  }
+
+  function sendPosition(){
+    if(conn && conn.open){
+      conn.send({ 
+        x: Math.round(myChar.x), 
+        y: Math.round(myChar.y),
+        vx: myChar.vx,
+        facing: myChar.facing
+      });
+    }
+  }
+  setInterval(sendPosition, 40);
+
+  function update(){
+    if(!myChar) return;
+
+    if(keys.left) { myChar.vx = -2.8; myChar.facing = 'left'; }
+    else if(keys.right) { myChar.vx = 2.8; myChar.facing = 'right'; }
+    else { myChar.vx *= 0.8; }
+
+    myChar.vy += gravity;
+    myChar.x += myChar.vx;
+    myChar.y += myChar.vy;
+
+    opponentChar.x += (opponentChar.targetX - opponentChar.x) * 0.3;
+    opponentChar.y += (opponentChar.targetY - opponentChar.y) * 0.3;
+
+    movingPlatform.x += movingPlatform.vx;
+    if(movingPlatform.x <= movingPlatform.minX || movingPlatform.x >= movingPlatform.maxX) movingPlatform.vx *= -1;
+
+    myChar.grounded = false;
+    const allPlatforms = [...platforms, movingPlatform];
+
+    allPlatforms.forEach(p => {
+      if(myChar.x < p.x + p.w && myChar.x + myChar.w > p.x &&
+         myChar.y + myChar.h >= p.y && myChar.y + myChar.h <= p.y + p.h + myChar.vy + 2){
+          myChar.y = p.y - myChar.h;
+          myChar.vy = 0;
+          myChar.grounded = true;
+          if(p === movingPlatform) myChar.x += movingPlatform.vx;
+      }
+    });
+
+    if(myChar.y > canvas.height + 40) respawn();
+
+    coinsList.forEach(c => {
+      if(!c.taken && myChar.x < c.x + 12 && myChar.x + myChar.w > c.x && myChar.y < c.y + 12 && myChar.y + myChar.h > c.y){
+        c.taken = true;
+        coinsCount++;
+        score += 100;
+      }
+    });
+
+    enemies.forEach(e => {
+      if(!e.alive) return;
+      e.x += e.vx;
+      if(e.x <= e.minX || e.x >= e.maxX) e.vx *= -1;
+
+      if(myChar.x < e.x + e.w && myChar.x + myChar.w > e.x && myChar.y < e.y + e.h && myChar.y + myChar.h > e.y){
+        if(myChar.vy > 0 && myChar.y + myChar.h - myChar.vy <= e.y + 6){
+          e.alive = false;
+          myChar.vy = -6;
+          score += 200;
+        } else {
+          respawn();
+        }
+      }
+    });
+
+    if(myChar.x >= 750) document.getElementById('status').textContent = '🏆 KAMU MENANG!';
+  }
+
+  function drawPlayer(p, mainColor, hatColor){
+    ctx.fillStyle = mainColor;
+    ctx.fillRect(p.x, p.y + 6, p.w, p.h - 6);
+    ctx.fillStyle = '#ffcc99';
+    ctx.fillRect(p.x + (p.facing === 'right' ? 4 : 0), p.y + 4, 12, 8);
+    ctx.fillStyle = hatColor;
+    ctx.fillRect(p.x + (p.facing === 'right' ? 2 : -2), p.y, 16, 5);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(p.x + (p.facing === 'right' ? 12 : 3), p.y + 6, 2, 2);
+  }
+
+  function draw(){
+    if(!myChar) return;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    let cameraX = myChar.x - 100;
+    if(cameraX < 0) cameraX = 0;
+
+    ctx.save();
+    ctx.translate(-cameraX, 0);
+
+    ctx.fillStyle = '#5c94fc';
+    ctx.fillRect(cameraX, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(150, 50, 16, 0, Math.PI * 2);
+    ctx.arc(170, 45, 20, 0, Math.PI * 2);
+    ctx.arc(190, 50, 16, 0, Math.PI * 2);
+    ctx.fill();
+
+    platforms.forEach(p => {
+      ctx.fillStyle = '#c84c0c';
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+      ctx.fillStyle = '#00a800';
+      ctx.fillRect(p.x, p.y, p.w, 4);
+    });
+
+    ctx.fillStyle = '#fc9838';
+    ctx.fillRect(movingPlatform.x, movingPlatform.y, movingPlatform.w, movingPlatform.h);
+
+    coinsList.forEach(c => {
+      if(!c.taken){
+        ctx.fillStyle = '#f7c548';
+        ctx.beginPath();
+        ctx.arc(c.x + 6, c.y + 6, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(c.x + 4, c.y + 3, 2, 6);
+      }
+    });
+
+    enemies.forEach(e => {
+      if(e.alive){
+        ctx.fillStyle = '#a81000';
+        ctx.fillRect(e.x, e.y, e.w, e.h);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(e.x + 2, e.y + 4, 3, 4);
+        ctx.fillRect(e.x + 11, e.y + 4, 3, 4);
+      }
+    });
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(760, 90, 4, 120);
+    ctx.fillStyle = '#2ecc71';
+    ctx.beginPath();
+    ctx.moveTo(764, 90); ctx.lineTo(790, 105); ctx.lineTo(764, 120);
+    ctx.fill();
+
+    const p1Color = '#e74c3c', p2Color = '#2ecc71';
+    if(myRole === 'p1'){
+      drawPlayer(opponentChar, p2Color, p2Color);
+      drawPlayer(myChar, p1Color, p1Color);
+    } else {
+      drawPlayer(opponentChar, p1Color, p1Color);
+      drawPlayer(myChar, p2Color, p2Color);
+    }
+
+    ctx.restore();
+  }
+
+  function loop(){
+    update(); draw();
+    requestAnimationFrame(loop);
+  }
+
+  const bL = document.getElementById('btnLeft');
+  const bR = document.getElementById('btnRight');
+  const bJ = document.getElementById('btnJump');
+
+  const setLeft = (val) => keys ? keys.left = val : null;
+  const setRight = (val) => keys ? keys.right = val : null;
+
+  bL.addEventListener('touchstart', (e)=>{ e.preventDefault(); setLeft(true); });
+  bL.addEventListener('touchend', (e)=>{ e.preventDefault(); setLeft(false); });
+  bR.addEventListener('touchstart', (e)=>{ e.preventDefault(); setRight(true); });
+  bR.addEventListener('touchend', (e)=>{ e.preventDefault(); setRight(false); });
+  
+  bJ.addEventListener('touchstart', (e)=>{
+    e.preventDefault();
+    if(myChar && myChar.grounded){ myChar.vy = -9.2; myChar.grounded = false; }
+  });
+
+})();
+</script>
+</body>
+</html>
