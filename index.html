@@ -42,31 +42,36 @@ body {
 
 /* Persistent Room ID badge - selalu kelihatan biar gampang share ke temen */
 .room-badge {
-  position: fixed; top: 12px; left: 12px; z-index: 999;
-  background: linear-gradient(135deg, rgba(20,24,32,0.92), rgba(13,17,23,0.92));
-  border: 1px solid rgba(88,166,255,0.4);
-  color: #e3b341; font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
-  padding: 7px 10px; border-radius: 10px; cursor: pointer;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.45);
-  display: none; align-items: center; gap: 6px;
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 999;
+  background: linear-gradient(135deg, rgba(22,27,38,0.95), rgba(13,17,23,0.95));
+  border: 1px solid rgba(88,166,255,0.45);
+  color: #e3b341; font-size: 12px; font-weight: 800; letter-spacing: 1px;
+  padding: 9px 14px; border-radius: 30px; cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.5), 0 0 0 4px rgba(88,166,255,0.06);
+  display: none; align-items: center; gap: 8px;
   transition: transform .12s ease;
 }
-.room-badge:active { transform: scale(0.95); }
-.room-badge.show { display: inline-flex; }
-.room-badge .rb-copy { font-size: 10px; color: #58a6ff; }
+.room-badge:active { transform: translateX(-50%) scale(0.94); }
+.room-badge.show { display: inline-flex; animation: badgeDrop .35s cubic-bezier(.2,1.3,.4,1); }
+@keyframes badgeDrop { from { opacity:0; transform: translateX(-50%) translateY(-12px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+.room-badge .rb-copy { font-size: 10px; color: #58a6ff; padding-left: 8px; border-left: 1px solid rgba(255,255,255,0.15); }
 .room-badge.copied { border-color: #2ea043; }
 .room-badge.copied .rb-copy { color: #2ea043; }
 
 /* Lobby */
-#gamePickScreen .lobby-title, #joinScreen .lobby-title, #createdScreen .lobby-title { font-size: 18px; font-weight: 800; color: #58a6ff; margin-bottom: 14px; text-align: center; }
-#joinScreen .join-box { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
-#joinScreen .join-box input { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #fff; padding: 13px; border-radius: 10px; font-size: 16px; letter-spacing: 2px; text-align: center; outline: none; margin-bottom: 8px; transition: border-color .15s ease, box-shadow .15s ease; }
-#joinScreen .join-box input:focus { border-color: #58a6ff; box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
-#createdScreen .status { font-size: 13px; color: #e3b341; margin: 12px 0; font-weight: 600; text-align: center; background: #0d1117; padding: 16px; border-radius: 12px; border: 1px solid #21262d; line-height: 1.7; box-shadow: inset 0 2px 8px rgba(0,0,0,0.4); }
-#createdScreen .status b { font-size: 22px !important; letter-spacing: 3px; text-shadow: 0 2px 8px rgba(227,179,65,0.4); }
-.btn-back { background: transparent; color: #7d8590; border: 1px solid #30363d; text-align: center; justify-content: center; box-shadow: none; }
+#gamePickScreen .lobby-title, #joinScreen .lobby-title, #createdScreen .lobby-title { font-size: 19px; font-weight: 800; color: #58a6ff; margin-bottom: 16px; text-align: center; }
+#joinScreen .join-box, #createdScreen { display: flex; flex-direction: column; align-items: center; }
+#joinScreen .join-box { gap: 8px; margin-top: 4px; width: 100%; }
+#joinScreen .join-box input { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #fff; padding: 16px; border-radius: 12px; font-size: 20px; letter-spacing: 6px; text-align: center; outline: none; margin-bottom: 8px; font-weight: 700; transition: border-color .15s ease, box-shadow .15s ease; }
+#joinScreen .join-box input:focus { border-color: #58a6ff; box-shadow: 0 0 0 4px rgba(88,166,255,0.15); }
+#joinScreen .join-icon, #createdScreen .created-icon { font-size: 42px; margin-bottom: 6px; filter: drop-shadow(0 4px 10px rgba(88,166,255,0.35)); }
+#createdScreen .status { font-size: 13px; color: #9da7b3; margin: 4px 0 16px; font-weight: 600; text-align: center; background: #0d1117; padding: 20px 16px; border-radius: 16px; border: 1px solid #21262d; line-height: 1.7; box-shadow: inset 0 2px 10px rgba(0,0,0,0.4); width: 100%; }
+#createdScreen .status .code-big { display: block; font-size: 34px; font-weight: 900; letter-spacing: 8px; color: #ffd33d; margin: 10px 0; text-shadow: 0 4px 16px rgba(255,211,61,0.4); }
+#createdScreen .status .game-name { color: #58a6ff; font-weight: 700; }
+#createdScreen .btn-copy-code { background: linear-gradient(135deg,#1f6feb,#388bfd); width: 100%; text-align: center; justify-content: center; margin-bottom: 10px; }
+.btn-back { background: transparent; color: #7d8590; border: 1px solid #30363d; text-align: center; justify-content: center; box-shadow: none; width: 100%; }
 .btn-back:active { background: rgba(255,255,255,0.04); }
-.spinner { width:16px; height:16px; border-radius:50%; border:2px solid rgba(255,255,255,0.25); border-top-color:#e3b341; display:inline-block; animation: spin .7s linear infinite; margin-top: 8px; }
+.spinner { width:18px; height:18px; border-radius:50%; border:2px solid rgba(255,255,255,0.25); border-top-color:#e3b341; display:inline-block; animation: spin .7s linear infinite; margin-top: 4px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Shared game header */
@@ -85,6 +90,7 @@ canvas { width: 100%; height: 100%; display: block; }
 .btn-jump { width: 84px; background: linear-gradient(160deg,#e04440,#da3633); color: #fff; box-shadow: 0 5px 0 #8e1513, 0 8px 14px rgba(0,0,0,0.4); }
 .btn-jump:active { background: #b62321; box-shadow: 0 1px 0 #8e1513; }
 .coin-counter { position: absolute; top: 8px; right: 8px; background: rgba(13,17,23,0.8); color: #ffd33d; font-size: 12px; font-weight: 800; padding: 5px 11px; border-radius: 20px; z-index: 5; box-shadow: 0 3px 8px rgba(0,0,0,0.4); }
+.players-counter { position: absolute; top: 8px; left: 8px; background: rgba(13,17,23,0.8); color: #7ee787; font-size: 12px; font-weight: 800; padding: 5px 11px; border-radius: 20px; z-index: 5; box-shadow: 0 3px 8px rgba(0,0,0,0.4); }
 .win-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(13,17,23,0.92); backdrop-filter: blur(3px); z-index: 20; flex-direction: column; justify-content: center; align-items: center; gap: 14px; animation: fadeSlide .25s ease; }
 .win-text { font-size: 26px; font-weight: 900; text-align: center; color: #ffd33d; padding: 0 16px; text-shadow: 0 4px 18px rgba(255,211,61,0.5); animation: popIn .35s cubic-bezier(.2,1.4,.4,1); }
 @keyframes popIn { from{ transform: scale(.6); opacity:0; } to{ transform:scale(1); opacity:1; } }
@@ -113,8 +119,11 @@ canvas { width: 100%; height: 100%; display: block; }
 #tttScreen .ttt-cell { aspect-ratio:1; background:linear-gradient(160deg,#1c212a,#141920); border:none; border-radius: 8px; padding:16%; cursor:pointer; box-shadow: inset 0 2px 6px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.03); transition: transform .08s ease, background .12s ease; }
 #tttScreen .ttt-cell:active { transform: scale(0.94); background: linear-gradient(160deg,#242b36,#1a2029); }
 #tttScreen .ttt-cell svg { width:100%; height:100%; display:block; overflow: visible; }
-#tttScreen .o-circle { fill:none; stroke:#1abc84; stroke-width:9; stroke-linecap:round; filter: drop-shadow(0 2px 4px rgba(26,188,132,0.5)); }
-#tttScreen .x-line { fill:none; stroke:#e8eaed; stroke-width:9; stroke-linecap:round; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+#tttScreen .o-circle { fill:none; stroke:#1abc84; stroke-width:9; stroke-linecap:round; filter: drop-shadow(0 2px 4px rgba(26,188,132,0.5)); stroke-dasharray: 214; stroke-dashoffset: 214; animation: tttDrawCircle .38s ease-out forwards; }
+#tttScreen .x-line { fill:none; stroke:#e8eaed; stroke-width:9; stroke-linecap:round; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); stroke-dasharray: 85; stroke-dashoffset: 85; animation: tttDrawLine .22s ease-out forwards; }
+#tttScreen .x-line:nth-child(2) { animation-delay: .16s; }
+@keyframes tttDrawCircle { from { stroke-dashoffset: 214; transform: rotate(-90deg); transform-origin: 50% 50%; } to { stroke-dashoffset: 0; transform: rotate(270deg); transform-origin: 50% 50%; } }
+@keyframes tttDrawLine { from { stroke-dashoffset: 85; } to { stroke-dashoffset: 0; } }
 #tttScreen .winline-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; padding: 5px; box-sizing: border-box; }
 #tttScreen .winline { stroke:#1abc84; stroke-width:.07; stroke-linecap:round; filter: drop-shadow(0 0 6px rgba(26,188,132,0.8)); }
 </style>
@@ -138,7 +147,7 @@ canvas { width: 100%; height: 100%; display: block; }
   <!-- PILIH GAME (cuma muncul kalau Buat Room) -->
   <div class="screen" id="gamePickScreen">
     <div class="lobby-title">Pilih Game</div>
-    <button class="btn-menu g-mario" data-game="mario"><span class="ic">🍄</span> Mario 2P Realtime</button>
+    <button class="btn-menu g-mario" data-game="mario"><span class="ic">🍄</span> Mario Coin Rush (Multiplayer)</button>
     <button class="btn-menu g-chess" data-game="chess"><span class="ic">♟</span> Catur 2P Online</button>
     <button class="btn-menu g-ttt" data-game="ttt"><span class="ic">⭕</span> Tic-Tac-Toe 2P</button>
     <button class="btn-menu btn-back" id="btnGamePickBack">‹ Kembali</button>
@@ -147,8 +156,10 @@ canvas { width: 100%; height: 100%; display: block; }
   <!-- STATUS SETELAH BUAT ROOM (nunggu lawan) -->
   <div class="screen" id="createdScreen">
     <div class="lobby-title">Room Dibuat!</div>
+    <div class="created-icon">🎉</div>
     <div class="status" id="createdStatus" style="display:block"></div>
-    <div style="text-align:center"><span class="spinner"></span></div>
+    <button class="btn-menu btn-copy-code" id="btnCopyCreated" style="justify-content:center;text-align:center">⧉ Salin Kode Room</button>
+    <div style="text-align:center;margin-bottom:6px"><span class="spinner"></span></div>
     <button class="btn-menu btn-back" id="btnCreatedBack">‹ Batal</button>
   </div>
 
@@ -156,8 +167,9 @@ canvas { width: 100%; height: 100%; display: block; }
   <div class="screen" id="joinScreen">
     <div class="lobby-title">Gabung Room</div>
     <div class="join-box" style="display:flex">
-      <input type="text" id="roomIdInputLobby" placeholder="Masukkan ID Room (6 Digit)...">
-      <button class="btn-menu btn-join-mode" id="btnLobbyConnect">MASUK GAME</button>
+      <div class="join-icon">🔗</div>
+      <input type="text" id="roomIdInputLobby" placeholder="Kode Room" inputmode="numeric" maxlength="6">
+      <button class="btn-menu btn-join-mode" id="btnLobbyConnect" style="justify-content:center;text-align:center">MASUK GAME</button>
     </div>
     <button class="btn-menu btn-back" id="btnJoinBack">‹ Kembali</button>
   </div>
@@ -165,18 +177,14 @@ canvas { width: 100%; height: 100%; display: block; }
   <!-- MARIO -->
   <div class="screen" id="marioScreen">
     <div class="g-header">
-      <div class="g-title">🍄 Mario 2P Online</div>
+      <div class="g-title">🍄 Mario Coin Rush</div>
       <div class="g-role" id="marioRoleTag">-</div>
     </div>
     <div class="g-status" id="marioStatus">-</div>
     <div class="game-wrapper">
       <canvas id="canvas"></canvas>
-      <div class="coin-counter" id="coinCounter">🪙 0/5</div>
-      <div class="win-overlay" id="winOverlay">
-        <div class="win-text" id="winText">🏆</div>
-        <button class="btn-menu g-mario" id="btnMarioRestart" style="text-align:center;justify-content:center">MAIN LAGI</button>
-        <button class="btn-menu btn-back" id="btnMarioBack" style="text-align:center;justify-content:center">‹ Menu Utama</button>
-      </div>
+      <div class="coin-counter" id="coinCounter">🪙 0</div>
+      <div class="players-counter" id="playersCounter">👥 1</div>
     </div>
     <div class="touch-controls">
       <div class="dpad">
@@ -187,6 +195,7 @@ canvas { width: 100%; height: 100%; display: block; }
         <div class="btn-game btn-jump" id="btnJump">LOMPAT</div>
       </div>
     </div>
+    <button class="btn-menu btn-back" id="btnMarioBack" style="margin-top:10px;text-align:center;justify-content:center">‹ Menu Utama</button>
   </div>
 
   <!-- CHESS -->
@@ -252,25 +261,35 @@ canvas { width: 100%; height: 100%; display: block; }
     roomBadge.classList.add('show');
   }
   function hideRoomBadge(){ roomBadge.classList.remove('show'); }
+  function copyRoomId(onDone){
+    if(!roomIdGlobal) return;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(roomIdGlobal).then(onDone).catch(onDone);
+    } else { onDone(); }
+  }
   document.getElementById('roomBadgeCopy').onclick = (e) => {
     e.stopPropagation();
-    if(!roomIdGlobal) return;
-    const finish = () => {
+    copyRoomId(() => {
       roomBadge.classList.add('copied');
       document.getElementById('roomBadgeCopy').textContent = '✓ disalin';
       setTimeout(() => {
         roomBadge.classList.remove('copied');
         document.getElementById('roomBadgeCopy').textContent = '⧉ salin';
       }, 1500);
-    };
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(roomIdGlobal).then(finish).catch(finish);
-    } else { finish(); }
+    });
   };
   roomBadge.onclick = () => document.getElementById('roomBadgeCopy').click();
+  document.getElementById('btnCopyCreated').onclick = () => {
+    const btn = document.getElementById('btnCopyCreated');
+    copyRoomId(() => {
+      const original = btn.textContent;
+      btn.textContent = '✓ Kode Disalin!';
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    });
+  };
 
   const gameMeta = {
-    mario: { title: '🍄 Mario 2P Realtime', screen: 'marioScreen' },
+    mario: { title: '🍄 Mario Coin Rush', screen: 'marioScreen' },
     chess: { title: '♟ Catur 2P Online', screen: 'chessScreen' },
     ttt:   { title: '⭕ Tic-Tac-Toe 2P', screen: 'tttScreen' }
   };
@@ -284,6 +303,7 @@ canvas { width: 100%; height: 100%; display: block; }
     location.reload();
   };
 
+
   // ROOM ID baru dibuat SETELAH game dipilih (bukan sebelumnya)
   document.querySelectorAll('#gamePickScreen .btn-menu[data-game]').forEach(btn => {
     btn.onclick = () => {
@@ -292,11 +312,11 @@ canvas { width: 100%; height: 100%; display: block; }
       const roomId = Math.floor(100000 + Math.random() * 900000).toString();
       roomIdGlobal = roomId;
       roomRef = dbRoot.ref('rooms/' + roomId);
-      roomRef.set({ created: Date.now(), game: currentGame });
+      roomRef.set({ created: Date.now(), game: currentGame, mapSeed: Math.floor(Math.random() * 1e9) });
       showRoomBadge(roomId);
 
       document.getElementById('createdStatus').innerHTML =
-        'Game: ' + gameMeta[currentGame].title + '<br><br>Kode Room: <b style="font-size:18px">' + roomId + '</b><br>(Bagikan ke teman — ID juga muncul terus di pojok kiri atas)';
+        '<span class="game-name">' + gameMeta[currentGame].title + '</span><span class="code-big">' + roomId + '</span>Bagikan kode ini ke teman kamu';
       showScreen('createdScreen');
 
       setTimeout(() => enterGame(), 900);
@@ -325,11 +345,26 @@ canvas { width: 100%; height: 100%; display: block; }
         return;
       }
       currentGame = data.game;
-      myRole = 'p2';
       roomIdGlobal = targetId;
       roomRef = dbRoot.ref('rooms/' + targetId);
-      showRoomBadge(targetId);
-      enterGame();
+
+      if(currentGame === 'mario'){
+        // Mario mendukung banyak pemain sekaligus, jadi tidak perlu slot p1/p2.
+        myRole = 'joiner';
+        showRoomBadge(targetId);
+        enterGame();
+      } else {
+        // Catur & Tic-Tac-Toe tetap murni 2 pemain (p1 host, p2 joiner).
+        roomRef.child('presence/p2').once('value').then(p2snap => {
+          if(p2snap.val()){
+            alert('Room ini sudah penuh (2 pemain).');
+            return;
+          }
+          myRole = 'p2';
+          showRoomBadge(targetId);
+          enterGame();
+        });
+      }
     }).catch(() => {
       btnConnect.disabled = false;
       btnConnect.textContent = 'MASUK GAME';
@@ -380,115 +415,170 @@ canvas { width: 100%; height: 100%; display: block; }
   // ======================================================
   // ================== GAME 1: MARIO ====================
   // ======================================================
+  // Mario sekarang: MULTIPLAYER (bukan cuma 2 pemain), level INFINITE
+  // (dibuat prosedural, tidak ada garis finish), dan fokusnya cuma
+  // mengumpulkan koin sebanyak-banyaknya. Karakter pemain lain baru
+  // digambar begitu mereka benar-benar ada di data 'players' room —
+  // jadi kalau belum ada yang join, cuma karakter kita sendiri yang muncul.
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
   canvas.width = 440; canvas.height = 247;
 
-  let myChar, opponentChar;
-  let platforms, coinsList, enemies, movingPlatform;
-  let coinsTaken = 0;
-  let marioGameOver = false;
+  const CHUNK_W = 640;
+  const GROUND_Y = 210;
   const gravity = 0.45;
+  const PLAYER_COLORS = ['#e74c3c', '#2ecc71', '#3498db', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#ec4899'];
+
+  let myPlayerId = null;
+  let myChar = null;
+  let otherPlayers = {};       // { playerId: {x,y,targetX,targetY,facing,color} }
+  let mapSeed = 0, mapStartTime = 0;
+  let chunkCache = {};         // { chunkIndex: {platforms,coins,enemies} }
+  let coinsTakenSet = {};      // synced dari Firebase: { 'chunkIdx_coinIdx': true }
+  let myCoinCount = 0;
+
+  function mulberry32(seed){
+    return function(){
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // Chunk dibuat murni dari fungsi (chunkIndex, mapSeed) sehingga SEMUA klien
+  // menghasilkan layout yang identik tanpa perlu kirim data lewat Firebase.
+  function genChunk(idx){
+    if(chunkCache[idx]) return chunkCache[idx];
+    const rng = mulberry32(mapSeed + idx * 104729 + 1);
+    const baseX = idx * CHUNK_W;
+    const platforms = [];
+    const coins = [];
+    const enemies = [];
+
+    const platCount = 2 + Math.floor(rng() * 2);
+    for(let i = 0; i < platCount; i++){
+      const px = baseX + 60 + i * 220 + rng() * 90;
+      const py = 100 + rng() * 90;
+      const pw = 55 + rng() * 45;
+      platforms.push({ x: px, y: py, w: pw, h: 14 });
+      const coinN = 1 + Math.floor(rng() * 2);
+      for(let c = 0; c < coinN; c++){
+        coins.push({ x: px + 10 + c * 20, y: py - 30, chunk: idx, idx: coins.length, taken: false });
+      }
+    }
+    // koin tambahan melayang di udara sepanjang jalan
+    if(rng() > 0.4){
+      coins.push({ x: baseX + 300 + rng() * 200, y: 70 + rng() * 40, chunk: idx, idx: coins.length, taken: false });
+    }
+
+    const enemyCount = rng() > 0.25 ? 1 : 0;
+    for(let i = 0; i < enemyCount; i++){
+      enemies.push({
+        baseX: baseX + 200 + rng() * 300, y: GROUND_Y - 16, w: 16, h: 16,
+        range: 60 + rng() * 60, speed: 0.5 + rng() * 0.5, phase: rng() * Math.PI * 2
+      });
+    }
+
+    // sesekali ada platform melayang bergerak (deterministik lewat waktu, tanpa perlu sinkronisasi)
+    let movingPlat = null;
+    if(rng() > 0.5){
+      movingPlat = {
+        baseX: baseX + 340 + rng() * 120, y: 150 + rng() * 40, w: 55, h: 12,
+        range: 50 + rng() * 30, speed: 0.4 + rng() * 0.3, phase: rng() * Math.PI * 2
+      };
+    }
+
+    const chunk = { platforms, coins, enemies, movingPlat };
+    chunkCache[idx] = chunk;
+    return chunk;
+  }
+
+  function chunksAround(x, marginChunks){
+    const center = Math.floor(x / CHUNK_W);
+    const list = [];
+    for(let i = center - marginChunks; i <= center + marginChunks; i++) list.push(genChunk(i));
+    return list;
+  }
+
+  function timeNow(){ return (Date.now() - mapStartTime) / 1000; }
+
+  function enemyCurrentX(e){ return e.baseX + Math.sin(timeNow() * e.speed + e.phase) * e.range; }
+  function platCurrentX(p){ return p.baseX + Math.sin(timeNow() * p.speed + p.phase) * p.range; }
 
   function initMario(){
-    document.getElementById('marioRoleTag').textContent = myRole === 'p1' ? 'HOST (Mario)' : 'JOINER (Luigi)';
+    myPlayerId = myRole === 'p1' ? ('host_' + Math.random().toString(36).slice(2, 8)) : ('pl_' + Math.random().toString(36).slice(2, 8));
+    document.getElementById('marioRoleTag').textContent = myRole === 'p1' ? 'HOST' : 'PEMAIN';
+    document.getElementById('coinCounter').textContent = '🪙 0';
+    document.getElementById('playersCounter').textContent = '👥 1';
 
-    const spawnX = myRole === 'p1' ? 30 : 60;
-    myChar = { x: spawnX, y: 140, w: 18, h: 24, vx: 0, vy: 0, grounded: false, facing: 'right', spawnX: spawnX, spawnY: 140 };
-    opponentChar = { x: myRole === 'p1' ? 60 : 30, y: 140, targetX: 60, targetY: 140, w: 18, h: 24, vx: 0, facing: 'right' };
-
-    platforms = [
-      { x: 0, y: 210, w: 320, h: 40 },
-      { x: 380, y: 210, w: 500, h: 40 },
-      { x: 90, y: 160, w: 60, h: 14 },
-      { x: 200, y: 130, w: 80, h: 14 },
-      { x: 420, y: 160, w: 70, h: 14 },
-      { x: 530, y: 120, w: 80, h: 14 }
-    ];
-
-    movingPlatform = { x: 315, y: 170, w: 55, h: 12, vx: 1, minX: 310, maxX: 375 };
-
-    coinsList = [
-      { x: 110, y: 135, taken: false },
-      { x: 220, y: 105, taken: false },
-      { x: 245, y: 105, taken: false },
-      { x: 445, y: 135, taken: false },
-      { x: 560, y: 95, taken: false }
-    ];
-
-    enemies = [
-      { x: 210, y: 194, w: 16, h: 16, vx: -0.8, minX: 180, maxX: 300, alive: true },
-      { x: 450, y: 194, w: 16, h: 16, vx: 0.8, minX: 400, maxX: 550, alive: true }
-    ];
-
-    coinsTaken = 0;
-    marioGameOver = false;
-    document.getElementById('coinCounter').textContent = '🪙 0/' + coinsList.length;
-    document.getElementById('winOverlay').style.display = 'none';
-
+    otherPlayers = {};
+    chunkCache = {};
+    coinsTakenSet = {};
+    myCoinCount = 0;
+    myChar = { x: 30, y: 140, w: 18, h: 24, vx: 0, vy: 0, grounded: false, facing: 'right', checkX: 30, checkY: 140 };
     window.keys = { left: false, right: false };
 
     attachPresence('marioStatus', roomIdGlobal);
 
-    const oppKey = myRole === 'p1' ? 'p2' : 'p1';
-    roomRef.child(oppKey).on('value', (snap) => {
-      const data = snap.val();
-      if(data){
-        opponentChar.targetX = data.x;
-        opponentChar.targetY = data.y;
-        opponentChar.facing = data.facing;
+    // Ambil mapSeed & waktu mulai room supaya semua pemain menghasilkan level yang sama persis
+    roomRef.once('value').then(snap => {
+      const d = snap.val() || {};
+      mapSeed = d.mapSeed || 1;
+      mapStartTime = d.created || Date.now();
+    });
+
+    const myPresRef = roomRef.child('players/' + myPlayerId);
+    dbRoot.ref('.info/connected').on('value', (snap) => {
+      if(snap.val() === true){
+        myPresRef.onDisconnect().remove();
       }
     });
 
-    roomRef.child('coins').on('value', (snap) => {
-      const d = snap.val();
-      if(!d) return;
-      let takenCount = 0;
-      coinsList.forEach((c, i) => { if(d[i]) { c.taken = true; takenCount++; } });
-      coinsTaken = takenCount;
-      document.getElementById('coinCounter').textContent = '🪙 ' + coinsTaken + '/' + coinsList.length;
-    });
-
-    roomRef.child('winner').on('value', (snap) => {
-      const w = snap.val();
-      if(w && !marioGameOver){
-        marioGameOver = true;
-        const won = w === myRole;
-        document.getElementById('winText').textContent = won ? '🏆 KAMU MENANG!' : '😢 LAWAN MENANG!';
-        document.getElementById('winOverlay').style.display = 'flex';
-      }
-    });
-
-    if(myRole === 'p1'){
-      window.marioMapInterval = setInterval(() => {
-        roomRef.child('mapState').set({
-          platX: Math.round(movingPlatform.x),
-          e1X: Math.round(enemies[0].x), e1Alive: enemies[0].alive,
-          e2X: Math.round(enemies[1].x), e2Alive: enemies[1].alive
-        });
-      }, 50);
-    } else {
-      roomRef.child('mapState').on('value', (snap) => {
-        const data = snap.val();
-        if(data){
-          movingPlatform.x = data.platX;
-          enemies[0].x = data.e1X; enemies[0].alive = data.e1Alive;
-          enemies[1].x = data.e2X; enemies[1].alive = data.e2Alive;
+    // Render pemain lain HANYA kalau memang ada datanya di Firebase —
+    // jadi karakter lawan baru kelihatan begitu mereka benar-benar join.
+    roomRef.child('players').on('value', (snap) => {
+      const data = snap.val() || {};
+      const seenIds = new Set();
+      Object.keys(data).forEach(pid => {
+        if(pid === myPlayerId) return;
+        seenIds.add(pid);
+        const d = data[pid];
+        if(!otherPlayers[pid]){
+          let hash = 0; for(let i = 0; i < pid.length; i++) hash = (hash * 31 + pid.charCodeAt(i)) | 0;
+          const color = PLAYER_COLORS[Math.abs(hash) % PLAYER_COLORS.length];
+          otherPlayers[pid] = { x: d.x, y: d.y, targetX: d.x, targetY: d.y, facing: d.facing || 'right', color };
+        } else {
+          otherPlayers[pid].targetX = d.x;
+          otherPlayers[pid].targetY = d.y;
+          otherPlayers[pid].facing = d.facing || 'right';
         }
       });
-    }
+      Object.keys(otherPlayers).forEach(pid => { if(!seenIds.has(pid)) delete otherPlayers[pid]; });
+      document.getElementById('playersCounter').textContent = '👥 ' + (seenIds.size + 1);
+    });
+
+    roomRef.child('coinsTaken').on('value', (snap) => {
+      coinsTakenSet = snap.val() || {};
+      let total = 0;
+      Object.keys(chunkCache).forEach(ci => {
+        chunkCache[ci].coins.forEach(c => { c.taken = !!coinsTakenSet[c.chunk + '_' + c.idx]; });
+      });
+      total = Object.keys(coinsTakenSet).length;
+      document.getElementById('coinCounter').textContent = '🪙 ' + total;
+    });
 
     window.marioPosInterval = setInterval(() => {
       if(roomRef && myChar){
-        roomRef.child(myRole).set({ x: Math.round(myChar.x), y: Math.round(myChar.y), facing: myChar.facing });
+        roomRef.child('players/' + myPlayerId).set({ x: Math.round(myChar.x), y: Math.round(myChar.y), facing: myChar.facing });
       }
-    }, 30);
+    }, 40);
 
     marioLoop();
   }
 
-  function marioRespawn(){
-    myChar.x = myChar.spawnX; myChar.y = myChar.spawnY; myChar.vx = 0; myChar.vy = 0;
+  function marioRespawnToCheckpoint(){
+    myChar.x = myChar.checkX; myChar.y = myChar.checkY; myChar.vx = 0; myChar.vy = 0;
   }
 
   function marioUpdate(){
@@ -500,62 +590,73 @@ canvas { width: 100%; height: 100%; display: block; }
 
     myChar.vy += gravity;
     myChar.x += myChar.vx;
+    if(myChar.x < 5) myChar.x = 5;
     myChar.y += myChar.vy;
 
-    opponentChar.x += (opponentChar.targetX - opponentChar.x) * 0.4;
-    opponentChar.y += (opponentChar.targetY - opponentChar.y) * 0.4;
+    Object.values(otherPlayers).forEach(p => {
+      p.x += (p.targetX - p.x) * 0.35;
+      p.y += (p.targetY - p.y) * 0.35;
+    });
 
-    if(myRole === 'p1'){
-      movingPlatform.x += movingPlatform.vx;
-      if(movingPlatform.x <= movingPlatform.minX || movingPlatform.x >= movingPlatform.maxX) movingPlatform.vx *= -1;
+    const nearChunks = chunksAround(myChar.x, 2);
+    myChar.grounded = false;
+
+    // Lantai dasar tak berujung (tidak ada jurang / garis finish)
+    if(myChar.y + myChar.h >= GROUND_Y){
+      myChar.y = GROUND_Y - myChar.h;
+      myChar.vy = 0;
+      myChar.grounded = true;
     }
 
-    myChar.grounded = false;
-    const allPlatforms = [...platforms, movingPlatform];
-    allPlatforms.forEach(p => {
-      if(myChar.x < p.x + p.w && myChar.x + myChar.w > p.x &&
-         myChar.y + myChar.h >= p.y && myChar.y + myChar.h <= p.y + p.h + myChar.vy + 2){
+    nearChunks.forEach(chunk => {
+      chunk.platforms.forEach(p => {
+        if(myChar.x < p.x + p.w && myChar.x + myChar.w > p.x &&
+           myChar.y + myChar.h >= p.y && myChar.y + myChar.h <= p.y + p.h + myChar.vy + 2){
           myChar.y = p.y - myChar.h;
           myChar.vy = 0;
           myChar.grounded = true;
-          if(p === movingPlatform && myRole === 'p1') myChar.x += movingPlatform.vx;
+        }
+      });
+      if(chunk.movingPlat){
+        const mp = chunk.movingPlat;
+        const mx = platCurrentX(mp);
+        if(myChar.x < mx + mp.w && myChar.x + myChar.w > mx &&
+           myChar.y + myChar.h >= mp.y && myChar.y + myChar.h <= mp.y + mp.h + myChar.vy + 2){
+          myChar.y = mp.y - myChar.h;
+          myChar.vy = 0;
+          myChar.grounded = true;
+        }
       }
     });
 
-    if(myChar.y > canvas.height + 40) marioRespawn();
+    if(myChar.grounded) { myChar.checkX = myChar.x; myChar.checkY = myChar.y; }
 
-    coinsList.forEach((c, i) => {
-      if(c.taken) return;
-      if(myChar.x < c.x + 12 && myChar.x + myChar.w > c.x && myChar.y < c.y + 12 && myChar.y + myChar.h > c.y){
-        c.taken = true;
-        roomRef.child('coins/' + i).set(true);
-      }
+    // Jatuh ke jurang virtual (di bawah layar) -> balik ke checkpoint terakhir, bukan game over
+    if(myChar.y > canvas.height + 60) marioRespawnToCheckpoint();
+
+    nearChunks.forEach(chunk => {
+      chunk.coins.forEach(c => {
+        if(c.taken) return;
+        if(myChar.x < c.x + 12 && myChar.x + myChar.w > c.x && myChar.y < c.y + 12 && myChar.y + myChar.h > c.y){
+          c.taken = true;
+          roomRef.child('coinsTaken/' + c.chunk + '_' + c.idx).set(true);
+        }
+      });
+      chunk.enemies.forEach(e => {
+        const ex = enemyCurrentX(e);
+        if(myChar.x < ex + e.w && myChar.x + myChar.w > ex && myChar.y < e.y + e.h && myChar.y + myChar.h > e.y){
+          marioRespawnToCheckpoint();
+        }
+      });
     });
-
-    enemies.forEach(e => {
-      if(!e.alive) return;
-      if(myRole === 'p1'){
-        e.x += e.vx;
-        if(e.x <= e.minX || e.x >= e.maxX) e.vx *= -1;
-      }
-      if(myChar.x < e.x + e.w && myChar.x + myChar.w > e.x && myChar.y < e.y + e.h && myChar.y + myChar.h > e.y){
-        if(myChar.vy > 0 && myChar.y + myChar.h - myChar.vy <= e.y + 6){
-          e.alive = false; myChar.vy = -6;
-        } else { marioRespawn(); }
-      }
-    });
-
-    if(!marioGameOver && myChar.x >= 750){
-      roomRef.child('winner').transaction((current) => current || myRole);
-    }
   }
 
-  function drawPlayer(p, mainColor, hatColor){
-    ctx.fillStyle = mainColor;
+  function drawPlayer(p, color){
+    ctx.fillStyle = color;
     ctx.fillRect(p.x, p.y + 6, p.w, p.h - 6);
     ctx.fillStyle = '#ffcc99';
     ctx.fillRect(p.x + (p.facing === 'right' ? 4 : 0), p.y + 4, 12, 8);
-    ctx.fillStyle = hatColor;
+    ctx.fillStyle = color;
     ctx.fillRect(p.x + (p.facing === 'right' ? 2 : -2), p.y, 16, 5);
     ctx.fillStyle = '#000';
     ctx.fillRect(p.x + (p.facing === 'right' ? 12 : 3), p.y + 6, 2, 2);
@@ -563,69 +664,70 @@ canvas { width: 100%; height: 100%; display: block; }
 
   function marioDraw(){
     if(!myChar || currentGame !== 'mario') return;
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     let cameraX = myChar.x - 100;
     if(cameraX < 0) cameraX = 0;
     ctx.save();
     ctx.translate(-cameraX, 0);
+
     ctx.fillStyle = '#5c94fc';
     ctx.fillRect(cameraX, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(150, 50, 16, 0, Math.PI * 2);
-    ctx.arc(170, 45, 20, 0, Math.PI * 2);
-    ctx.arc(190, 50, 16, 0, Math.PI * 2);
-    ctx.fill();
-
-    platforms.forEach(p => {
-      ctx.fillStyle = '#c84c0c';
-      ctx.fillRect(p.x, p.y, p.w, p.h);
-      ctx.fillStyle = '#00a800';
-      ctx.fillRect(p.x, p.y, p.w, 4);
-    });
-
-    ctx.fillStyle = '#fc9838';
-    ctx.fillRect(movingPlatform.x, movingPlatform.y, movingPlatform.w, movingPlatform.h);
-
-    coinsList.forEach(c => {
-      if(c.taken) return;
-      ctx.fillStyle = '#ffd33d';
-      ctx.beginPath(); ctx.arc(c.x + 6, c.y + 6, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#e3a800';
-      ctx.beginPath(); ctx.arc(c.x + 6, c.y + 6, 6, 0, Math.PI * 2); ctx.stroke();
-    });
-
-    enemies.forEach(e => {
-      if(e.alive){
-        ctx.fillStyle = '#a81000';
-        ctx.fillRect(e.x, e.y, e.w, e.h);
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(e.x + 2, e.y + 4, 3, 4);
-        ctx.fillRect(e.x + 11, e.y + 4, 3, 4);
-      }
-    });
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(760, 90, 4, 120);
-    ctx.fillStyle = '#2ecc71';
-    ctx.beginPath();
-    ctx.moveTo(764, 90); ctx.lineTo(790, 105); ctx.lineTo(764, 120);
-    ctx.fill();
-
-    const p1Color = '#e74c3c', p2Color = '#2ecc71';
-    if(myRole === 'p1'){
-      drawPlayer(opponentChar, p2Color, p2Color);
-      drawPlayer(myChar, p1Color, p1Color);
-    } else {
-      drawPlayer(opponentChar, p1Color, p1Color);
-      drawPlayer(myChar, p2Color, p2Color);
+    for(let i = 0; i < 3; i++){
+      const cx = cameraX + 80 + i * 160;
+      ctx.beginPath();
+      ctx.arc(cx, 50, 16, 0, Math.PI * 2);
+      ctx.arc(cx + 20, 45, 20, 0, Math.PI * 2);
+      ctx.arc(cx + 40, 50, 16, 0, Math.PI * 2);
+      ctx.fill();
     }
+
+    // lantai tak berujung
+    ctx.fillStyle = '#c84c0c';
+    ctx.fillRect(cameraX - 20, GROUND_Y, canvas.width + 40, 60);
+    ctx.fillStyle = '#00a800';
+    ctx.fillRect(cameraX - 20, GROUND_Y, canvas.width + 40, 4);
+
+    const nearChunks = chunksAround(myChar.x, 2);
+    nearChunks.forEach(chunk => {
+      chunk.platforms.forEach(p => {
+        ctx.fillStyle = '#c84c0c';
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+        ctx.fillStyle = '#00a800';
+        ctx.fillRect(p.x, p.y, p.w, 4);
+      });
+      if(chunk.movingPlat){
+        const mp = chunk.movingPlat;
+        ctx.fillStyle = '#fc9838';
+        ctx.fillRect(platCurrentX(mp), mp.y, mp.w, mp.h);
+      }
+      chunk.coins.forEach(c => {
+        if(c.taken) return;
+        ctx.fillStyle = '#ffd33d';
+        ctx.beginPath(); ctx.arc(c.x + 6, c.y + 6, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#e3a800';
+        ctx.beginPath(); ctx.arc(c.x + 6, c.y + 6, 6, 0, Math.PI * 2); ctx.stroke();
+      });
+      chunk.enemies.forEach(e => {
+        const ex = enemyCurrentX(e);
+        ctx.fillStyle = '#a81000';
+        ctx.fillRect(ex, e.y, e.w, e.h);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(ex + 2, e.y + 4, 3, 4);
+        ctx.fillRect(ex + 11, e.y + 4, 3, 4);
+      });
+    });
+
+    // Karakter pemain lain HANYA digambar kalau memang sudah join
+    Object.values(otherPlayers).forEach(p => drawPlayer(p, p.color));
+    drawPlayer(myChar, myRole === 'p1' ? PLAYER_COLORS[0] : PLAYER_COLORS[1]);
+
     ctx.restore();
   }
 
   function marioLoop(){
     marioUpdate(); marioDraw();
-    requestAnimationFrame(marioLoop);
+    if(currentGame === 'mario') requestAnimationFrame(marioLoop);
   }
 
   const bL = document.getElementById('btnLeft');
@@ -661,7 +763,6 @@ canvas { width: 100%; height: 100%; display: block; }
     if(e.code === 'ArrowRight' || e.code === 'KeyD') setRight(false);
   });
 
-  document.getElementById('btnMarioRestart').onclick = () => location.reload();
   document.getElementById('btnMarioBack').onclick = () => location.reload();
 
   // ======================================================
