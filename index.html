@@ -26,6 +26,9 @@
     .btn-game:active { transform: translateY(3px); box-shadow: 0 1px 0 #0d1117; background: #2ea043; color: #fff; }
     .btn-jump { width: 80px; background: #da3633; color: #fff; box-shadow: 0 4px 0 #8e1513; }
     .btn-jump:active { background: #b62321; box-shadow: 0 1px 0 #8e1513; }
+    .coin-counter { position: absolute; top: 8px; right: 8px; background: rgba(13,17,23,0.75); color: #ffd33d; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 20px; z-index: 5; }
+    .win-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(13,17,23,0.9); z-index: 20; flex-direction: column; justify-content: center; align-items: center; gap: 14px; }
+    .win-text { font-size: 26px; font-weight: 900; text-align: center; color: #ffd33d; padding: 0 16px; }
   </style>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -53,6 +56,11 @@
 
   <div class="game-wrapper">
     <canvas id="canvas"></canvas>
+    <div class="coin-counter" id="coinCounter">🪙 0/5</div>
+    <div class="win-overlay" id="winOverlay">
+      <div class="win-text" id="winText">🏆</div>
+      <button class="btn-menu btn-host" id="btnRestart">MAIN LAGI</button>
+    </div>
   </div>
 
   <div class="touch-controls">
@@ -82,6 +90,8 @@
   let roomRef = null;
   let myChar, opponentChar;
   let platforms, coinsList, enemies, movingPlatform;
+  let coinsTaken = 0;
+  let gameOver = false;
   const gravity = 0.45;
 
   const menuOverlay = document.getElementById('menuOverlay');
@@ -115,14 +125,31 @@
   document.getElementById('btnConnect').onclick = () => {
     const targetId = document.getElementById('roomIdInput').value.trim();
     if(!targetId) return alert('Masukkan ID Room!');
-    
-    myRole = 'p2';
-    roleTag.textContent = 'JOINER (Luigi)';
-    roomRef = dbRoot.ref('rooms/' + targetId);
 
-    document.getElementById('status').textContent = 'Terhubung! Memuat Game...';
-    menuOverlay.style.display = 'none';
-    initGame(targetId);
+    const btnConnect = document.getElementById('btnConnect');
+    btnConnect.disabled = true;
+    btnConnect.textContent = 'MENGECEK ROOM...';
+
+    dbRoot.ref('rooms/' + targetId).get().then(snap => {
+      btnConnect.disabled = false;
+      btnConnect.textContent = 'MASUK GAME';
+      if(!snap.exists()){
+        alert('Room ID tidak ditemukan! Cek lagi kodenya.');
+        return;
+      }
+
+      myRole = 'p2';
+      roleTag.textContent = 'JOINER (Luigi)';
+      roomRef = dbRoot.ref('rooms/' + targetId);
+
+      document.getElementById('status').textContent = 'Terhubung! Memuat Game...';
+      menuOverlay.style.display = 'none';
+      initGame(targetId);
+    }).catch(() => {
+      btnConnect.disabled = false;
+      btnConnect.textContent = 'MASUK GAME';
+      alert('Gagal cek room, coba lagi.');
+    });
   };
 
   function initGame(roomId){
@@ -161,10 +188,59 @@
       { x: 450, y: 194, w: 16, h: 16, vx: 0.8, minX: 400, maxX: 550, alive: true }
     ];
 
+    coinsTaken = 0;
+    gameOver = false;
+    document.getElementById('coinCounter').textContent = '🪙 0/' + coinsList.length;
+    document.getElementById('winOverlay').style.display = 'none';
+
     window.keys = { left: false, right: false };
 
-    // Listen data posisi lawan secara realtime dari Firebase
+    // Sync koin: siapapun yang ambil, tulis ke Firebase, kedua sisi dengerin bareng
+    roomRef.child('coins').on('value', (snap) => {
+      const d = snap.val();
+      if(!d) return;
+      let takenCount = 0;
+      coinsList.forEach((c, i) => {
+        if(d[i]) { c.taken = true; takenCount++; }
+      });
+      coinsTaken = takenCount;
+      document.getElementById('coinCounter').textContent = '🪙 ' + coinsTaken + '/' + coinsList.length;
+    });
+
+    // Sync pemenang: siapapun sampai duluan, semua langsung lihat hasilnya
+    roomRef.child('winner').on('value', (snap) => {
+      const w = snap.val();
+      if(w && !gameOver){
+        gameOver = true;
+        const won = w === myRole;
+        document.getElementById('winText').textContent = won ? '🏆 KAMU MENANG!' : '😢 LAWAN MENANG!';
+        document.getElementById('winOverlay').style.display = 'flex';
+      }
+    });
+
+    // Presence: tandai diri sendiri online, otomatis kehapus kalau tab ditutup/koneksi putus
+    const presenceRef = roomRef.child('presence/' + myRole);
+    presenceRef.onDisconnect().remove();
+    presenceRef.set(true);
+    if(myRole === 'p1'){
+      roomRef.onDisconnect().remove(); // host keluar -> room ikut dibersihkan
+    }
+
+    // Listen status koneksi lawan (nyambung / putus)
     const oppKey = myRole === 'p1' ? 'p2' : 'p1';
+    let opponentOnline = false;
+    roomRef.child('presence/' + oppKey).on('value', (snap) => {
+      opponentOnline = !!snap.val();
+      if(opponentOnline){
+        document.getElementById('status').textContent = '🟢 Lawan terhubung! Main jalan...';
+      } else {
+        document.getElementById('status').textContent = myRole === 'p1'
+          ? '🟡 Room: ' + roomId + ' (Menunggu lawan...)'
+          : '🔴 Lawan terputus / belum masuk.';
+      }
+    });
+
+    // Listen data posisi lawan secara realtime dari Firebase
     roomRef.child(oppKey).on('value', (snap) => {
       const data = snap.val();
       if(data){
@@ -251,6 +327,14 @@
 
     if(myChar.y > canvas.height + 40) respawn();
 
+    coinsList.forEach((c, i) => {
+      if(c.taken) return;
+      if(myChar.x < c.x + 12 && myChar.x + myChar.w > c.x && myChar.y < c.y + 12 && myChar.y + myChar.h > c.y){
+        c.taken = true;
+        roomRef.child('coins/' + i).set(true);
+      }
+    });
+
     enemies.forEach(e => {
       if(!e.alive) return;
       if(myRole === 'p1'){
@@ -268,7 +352,9 @@
       }
     });
 
-    if(myChar.x >= 750) document.getElementById('status').textContent = '🏆 KAMU MENANG!';
+    if(!gameOver && myChar.x >= 750){
+      roomRef.child('winner').transaction((current) => current || myRole);
+    }
   }
 
   function drawPlayer(p, mainColor, hatColor){
@@ -311,6 +397,18 @@
 
     ctx.fillStyle = '#fc9838';
     ctx.fillRect(movingPlatform.x, movingPlatform.y, movingPlatform.w, movingPlatform.h);
+
+    coinsList.forEach(c => {
+      if(c.taken) return;
+      ctx.fillStyle = '#ffd33d';
+      ctx.beginPath();
+      ctx.arc(c.x + 6, c.y + 6, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#e3a800';
+      ctx.beginPath();
+      ctx.arc(c.x + 6, c.y + 6, 6, 0, Math.PI * 2);
+      ctx.stroke();
+    });
 
     enemies.forEach(e => {
       if(e.alive){
@@ -357,11 +455,37 @@
   bL.addEventListener('touchend', (e)=>{ e.preventDefault(); setLeft(false); });
   bR.addEventListener('touchstart', (e)=>{ e.preventDefault(); setRight(true); });
   bR.addEventListener('touchend', (e)=>{ e.preventDefault(); setRight(false); });
-  
-  bJ.addEventListener('touchstart', (e)=>{
-    e.preventDefault();
+
+  bL.addEventListener('mousedown', ()=> setLeft(true));
+  bL.addEventListener('mouseup', ()=> setLeft(false));
+  bL.addEventListener('mouseleave', ()=> setLeft(false));
+  bR.addEventListener('mousedown', ()=> setRight(true));
+  bR.addEventListener('mouseup', ()=> setRight(false));
+  bR.addEventListener('mouseleave', ()=> setRight(false));
+
+  function doJump(){
     if(myChar && myChar.grounded){ myChar.vy = -9.2; myChar.grounded = false; }
+  }
+
+  bJ.addEventListener('touchstart', (e)=>{ e.preventDefault(); doJump(); });
+  bJ.addEventListener('mousedown', doJump);
+
+  // Kontrol keyboard buat testing di desktop (Panah / WASD / Spasi)
+  document.addEventListener('keydown', (e)=>{
+    if(!window.keys) return;
+    if(e.code === 'ArrowLeft' || e.code === 'KeyA') setLeft(true);
+    if(e.code === 'ArrowRight' || e.code === 'KeyD') setRight(true);
+    if(e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space'){ e.preventDefault(); doJump(); }
   });
+  document.addEventListener('keyup', (e)=>{
+    if(!window.keys) return;
+    if(e.code === 'ArrowLeft' || e.code === 'KeyA') setLeft(false);
+    if(e.code === 'ArrowRight' || e.code === 'KeyD') setRight(false);
+  });
+
+  document.getElementById('btnRestart').onclick = () => {
+    location.reload();
+  };
 
 })();
 </script>
