@@ -94,6 +94,14 @@ body {
 #createdScreen .status .code-big, #resumeScreen .status .code-big { display: block; font-family: 'Space Grotesk', monospace; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: var(--gold); margin: 10px 0; }
 #createdScreen .status .game-name, #resumeScreen .status .game-name { color: var(--ink); font-weight: 700; }
 #createdScreen .btn-copy-code, #resumeScreen .btn-copy-code { background: var(--blue); color: #fff; width: 100%; text-align: center; justify-content: center; margin-bottom: 10px; }
+/* Tombol "MASUK GAME" sebelumnya gak ada style-nya sama sekali (class
+   .btn-join-mode dipakai di HTML tapi CSS-nya gak pernah dibikin), jadi
+   browser jatuh ke tombol putih default bawaan. Disamain ke tema biru
+   kayak tombol utama lainnya, termasuk state disabled pas lagi "MENGECEK
+   ROOM...". */
+.btn-join-mode { background: var(--blue); color: #fff; border-bottom: 3px solid #1f3f9e; margin-top: 6px; }
+.btn-join-mode:active { background: #3560d6; }
+.btn-join-mode:disabled { background: var(--panel-3); color: var(--ink-dim); border-bottom-color: rgba(0,0,0,0.28); cursor: not-allowed; }
 .btn-back { background: transparent; color: var(--ink-dim); border: 1px solid var(--line); text-align: center; justify-content: center; box-shadow: none; width: 100%; }
 .btn-back:active { background: rgba(255,255,255,0.04); }
 .spinner { width:16px; height:16px; border-radius:50%; border:2px solid var(--line); border-top-color: var(--gold); display:inline-block; animation: spin .7s linear infinite; margin-top: 4px; }
@@ -288,6 +296,25 @@ canvas { width: 100%; height: 100%; display: block; }
   };
   if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   const dbRoot = firebase.database();
+
+  // ID perangkat yang STABIL, disimpan di localStorage supaya sama terus
+  // walau halaman di-reload / sesi di-resume. Sebelumnya myPlayerId Mario
+  // dibikin acak (Math.random()) setiap initMario() dipanggil, jadi tiap
+  // reload/resume bikin entry BARU di Firebase 'players/' sementara entry
+  // LAMA belum tentu langsung kehapus (onDisconnect kadang telat, apalagi
+  // di WebView WhatsApp/mobile). Entry lama numpuk -> counter 👥 salah
+  // hitung, nambah terus padahal orangnya cuma reconnect, bukan orang baru.
+  // Dengan ID stabil, reconnect dari device yang sama akan nimpa
+  // (overwrite) node yang SAMA persis, bukan bikin node baru.
+  function getDeviceId(){
+    let id = null;
+    try{ id = localStorage.getItem('ghub_device_id'); }catch(e){}
+    if(!id){
+      id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      try{ localStorage.setItem('ghub_device_id', id); }catch(e){}
+    }
+    return id;
+  }
 
   // ============ NAVIGASI ANTAR SCREEN ============
   function showScreen(id){
@@ -663,7 +690,7 @@ canvas { width: 100%; height: 100%; display: block; }
   function platCurrentX(p){ return p.baseX + Math.sin(timeNow() * p.speed + p.phase) * p.range; }
 
   function initMario(){
-    myPlayerId = myRole === 'p1' ? ('host_' + Math.random().toString(36).slice(2, 8)) : ('pl_' + Math.random().toString(36).slice(2, 8));
+    myPlayerId = (myRole === 'p1' ? 'host_' : 'pl_') + getDeviceId();
     document.getElementById('marioRoleTag').textContent = myRole === 'p1' ? 'HOST' : 'PEMAIN';
     document.getElementById('playersCounter').textContent = '👥 1';
 
@@ -680,11 +707,23 @@ canvas { width: 100%; height: 100%; display: block; }
 
     attachPresence('marioStatus', roomIdGlobal);
 
-    // Ambil mapSeed & waktu mulai room supaya semua pemain menghasilkan level yang sama persis
+    // Ambil mapSeed & waktu mulai room supaya semua pemain menghasilkan level yang sama persis.
+    // PENTING: game loop (dan genChunk yang meng-cache hasilnya permanen)
+    // BARU boleh mulai SETELAH mapSeed asli ini sampai. Sebelumnya
+    // requestAnimationFrame(marioLoop) langsung jalan di baris terakhir
+    // initMario() tanpa nunggu fetch async ini selesai, jadi chunk di
+    // sekitar titik spawn keburu ke-generate & ke-cache pakai mapSeed
+    // default (1) sebelum mapSeed asli datang. Karena tiap HP beda
+    // kecepatan koneksinya, tiap pemain akhirnya dapat layout awal yang
+    // beda-beda padahal harusnya identik. Nunggu dulu di sini supaya
+    // SEMUA pemain pasti pakai mapSeed yang sama sebelum chunk pertama
+    // dibuat.
     roomRef.once('value').then(snap => {
       const d = snap.val() || {};
       mapSeed = d.mapSeed || 1;
       mapStartTime = d.created || Date.now();
+      lastMarioTs = 0;
+      requestAnimationFrame(marioLoop);
     });
 
     const myPresRef = roomRef.child('players/' + myPlayerId);
@@ -693,6 +732,12 @@ canvas { width: 100%; height: 100%; display: block; }
         myPresRef.onDisconnect().remove();
       }
     });
+    // Jaring pengaman tambahan: onDisconnect() Firebase butuh koneksi
+    // socket beneran putus, dan di WebView WhatsApp/mobile itu suka
+    // telat kedeteksi (tab dipindah, app di-minimize, dll). pagehide
+    // langsung hapus node kita begitu halaman ditinggalkan, jadi counter
+    // 👥 gak nyangkut ke-itung padahal orangnya udah pergi.
+    window.addEventListener('pagehide', () => { myPresRef.remove(); });
 
     // Render pemain lain HANYA kalau memang ada datanya di Firebase —
     // jadi karakter lawan baru kelihatan begitu mereka benar-benar join.
@@ -733,9 +778,6 @@ canvas { width: 100%; height: 100%; display: block; }
       if(!marioActive) return; // OFF -> jangan kirim posisi, node kita udah dihapus dari Firebase
       roomRef.child('players/' + myPlayerId).set({ x: Math.round(myChar.x), y: Math.round(myChar.y), facing: myChar.facing });
     }, 40);
-
-    lastMarioTs = 0;
-    requestAnimationFrame(marioLoop);
   }
 
   function marioRespawnToCheckpoint(){
