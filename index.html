@@ -1,77 +1,178 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Super Mario 2P Realtime</title>
-  <style>
-    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
-    body { background: #0d1117; font-family: 'Segoe UI', Tahoma, sans-serif; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 10px; }
-    .card { width: 100%; max-width: 500px; background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 14px; position: relative; overflow: hidden; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    .title { font-size: 18px; font-weight: 800; color: #58a6ff; }
-    .menu-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #161b22; z-index: 10; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; gap: 14px; }
-    .menu-title { font-size: 22px; font-weight: 800; color: #58a6ff; margin-bottom: 10px; text-align: center; }
-    .btn-menu { width: 80%; max-width: 250px; padding: 12px; border: none; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; text-align: center; }
-    .btn-host { background: #238636; color: #fff; }
-    .btn-join-mode { background: #1f6feb; color: #fff; }
-    .join-box { display: none; width: 80%; max-width: 250px; flex-direction: column; gap: 8px; }
-    .join-box input { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #fff; padding: 10px; border-radius: 6px; font-size: 13px; text-align: center; outline: none; }
-    .status { font-size: 12px; color: #e3b341; margin-bottom: 10px; font-weight: 600; text-align: center; background: #0d1117; padding: 6px; border-radius: 8px; border: 1px solid #21262d; }
-    .game-wrapper { width: 100%; aspect-ratio: 16/9; background: #5c94fc; border-radius: 12px; overflow: hidden; border: 2px solid #30363d; position: relative; }
-    canvas { width: 100%; height: 100%; display: block; }
-    .touch-controls { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
-    .dpad, .actions { display: flex; gap: 10px; }
-    .btn-game { width: 52px; height: 52px; background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 12px; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; touch-action: manipulation; box-shadow: 0 4px 0 #0d1117; }
-    .btn-game:active { transform: translateY(3px); box-shadow: 0 1px 0 #0d1117; background: #2ea043; color: #fff; }
-    .btn-jump { width: 80px; background: #da3633; color: #fff; box-shadow: 0 4px 0 #8e1513; }
-    .btn-jump:active { background: #b62321; box-shadow: 0 1px 0 #8e1513; }
-    .coin-counter { position: absolute; top: 8px; right: 8px; background: rgba(13,17,23,0.75); color: #ffd33d; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 20px; z-index: 5; }
-    .win-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(13,17,23,0.9); z-index: 20; flex-direction: column; justify-content: center; align-items: center; gap: 14px; }
-    .win-text { font-size: 26px; font-weight: 900; text-align: center; color: #ffd33d; padding: 0 16px; }
-  </style>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Game Hub 2P Realtime</title>
+<style>
+* { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
+body { background: #0d1117; font-family: 'Segoe UI', Tahoma, sans-serif; color: #fff; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 10px; }
+.card { width: 100%; max-width: 500px; background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 14px; position: relative; overflow: hidden; }
+.screen { display: none; }
+.screen.active { display: block; }
+.btn-menu { width: 100%; padding: 14px; border: none; border-radius: 10px; font-weight: 700; font-size: 15px; cursor: pointer; text-align: left; margin-bottom: 10px; color: #fff; display: flex; align-items: center; gap: 10px; }
+.btn-menu span.ic { font-size: 22px; }
+.g-mario { background: linear-gradient(135deg,#c0392b,#e74c3c); }
+.g-chess { background: linear-gradient(135deg,#1f6feb,#388bfd); }
+.g-ttt { background: linear-gradient(135deg,#238636,#2ea043); }
+.hub-title { font-size: 20px; font-weight: 800; color: #58a6ff; margin-bottom: 4px; }
+.hub-sub { font-size: 12px; color: #7d8590; margin-bottom: 16px; }
+
+/* Lobby */
+#gamePickScreen .lobby-title, #joinScreen .lobby-title, #createdScreen .lobby-title { font-size: 18px; font-weight: 800; color: #58a6ff; margin-bottom: 14px; text-align: center; }
+#joinScreen .join-box { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+#joinScreen .join-box input { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #fff; padding: 12px; border-radius: 8px; font-size: 14px; text-align: center; outline: none; margin-bottom: 8px; }
+#createdScreen .status { font-size: 13px; color: #e3b341; margin: 12px 0; font-weight: 600; text-align: center; background: #0d1117; padding: 14px; border-radius: 8px; border: 1px solid #21262d; line-height: 1.6; }
+.btn-back { background: transparent; color: #7d8590; border: 1px solid #30363d; text-align: center; justify-content: center; }
+
+/* Shared game header */
+.g-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.g-title { font-size: 16px; font-weight: 800; color: #58a6ff; }
+.g-role { font-size: 12px; color: #58a6ff; font-weight: bold; }
+.g-status { font-size: 12px; color: #1abc84; margin-bottom: 10px; font-weight: 600; text-align: center; background: #0d1117; padding: 6px; border-radius: 8px; border: 1px solid #21262d; }
+
+/* Mario */
+.game-wrapper { width: 100%; aspect-ratio: 16/9; background: #5c94fc; border-radius: 12px; overflow: hidden; border: 2px solid #30363d; position: relative; }
+canvas { width: 100%; height: 100%; display: block; }
+.touch-controls { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+.dpad, .actions { display: flex; gap: 10px; }
+.btn-game { width: 52px; height: 52px; background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 12px; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; touch-action: manipulation; box-shadow: 0 4px 0 #0d1117; }
+.btn-game:active { transform: translateY(3px); box-shadow: 0 1px 0 #0d1117; background: #2ea043; color: #fff; }
+.btn-jump { width: 80px; background: #da3633; color: #fff; box-shadow: 0 4px 0 #8e1513; }
+.btn-jump:active { background: #b62321; box-shadow: 0 1px 0 #8e1513; }
+.coin-counter { position: absolute; top: 8px; right: 8px; background: rgba(13,17,23,0.75); color: #ffd33d; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 20px; z-index: 5; }
+.win-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(13,17,23,0.9); z-index: 20; flex-direction: column; justify-content: center; align-items: center; gap: 14px; }
+.win-text { font-size: 24px; font-weight: 900; text-align: center; color: #ffd33d; padding: 0 16px; }
+.win-overlay .btn-menu { width: 80%; max-width: 220px; margin: 0; }
+
+/* Chess */
+#chessScreen .board-wrapper { width: 100%; aspect-ratio: 1/1; position: relative; }
+#chessScreen .board { display: grid; grid-template-columns: repeat(8,1fr); grid-template-rows: repeat(8,1fr); width: 100%; height: 100%; background: #2d333b; border-radius: 8px; overflow: hidden; }
+#chessScreen .cell { display: flex; align-items: center; justify-content: center; font-size: clamp(18px,7vw,32px); cursor: pointer; position: relative; width: 100%; height: 100%; }
+#chessScreen .cell.light { background: #eeeed5; }
+#chessScreen .cell.dark { background: #769656; }
+#chessScreen .cell.selected { background: #baca44 !important; }
+#chessScreen .cell.valid::after { content:''; width:26%; height:26%; background:rgba(0,0,0,0.25); border-radius:50%; position:absolute; pointer-events:none; }
+#chessScreen .cell.capture::after { content:''; width:80%; height:80%; background:transparent; border:3px solid #f7c548; border-radius:50%; position:absolute; pointer-events:none; }
+#chessScreen .piece.white { color:#ffffff; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
+#chessScreen .piece.black { color:#181818; }
+#chessScreen .chess-controls { display:flex; gap:8px; margin-bottom:10px; justify-content:center; }
+#chessScreen .btn-flip { flex:1; background:#21262d; border:1px solid #30363d; color:#c9d1d9; padding:8px; border-radius:8px; font-size:12px; font-weight:700; }
+
+/* Tic Tac Toe */
+#tttScreen .ttt-scoreline { display:flex; justify-content:center; gap:16px; font-size:13px; color:#c7cbd1; margin-bottom:10px; }
+#tttScreen .ttt-scoreline b { color:#f0f2f5; margin-left:4px; }
+#tttScreen .ttt-board-wrap { position: relative; margin-bottom: 6px; }
+#tttScreen .ttt-board { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; background:#262b33; border-radius:12px; overflow:hidden; }
+#tttScreen .ttt-cell { aspect-ratio:1; background:#171b22; border:none; padding:14%; cursor:pointer; }
+#tttScreen .ttt-cell svg { width:100%; height:100%; display:block; }
+#tttScreen .o-circle { fill:none; stroke:#1abc84; stroke-width:9; stroke-linecap:round; }
+#tttScreen .x-line { fill:none; stroke:#e8eaed; stroke-width:9; stroke-linecap:round; }
+#tttScreen .winline-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+#tttScreen .winline { stroke:#1abc84; stroke-width:.08; stroke-linecap:round; }
+</style>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
 
 <div class="card">
-  <div class="menu-overlay" id="menuOverlay">
-    <div class="menu-title">🍄 MARIO 2P REALTIME</div>
-    <button class="btn-menu btn-host" id="btnChooseHost">🎮 BUAT ROOM (HOST)</button>
-    <button class="btn-menu btn-join-mode" id="btnChooseJoin">🔗 GABUNG ROOM (JOIN)</button>
-    
-    <div class="join-box" id="joinBox">
-      <input type="text" id="roomIdInput" placeholder="Masukkan ID Room (6 Digit)...">
-      <button class="btn-menu btn-join-mode" style="width:100%" id="btnConnect">MASUK GAME</button>
+
+  <!-- START: Create atau Join -->
+  <div class="screen active" id="startScreen">
+    <div class="hub-title">🎮 Game Hub 2P Realtime</div>
+    <div class="hub-sub">Main bareng temen secara online</div>
+    <button class="btn-menu g-chess" id="btnGoCreate" style="justify-content:center;text-align:center">🎮 BUAT ROOM</button>
+    <button class="btn-menu g-ttt" id="btnGoJoin" style="justify-content:center;text-align:center">🔗 GABUNG ROOM</button>
+  </div>
+
+  <!-- PILIH GAME (cuma muncul kalau Buat Room) -->
+  <div class="screen" id="gamePickScreen">
+    <div class="lobby-title">Pilih Game</div>
+    <button class="btn-menu g-mario" data-game="mario"><span class="ic">🍄</span> Mario 2P Realtime</button>
+    <button class="btn-menu g-chess" data-game="chess"><span class="ic">♟</span> Catur 2P Online</button>
+    <button class="btn-menu g-ttt" data-game="ttt"><span class="ic">⭕</span> Tic-Tac-Toe 2P</button>
+    <button class="btn-menu btn-back" id="btnGamePickBack">‹ Kembali</button>
+  </div>
+
+  <!-- STATUS SETELAH BUAT ROOM (nunggu lawan) -->
+  <div class="screen" id="createdScreen">
+    <div class="lobby-title">Room Dibuat!</div>
+    <div class="status" id="createdStatus" style="display:block"></div>
+    <button class="btn-menu btn-back" id="btnCreatedBack">‹ Batal</button>
+  </div>
+
+  <!-- JOIN ROOM -->
+  <div class="screen" id="joinScreen">
+    <div class="lobby-title">Gabung Room</div>
+    <div class="join-box" style="display:flex">
+      <input type="text" id="roomIdInputLobby" placeholder="Masukkan ID Room (6 Digit)...">
+      <button class="btn-menu btn-join-mode" id="btnLobbyConnect">MASUK GAME</button>
+    </div>
+    <button class="btn-menu btn-back" id="btnJoinBack">‹ Kembali</button>
+  </div>
+
+  <!-- MARIO -->
+  <div class="screen" id="marioScreen">
+    <div class="g-header">
+      <div class="g-title">🍄 Mario 2P Online</div>
+      <div class="g-role" id="marioRoleTag">-</div>
+    </div>
+    <div class="g-status" id="marioStatus">-</div>
+    <div class="game-wrapper">
+      <canvas id="canvas"></canvas>
+      <div class="coin-counter" id="coinCounter">🪙 0/5</div>
+      <div class="win-overlay" id="winOverlay">
+        <div class="win-text" id="winText">🏆</div>
+        <button class="btn-menu g-mario" id="btnMarioRestart" style="text-align:center;justify-content:center">MAIN LAGI</button>
+        <button class="btn-menu btn-back" id="btnMarioBack" style="text-align:center;justify-content:center">‹ Menu Utama</button>
+      </div>
+    </div>
+    <div class="touch-controls">
+      <div class="dpad">
+        <div class="btn-game" id="btnLeft">◀</div>
+        <div class="btn-game" id="btnRight">▶</div>
+      </div>
+      <div class="actions">
+        <div class="btn-game btn-jump" id="btnJump">LOMPAT</div>
+      </div>
     </div>
   </div>
 
-  <div class="header">
-    <div class="title">🍄 Mario 2P Online</div>
-    <div id="roleTag" style="font-size:12px; color:#58a6ff; font-weight:bold;">Waiting...</div>
-  </div>
-
-  <div class="status" id="status">Pilih Mode Bermain...</div>
-
-  <div class="game-wrapper">
-    <canvas id="canvas"></canvas>
-    <div class="coin-counter" id="coinCounter">🪙 0/5</div>
-    <div class="win-overlay" id="winOverlay">
-      <div class="win-text" id="winText">🏆</div>
-      <button class="btn-menu btn-host" id="btnRestart">MAIN LAGI</button>
+  <!-- CHESS -->
+  <div class="screen" id="chessScreen">
+    <div class="g-header">
+      <div class="g-title">♟ Catur 2P Online</div>
+      <div class="g-role" id="chessRoleTag">-</div>
+    </div>
+    <div class="g-status" id="chessStatus">-</div>
+    <div class="chess-controls">
+      <button class="btn-flip" id="btnChessFlip">🔄 Flip Papan</button>
+      <button class="btn-flip" id="btnChessBack">‹ Menu Utama</button>
+    </div>
+    <div class="board-wrapper">
+      <div class="board" id="chessBoard"></div>
+      <div class="win-overlay" id="chessWinOverlay">
+        <div class="win-text" id="chessWinText">🏆</div>
+        <button class="btn-menu btn-back" id="btnChessMenu" style="text-align:center;justify-content:center">‹ Menu Utama</button>
+      </div>
     </div>
   </div>
 
-  <div class="touch-controls">
-    <div class="dpad">
-      <div class="btn-game" id="btnLeft">◀</div>
-      <div class="btn-game" id="btnRight">▶</div>
+  <!-- TIC TAC TOE -->
+  <div class="screen" id="tttScreen">
+    <div class="g-header">
+      <div class="g-title">⭕ Tic-Tac-Toe 2P</div>
+      <div class="g-role" id="tttRoleTag">-</div>
     </div>
-    <div class="actions">
-      <div class="btn-game btn-jump" id="btnJump">LOMPAT</div>
+    <div class="g-status" id="tttStatus">-</div>
+    <div class="ttt-scoreline">Kamu<b id="tttScoreYou">0</b>Seri<b id="tttScoreDraw">0</b>Lawan<b id="tttScoreOpp">0</b></div>
+    <div class="ttt-board-wrap" id="tttBoardWrap">
+      <div class="ttt-board" id="tttBoard"></div>
     </div>
+    <button class="btn-menu btn-back" id="btnTttBack" style="margin-top:10px;text-align:center;justify-content:center">‹ Menu Utama</button>
   </div>
+
 </div>
 
 <script>
@@ -82,51 +183,53 @@
   if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   const dbRoot = firebase.database();
 
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  canvas.width = 440; canvas.height = 247;
+  // ============ NAVIGASI ANTAR SCREEN ============
+  function showScreen(id){
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
 
-  let myRole = 'p1';
+  let currentGame = null;   // 'mario' | 'chess' | 'ttt'
+  let myRole = null;        // 'p1' (host) | 'p2' (joiner)
   let roomRef = null;
-  let myChar, opponentChar;
-  let platforms, coinsList, enemies, movingPlatform;
-  let coinsTaken = 0;
-  let gameOver = false;
-  const gravity = 0.45;
+  let roomIdGlobal = null;
 
-  const menuOverlay = document.getElementById('menuOverlay');
-  const btnChooseHost = document.getElementById('btnChooseHost');
-  const btnChooseJoin = document.getElementById('btnChooseJoin');
-  const joinBox = document.getElementById('joinBox');
-  const roleTag = document.getElementById('roleTag');
-
-  btnChooseJoin.onclick = () => {
-    btnChooseHost.style.display = 'none';
-    btnChooseJoin.style.display = 'none';
-    joinBox.style.display = 'flex';
+  const gameMeta = {
+    mario: { title: '🍄 Mario 2P Realtime', screen: 'marioScreen' },
+    chess: { title: '♟ Catur 2P Online', screen: 'chessScreen' },
+    ttt:   { title: '⭕ Tic-Tac-Toe 2P', screen: 'tttScreen' }
   };
 
-  btnChooseHost.onclick = () => {
-    myRole = 'p1';
-    roleTag.textContent = 'HOST (Mario)';
-    const roomId = Math.floor(100000 + Math.random() * 900000).toString();
-    roomRef = dbRoot.ref('rooms/' + roomId);
+  document.getElementById('btnGoCreate').onclick = () => showScreen('gamePickScreen');
+  document.getElementById('btnGoJoin').onclick = () => showScreen('joinScreen');
+  document.getElementById('btnGamePickBack').onclick = () => showScreen('startScreen');
+  document.getElementById('btnJoinBack').onclick = () => showScreen('startScreen');
+  document.getElementById('btnCreatedBack').onclick = () => location.reload();
 
-    roomRef.set({
-      created: Date.now(),
-      status: 'waiting'
-    });
+  // ROOM ID baru dibuat SETELAH game dipilih (bukan sebelumnya)
+  document.querySelectorAll('#gamePickScreen .btn-menu[data-game]').forEach(btn => {
+    btn.onclick = () => {
+      currentGame = btn.dataset.game;
+      myRole = 'p1';
+      const roomId = Math.floor(100000 + Math.random() * 900000).toString();
+      roomIdGlobal = roomId;
+      roomRef = dbRoot.ref('rooms/' + roomId);
+      roomRef.set({ created: Date.now(), game: currentGame });
 
-    document.getElementById('status').textContent = 'Kode Room: ' + roomId + ' (Tunggu P2 Masuk)';
-    menuOverlay.style.display = 'none';
-    initGame(roomId);
-  };
+      document.getElementById('createdStatus').innerHTML =
+        'Game: ' + gameMeta[currentGame].title + '<br><br>Kode Room: <b style="font-size:18px">' + roomId + '</b><br>(Bagikan ke teman)';
+      showScreen('createdScreen');
 
-  document.getElementById('btnConnect').onclick = () => {
-    const targetId = document.getElementById('roomIdInput').value.trim();
+      setTimeout(() => enterGame(), 900);
+    };
+  });
+
+  // JOIN: cukup masukin ID, game-nya otomatis kedeteksi dari data room
+  document.getElementById('btnLobbyConnect').onclick = () => {
+    const targetId = document.getElementById('roomIdInputLobby').value.trim();
     if(!targetId) return alert('Masukkan ID Room!');
 
-    const btnConnect = document.getElementById('btnConnect');
+    const btnConnect = document.getElementById('btnLobbyConnect');
     btnConnect.disabled = true;
     btnConnect.textContent = 'MENGECEK ROOM...';
 
@@ -137,14 +240,16 @@
         alert('Room ID tidak ditemukan! Cek lagi kodenya.');
         return;
       }
-
+      const data = snap.val();
+      if(!data.game || !gameMeta[data.game]){
+        alert('Data room rusak / game tidak dikenali.');
+        return;
+      }
+      currentGame = data.game;
       myRole = 'p2';
-      roleTag.textContent = 'JOINER (Luigi)';
+      roomIdGlobal = targetId;
       roomRef = dbRoot.ref('rooms/' + targetId);
-
-      document.getElementById('status').textContent = 'Terhubung! Memuat Game...';
-      menuOverlay.style.display = 'none';
-      initGame(targetId);
+      enterGame();
     }).catch(() => {
       btnConnect.disabled = false;
       btnConnect.textContent = 'MASUK GAME';
@@ -152,17 +257,54 @@
     });
   };
 
-  function initGame(roomId){
+  function enterGame(){
+    showScreen(gameMeta[currentGame].screen);
+    if(currentGame === 'mario') initMario();
+    if(currentGame === 'chess') initChess();
+    if(currentGame === 'ttt') initTTT();
+  }
+
+  // Presence generik: dipakai semua game biar tau lawan connect/putus
+  function attachPresence(statusElId, roomLabel, onOpponentChange){
+    const presenceRef = roomRef.child('presence/' + myRole);
+    presenceRef.onDisconnect().remove();
+    presenceRef.set(true);
+    if(myRole === 'p1') roomRef.onDisconnect().remove();
+
+    const oppKey = myRole === 'p1' ? 'p2' : 'p1';
+    roomRef.child('presence/' + oppKey).on('value', (snap) => {
+      const online = !!snap.val();
+      const statusEl = document.getElementById(statusElId);
+      if(online){
+        statusEl.textContent = '🟢 Lawan terhubung! Main jalan...';
+      } else {
+        statusEl.textContent = myRole === 'p1'
+          ? '🟡 Room: ' + roomLabel + ' (Menunggu lawan...)'
+          : '🔴 Lawan terputus / belum masuk.';
+      }
+      if(onOpponentChange) onOpponentChange(online);
+    });
+  }
+
+  // ======================================================
+  // ================== GAME 1: MARIO ====================
+  // ======================================================
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 440; canvas.height = 247;
+
+  let myChar, opponentChar;
+  let platforms, coinsList, enemies, movingPlatform;
+  let coinsTaken = 0;
+  let marioGameOver = false;
+  const gravity = 0.45;
+
+  function initMario(){
+    document.getElementById('marioRoleTag').textContent = myRole === 'p1' ? 'HOST (Mario)' : 'JOINER (Luigi)';
+
     const spawnX = myRole === 'p1' ? 30 : 60;
-    myChar = { 
-      x: spawnX, y: 140, w: 18, h: 24, vx: 0, vy: 0, 
-      grounded: false, facing: 'right', spawnX: spawnX, spawnY: 140 
-    };
-    
-    opponentChar = { 
-      x: myRole === 'p1' ? 60 : 30, y: 140, targetX: 60, targetY: 140, 
-      w: 18, h: 24, vx: 0, facing: 'right' 
-    };
+    myChar = { x: spawnX, y: 140, w: 18, h: 24, vx: 0, vy: 0, grounded: false, facing: 'right', spawnX: spawnX, spawnY: 140 };
+    opponentChar = { x: myRole === 'p1' ? 60 : 30, y: 140, targetX: 60, targetY: 140, w: 18, h: 24, vx: 0, facing: 'right' };
 
     platforms = [
       { x: 0, y: 210, w: 320, h: 40 },
@@ -189,58 +331,15 @@
     ];
 
     coinsTaken = 0;
-    gameOver = false;
+    marioGameOver = false;
     document.getElementById('coinCounter').textContent = '🪙 0/' + coinsList.length;
     document.getElementById('winOverlay').style.display = 'none';
 
     window.keys = { left: false, right: false };
 
-    // Sync koin: siapapun yang ambil, tulis ke Firebase, kedua sisi dengerin bareng
-    roomRef.child('coins').on('value', (snap) => {
-      const d = snap.val();
-      if(!d) return;
-      let takenCount = 0;
-      coinsList.forEach((c, i) => {
-        if(d[i]) { c.taken = true; takenCount++; }
-      });
-      coinsTaken = takenCount;
-      document.getElementById('coinCounter').textContent = '🪙 ' + coinsTaken + '/' + coinsList.length;
-    });
+    attachPresence('marioStatus', roomIdGlobal);
 
-    // Sync pemenang: siapapun sampai duluan, semua langsung lihat hasilnya
-    roomRef.child('winner').on('value', (snap) => {
-      const w = snap.val();
-      if(w && !gameOver){
-        gameOver = true;
-        const won = w === myRole;
-        document.getElementById('winText').textContent = won ? '🏆 KAMU MENANG!' : '😢 LAWAN MENANG!';
-        document.getElementById('winOverlay').style.display = 'flex';
-      }
-    });
-
-    // Presence: tandai diri sendiri online, otomatis kehapus kalau tab ditutup/koneksi putus
-    const presenceRef = roomRef.child('presence/' + myRole);
-    presenceRef.onDisconnect().remove();
-    presenceRef.set(true);
-    if(myRole === 'p1'){
-      roomRef.onDisconnect().remove(); // host keluar -> room ikut dibersihkan
-    }
-
-    // Listen status koneksi lawan (nyambung / putus)
     const oppKey = myRole === 'p1' ? 'p2' : 'p1';
-    let opponentOnline = false;
-    roomRef.child('presence/' + oppKey).on('value', (snap) => {
-      opponentOnline = !!snap.val();
-      if(opponentOnline){
-        document.getElementById('status').textContent = '🟢 Lawan terhubung! Main jalan...';
-      } else {
-        document.getElementById('status').textContent = myRole === 'p1'
-          ? '🟡 Room: ' + roomId + ' (Menunggu lawan...)'
-          : '🔴 Lawan terputus / belum masuk.';
-      }
-    });
-
-    // Listen data posisi lawan secara realtime dari Firebase
     roomRef.child(oppKey).on('value', (snap) => {
       const data = snap.val();
       if(data){
@@ -250,9 +349,27 @@
       }
     });
 
-    // Sync status platform berjalan & musuh (Host mengontrol logika map)
+    roomRef.child('coins').on('value', (snap) => {
+      const d = snap.val();
+      if(!d) return;
+      let takenCount = 0;
+      coinsList.forEach((c, i) => { if(d[i]) { c.taken = true; takenCount++; } });
+      coinsTaken = takenCount;
+      document.getElementById('coinCounter').textContent = '🪙 ' + coinsTaken + '/' + coinsList.length;
+    });
+
+    roomRef.child('winner').on('value', (snap) => {
+      const w = snap.val();
+      if(w && !marioGameOver){
+        marioGameOver = true;
+        const won = w === myRole;
+        document.getElementById('winText').textContent = won ? '🏆 KAMU MENANG!' : '😢 LAWAN MENANG!';
+        document.getElementById('winOverlay').style.display = 'flex';
+      }
+    });
+
     if(myRole === 'p1'){
-      setInterval(() => {
+      window.marioMapInterval = setInterval(() => {
         roomRef.child('mapState').set({
           platX: Math.round(movingPlatform.x),
           e1X: Math.round(enemies[0].x), e1Alive: enemies[0].alive,
@@ -270,29 +387,21 @@
       });
     }
 
-    // Polling kirim posisi player lokal (Setiap 30ms)
-    setInterval(() => {
+    window.marioPosInterval = setInterval(() => {
       if(roomRef && myChar){
-        roomRef.child(myRole).set({
-          x: Math.round(myChar.x),
-          y: Math.round(myChar.y),
-          facing: myChar.facing
-        });
+        roomRef.child(myRole).set({ x: Math.round(myChar.x), y: Math.round(myChar.y), facing: myChar.facing });
       }
     }, 30);
 
-    loop();
+    marioLoop();
   }
 
-  function respawn(){
-    myChar.x = myChar.spawnX;
-    myChar.y = myChar.spawnY;
-    myChar.vx = 0;
-    myChar.vy = 0;
+  function marioRespawn(){
+    myChar.x = myChar.spawnX; myChar.y = myChar.spawnY; myChar.vx = 0; myChar.vy = 0;
   }
 
-  function update(){
-    if(!myChar) return;
+  function marioUpdate(){
+    if(!myChar || currentGame !== 'mario') return;
 
     if(window.keys.left) { myChar.vx = -2.8; myChar.facing = 'left'; }
     else if(window.keys.right) { myChar.vx = 2.8; myChar.facing = 'right'; }
@@ -302,11 +411,9 @@
     myChar.x += myChar.vx;
     myChar.y += myChar.vy;
 
-    // Smooth Lerp untuk posisi lawan
     opponentChar.x += (opponentChar.targetX - opponentChar.x) * 0.4;
     opponentChar.y += (opponentChar.targetY - opponentChar.y) * 0.4;
 
-    // Gerak platform berjalan (Hanya Host yang menghitung fisik)
     if(myRole === 'p1'){
       movingPlatform.x += movingPlatform.vx;
       if(movingPlatform.x <= movingPlatform.minX || movingPlatform.x >= movingPlatform.maxX) movingPlatform.vx *= -1;
@@ -314,7 +421,6 @@
 
     myChar.grounded = false;
     const allPlatforms = [...platforms, movingPlatform];
-
     allPlatforms.forEach(p => {
       if(myChar.x < p.x + p.w && myChar.x + myChar.w > p.x &&
          myChar.y + myChar.h >= p.y && myChar.y + myChar.h <= p.y + p.h + myChar.vy + 2){
@@ -325,7 +431,7 @@
       }
     });
 
-    if(myChar.y > canvas.height + 40) respawn();
+    if(myChar.y > canvas.height + 40) marioRespawn();
 
     coinsList.forEach((c, i) => {
       if(c.taken) return;
@@ -341,18 +447,14 @@
         e.x += e.vx;
         if(e.x <= e.minX || e.x >= e.maxX) e.vx *= -1;
       }
-
       if(myChar.x < e.x + e.w && myChar.x + myChar.w > e.x && myChar.y < e.y + e.h && myChar.y + myChar.h > e.y){
         if(myChar.vy > 0 && myChar.y + myChar.h - myChar.vy <= e.y + 6){
-          e.alive = false;
-          myChar.vy = -6;
-        } else {
-          respawn();
-        }
+          e.alive = false; myChar.vy = -6;
+        } else { marioRespawn(); }
       }
     });
 
-    if(!gameOver && myChar.x >= 750){
+    if(!marioGameOver && myChar.x >= 750){
       roomRef.child('winner').transaction((current) => current || myRole);
     }
   }
@@ -368,19 +470,15 @@
     ctx.fillRect(p.x + (p.facing === 'right' ? 12 : 3), p.y + 6, 2, 2);
   }
 
-  function draw(){
-    if(!myChar) return;
+  function marioDraw(){
+    if(!myChar || currentGame !== 'mario') return;
     ctx.clearRect(0,0,canvas.width,canvas.height);
-
     let cameraX = myChar.x - 100;
     if(cameraX < 0) cameraX = 0;
-
     ctx.save();
     ctx.translate(-cameraX, 0);
-
     ctx.fillStyle = '#5c94fc';
     ctx.fillRect(cameraX, 0, canvas.width, canvas.height);
-
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(150, 50, 16, 0, Math.PI * 2);
@@ -401,13 +499,9 @@
     coinsList.forEach(c => {
       if(c.taken) return;
       ctx.fillStyle = '#ffd33d';
-      ctx.beginPath();
-      ctx.arc(c.x + 6, c.y + 6, 6, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(c.x + 6, c.y + 6, 6, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#e3a800';
-      ctx.beginPath();
-      ctx.arc(c.x + 6, c.y + 6, 6, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.beginPath(); ctx.arc(c.x + 6, c.y + 6, 6, 0, Math.PI * 2); ctx.stroke();
     });
 
     enemies.forEach(e => {
@@ -435,19 +529,17 @@
       drawPlayer(opponentChar, p1Color, p1Color);
       drawPlayer(myChar, p2Color, p2Color);
     }
-
     ctx.restore();
   }
 
-  function loop(){
-    update(); draw();
-    requestAnimationFrame(loop);
+  function marioLoop(){
+    marioUpdate(); marioDraw();
+    requestAnimationFrame(marioLoop);
   }
 
   const bL = document.getElementById('btnLeft');
   const bR = document.getElementById('btnRight');
   const bJ = document.getElementById('btnJump');
-
   const setLeft = (val) => window.keys ? window.keys.left = val : null;
   const setRight = (val) => window.keys ? window.keys.right = val : null;
 
@@ -455,7 +547,6 @@
   bL.addEventListener('touchend', (e)=>{ e.preventDefault(); setLeft(false); });
   bR.addEventListener('touchstart', (e)=>{ e.preventDefault(); setRight(true); });
   bR.addEventListener('touchend', (e)=>{ e.preventDefault(); setRight(false); });
-
   bL.addEventListener('mousedown', ()=> setLeft(true));
   bL.addEventListener('mouseup', ()=> setLeft(false));
   bL.addEventListener('mouseleave', ()=> setLeft(false));
@@ -463,29 +554,301 @@
   bR.addEventListener('mouseup', ()=> setRight(false));
   bR.addEventListener('mouseleave', ()=> setRight(false));
 
-  function doJump(){
-    if(myChar && myChar.grounded){ myChar.vy = -9.2; myChar.grounded = false; }
-  }
-
+  function doJump(){ if(myChar && myChar.grounded){ myChar.vy = -9.2; myChar.grounded = false; } }
   bJ.addEventListener('touchstart', (e)=>{ e.preventDefault(); doJump(); });
   bJ.addEventListener('mousedown', doJump);
 
-  // Kontrol keyboard buat testing di desktop (Panah / WASD / Spasi)
   document.addEventListener('keydown', (e)=>{
-    if(!window.keys) return;
+    if(currentGame !== 'mario' || !window.keys) return;
     if(e.code === 'ArrowLeft' || e.code === 'KeyA') setLeft(true);
     if(e.code === 'ArrowRight' || e.code === 'KeyD') setRight(true);
     if(e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space'){ e.preventDefault(); doJump(); }
   });
   document.addEventListener('keyup', (e)=>{
-    if(!window.keys) return;
+    if(currentGame !== 'mario' || !window.keys) return;
     if(e.code === 'ArrowLeft' || e.code === 'KeyA') setLeft(false);
     if(e.code === 'ArrowRight' || e.code === 'KeyD') setRight(false);
   });
 
-  document.getElementById('btnRestart').onclick = () => {
-    location.reload();
-  };
+  document.getElementById('btnMarioRestart').onclick = () => location.reload();
+  document.getElementById('btnMarioBack').onclick = () => location.reload();
+
+  // ======================================================
+  // ================== GAME 2: CATUR ====================
+  // ======================================================
+  const pieceUnicode = {k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟',K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙'};
+  let chessBoardState, chessTurn, chessSelected = null, chessFlipped = false, myChessColor, chessGameOver = false;
+
+  function initChess(){
+    myChessColor = myRole === 'p1' ? 'w' : 'b';
+    document.getElementById('chessRoleTag').textContent = myRole === 'p1' ? 'HOST (Putih)' : 'JOINER (Hitam)';
+    chessFlipped = myChessColor === 'b';
+
+    chessBoardState = [
+      ['r','n','b','q','k','b','n','r'],
+      ['p','p','p','p','p','p','p','p'],
+      ['','','','','','','',''],
+      ['','','','','','','',''],
+      ['','','','','','','',''],
+      ['','','','','','','',''],
+      ['P','P','P','P','P','P','P','P'],
+      ['R','N','B','Q','K','B','N','R']
+    ];
+    chessTurn = 'w';
+    chessSelected = null;
+    chessGameOver = false;
+    document.getElementById('chessWinOverlay').style.display = 'none';
+
+    attachPresence('chessStatus', roomIdGlobal);
+
+    roomRef.child('state').on('value', (snap) => {
+      const data = snap.val();
+      if(data){
+        chessBoardState = JSON.parse(data.board);
+        chessTurn = data.turn;
+        chessSelected = null;
+        chessDraw();
+      }
+    });
+
+    roomRef.child('winner').on('value', (snap) => {
+      const w = snap.val();
+      if(w && !chessGameOver){
+        chessGameOver = true;
+        const won = w === myRole;
+        document.getElementById('chessWinText').textContent = won ? '🏆 KAMU MENANG!' : '😢 LAWAN MENANG!';
+        document.getElementById('chessWinOverlay').style.display = 'flex';
+      }
+    });
+
+    if(myRole === 'p1'){
+      roomRef.child('state').set({ board: JSON.stringify(chessBoardState), turn: chessTurn });
+    }
+
+    chessDraw();
+  }
+
+  function chessIsWhite(p){ return p && p === p.toUpperCase(); }
+
+  function chessPathClear(x1,y1,x2,y2){
+    const dx = Math.sign(x2 - x1), dy = Math.sign(y2 - y1);
+    let cx = x1 + dx, cy = y1 + dy;
+    while(cx !== x2 || cy !== y2){
+      if(chessBoardState[cy][cx] !== '') return false;
+      cx += dx; cy += dy;
+    }
+    return true;
+  }
+
+  function chessIsLegal(x1,y1,x2,y2){
+    if(x2 < 0 || y2 < 0 || x2 > 7 || y2 > 7) return false;
+    const src = chessBoardState[y1][x1];
+    const target = chessBoardState[y2][x2];
+    if(!src) return false;
+    if(target && chessIsWhite(src) === chessIsWhite(target)) return false;
+    const p = src.toLowerCase();
+    const dx = x2 - x1, dy = y2 - y1, adx = Math.abs(dx), ady = Math.abs(dy);
+
+    if(p === 'p'){
+      const dir = chessIsWhite(src) ? -1 : 1;
+      const startRow = chessIsWhite(src) ? 6 : 1;
+      if(dx === 0 && dy === dir && !target) return true;
+      if(dx === 0 && dy === 2 * dir && y1 === startRow && !target && !chessBoardState[y1 + dir][x1]) return true;
+      if(adx === 1 && dy === dir && target) return true;
+      return false;
+    }
+    if(p === 'n') return (adx === 2 && ady === 1) || (adx === 1 && ady === 2);
+    if(p === 'r') return (dx === 0 || dy === 0) && chessPathClear(x1,y1,x2,y2);
+    if(p === 'b') return (adx === ady) && chessPathClear(x1,y1,x2,y2);
+    if(p === 'q') return (dx === 0 || dy === 0 || adx === ady) && chessPathClear(x1,y1,x2,y2);
+    if(p === 'k') return adx <= 1 && ady <= 1;
+    return false;
+  }
+
+  function chessDraw(){
+    const bd = document.getElementById('chessBoard');
+    bd.innerHTML = '';
+    let validMoves = [];
+    if(chessSelected){
+      for(let y=0; y<8; y++) for(let x=0; x<8; x++)
+        if(chessIsLegal(chessSelected.x, chessSelected.y, x, y)) validMoves.push({x, y, capture: !!chessBoardState[y][x]});
+    }
+    for(let y=0; y<8; y++){
+      for(let x=0; x<8; x++){
+        const ry = chessFlipped ? 7 - y : y;
+        const rx = chessFlipped ? 7 - x : x;
+        const cell = document.createElement('div');
+        cell.className = 'cell ' + ((rx + ry) % 2 ? 'dark' : 'light');
+        if(chessSelected && chessSelected.x === rx && chessSelected.y === ry) cell.classList.add('selected');
+        const move = validMoves.find(m => m.x === rx && m.y === ry);
+        if(move) cell.classList.add(move.capture ? 'capture' : 'valid');
+        const p = chessBoardState[ry][rx];
+        if(p) cell.innerHTML = '<span class="piece ' + (chessIsWhite(p) ? 'white' : 'black') + '">' + pieceUnicode[p] + '</span>';
+        cell.onclick = () => chessHandleClick(rx, ry);
+        bd.appendChild(cell);
+      }
+    }
+    const myTurn = chessTurn === myChessColor && !chessGameOver;
+    document.getElementById('chessStatus').textContent = chessGameOver ? 'Game selesai' :
+      (myTurn ? '🟢 Giliranmu (' + (myChessColor==='w'?'Putih':'Hitam') + ')' : '⏳ Giliran lawan...');
+  }
+
+  function chessHandleClick(x, y){
+    if(chessGameOver) return;
+    if(chessTurn !== myChessColor) return; // bukan giliran kamu
+    const p = chessBoardState[y][x];
+    if(chessSelected){
+      if(chessMakeMove(chessSelected.x, chessSelected.y, x, y)){
+        chessSelected = null;
+      } else if(p && chessIsWhite(p) === (myChessColor === 'w')){
+        chessSelected = {x, y};
+      } else {
+        chessSelected = null;
+      }
+    } else if(p && chessIsWhite(p) === (myChessColor === 'w')){
+      chessSelected = {x, y};
+    }
+    chessDraw();
+  }
+
+  function chessMakeMove(x1, y1, x2, y2){
+    if(!chessIsLegal(x1, y1, x2, y2)) return false;
+    let piece = chessBoardState[y1][x1];
+    let targetPiece = chessBoardState[y2][x2];
+    if(piece === 'P' && y2 === 0) piece = 'Q';
+    if(piece === 'p' && y2 === 7) piece = 'q';
+
+    chessBoardState[y2][x2] = piece;
+    chessBoardState[y1][x1] = '';
+    chessTurn = chessTurn === 'w' ? 'b' : 'w';
+
+    roomRef.child('state').set({ board: JSON.stringify(chessBoardState), turn: chessTurn });
+
+    if(targetPiece === 'k' || targetPiece === 'K'){
+      roomRef.child('winner').transaction((current) => current || myRole);
+    }
+    return true;
+  }
+
+  document.getElementById('btnChessFlip').onclick = () => { chessFlipped = !chessFlipped; chessDraw(); };
+  document.getElementById('btnChessBack').onclick = () => location.reload();
+  document.getElementById('btnChessMenu').onclick = () => location.reload();
+
+  // ======================================================
+  // =============== GAME 3: TIC TAC TOE =================
+  // ======================================================
+  const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  let tttBoardState, tttTurn, mySymbol, tttWinSvg = null, tttRoundBusy = false;
+
+  function tttEmptyCells(b){ const r=[]; for(let i=0;i<9;i++) if(!b[i]) r.push(i); return r; }
+
+  function tttEval(b){
+    for(const l of LINES){ if(b[l[0]] && b[l[0]] === b[l[1]] && b[l[0]] === b[l[2]]) return {winner:b[l[0]], line:l}; }
+    if(tttEmptyCells(b).length === 0) return {winner:'draw', line:null};
+    return null;
+  }
+
+  function initTTT(){
+    mySymbol = myRole === 'p1' ? 'X' : 'O';
+    document.getElementById('tttRoleTag').textContent = myRole === 'p1' ? 'HOST (X)' : 'JOINER (O)';
+    tttRoundBusy = false;
+
+    attachPresence('tttStatus', roomIdGlobal);
+    buildTTTBoard();
+
+    roomRef.child('score').on('value', (snap) => {
+      const s = snap.val() || {};
+      document.getElementById('tttScoreYou').textContent = s[mySymbol] || 0;
+      document.getElementById('tttScoreOpp').textContent = s[mySymbol === 'X' ? 'O' : 'X'] || 0;
+      document.getElementById('tttScoreDraw').textContent = s.draw || 0;
+    });
+
+    roomRef.child('state').on('value', (snap) => {
+      const data = snap.val();
+      if(!data) return;
+      tttBoardState = data.board;
+      tttTurn = data.turn;
+      renderTTTBoard();
+      const result = tttEval(tttBoardState);
+      if(result && !tttRoundBusy){
+        tttRoundBusy = true;
+        if(result.line) drawTTTWinLine(result.line);
+        document.getElementById('tttStatus').textContent = result.winner === 'draw' ? 'Seri!' :
+          (result.winner === mySymbol ? '🏆 Kamu menang!' : '😢 Lawan menang!');
+
+        if(myRole === 'p1'){
+          const key = result.winner === 'draw' ? 'draw' : result.winner;
+          roomRef.child('score/' + key).transaction(v => (v || 0) + 1);
+          setTimeout(() => {
+            roomRef.child('state').set({ board: Array(9).fill(null), turn: 'X' });
+          }, 2200);
+        }
+      } else if(!result) {
+        tttRoundBusy = false;
+        clearTTTWinLine();
+        const myTurn = tttTurn === mySymbol;
+        document.getElementById('tttStatus').textContent = myTurn ? '🟢 Giliranmu' : '⏳ Giliran lawan...';
+      }
+    });
+
+    if(myRole === 'p1'){
+      roomRef.child('state').set({ board: Array(9).fill(null), turn: 'X' });
+    }
+  }
+
+  function buildTTTBoard(){
+    const bd = document.getElementById('tttBoard');
+    bd.innerHTML = '';
+    for(let i=0;i<9;i++){
+      const btn = document.createElement('button');
+      btn.className = 'ttt-cell';
+      btn.dataset.i = i;
+      btn.addEventListener('pointerdown', (e)=>{ e.preventDefault(); tttCellClick(i); });
+      bd.appendChild(btn);
+    }
+  }
+
+  function renderTTTBoard(){
+    if(!tttBoardState) return;
+    const cells = document.querySelectorAll('#tttBoard .ttt-cell');
+    cells.forEach((cell, i) => {
+      const v = tttBoardState[i];
+      if(v === 'O') cell.innerHTML = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="34" class="o-circle"/></svg>';
+      else if(v === 'X') cell.innerHTML = '<svg viewBox="0 0 100 100"><line x1="20" y1="20" x2="80" y2="80" class="x-line"/><line x1="80" y1="20" x2="20" y2="80" class="x-line"/></svg>';
+      else cell.innerHTML = '';
+    });
+  }
+
+  function tttCellCenter(i){ const col = i % 3, row = Math.floor(i/3); return {x: col+0.5, y: row+0.5}; }
+
+  function drawTTTWinLine(line){
+    clearTTTWinLine();
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 3 3');
+    svg.setAttribute('class', 'winline-svg');
+    const p1 = tttCellCenter(line[0]), p2 = tttCellCenter(line[2]);
+    const ln = document.createElementNS(ns, 'line');
+    ln.setAttribute('x1', p1.x); ln.setAttribute('y1', p1.y);
+    ln.setAttribute('x2', p2.x); ln.setAttribute('y2', p2.y);
+    ln.setAttribute('class', 'winline');
+    svg.appendChild(ln);
+    document.getElementById('tttBoardWrap').appendChild(svg);
+    tttWinSvg = svg;
+  }
+
+  function clearTTTWinLine(){ if(tttWinSvg){ tttWinSvg.remove(); tttWinSvg = null; } }
+
+  function tttCellClick(idx){
+    if(!tttBoardState || tttRoundBusy) return;
+    if(tttTurn !== mySymbol) return;
+    if(tttBoardState[idx]) return;
+    const newBoard = tttBoardState.slice();
+    newBoard[idx] = mySymbol;
+    roomRef.child('state').set({ board: newBoard, turn: mySymbol === 'X' ? 'O' : 'X' });
+  }
+
+  document.getElementById('btnTttBack').onclick = () => location.reload();
 
 })();
 </script>
