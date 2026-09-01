@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --void: #0a0c11;
+  --void: #0a0c11; 
   --panel: #12151d;
   --panel-2: #1a1f2a;
   --panel-3: #212734;
@@ -384,17 +384,39 @@ canvas { width: 100%; height: 100%; display: block; }
     btn.onclick = () => {
       currentGame = btn.dataset.game;
       myRole = 'p1';
-      const roomId = Math.floor(100000 + Math.random() * 900000).toString();
-      roomIdGlobal = roomId;
-      roomRef = dbRoot.ref('rooms/' + roomId);
-      roomRef.set({ created: Date.now(), game: currentGame, mapSeed: Math.floor(Math.random() * 1e9) });
-      showRoomBadge(roomId);
 
-      document.getElementById('createdStatus').innerHTML =
-        '<span class="game-name">' + gameMeta[currentGame].title + '</span><span class="code-big">' + roomId + '</span>Bagikan kode ini ke teman kamu';
-      showScreen('createdScreen');
+      // PENTING: pakai transaction() buat klaim room ID, BUKAN langsung
+      // .set() begitu aja. Kalau langsung set(), room ID lama yang kebetulan
+      // masih dipakai (walau peluangnya kecil dari 900.000 kombinasi) akan
+      // tertimpa diam-diam. transaction() cuma berhasil nulis kalau node-nya
+      // masih null (belum ada isinya); kalau sudah kepakai, committed=false
+      // dan kita coba lagi dengan ID baru (max beberapa kali percobaan).
+      function tryCreateRoom(attemptsLeft){
+        const roomId = Math.floor(100000 + Math.random() * 900000).toString();
+        const candidateRef = dbRoot.ref('rooms/' + roomId);
+        candidateRef.transaction(
+          (current) => (current === null
+            ? { created: Date.now(), game: currentGame, mapSeed: Math.floor(Math.random() * 1e9) }
+            : undefined),
+          (err, committed) => {
+            if(err || !committed){
+              if(attemptsLeft > 0){ tryCreateRoom(attemptsLeft - 1); return; }
+              alert('Gagal membuat room, coba lagi.');
+              return;
+            }
+            roomIdGlobal = roomId;
+            roomRef = candidateRef;
+            showRoomBadge(roomId);
 
-      safeDelay(() => enterGame(), 900);
+            document.getElementById('createdStatus').innerHTML =
+              '<span class="game-name">' + gameMeta[currentGame].title + '</span><span class="code-big">' + roomId + '</span>Bagikan kode ini ke teman kamu';
+            showScreen('createdScreen');
+
+            safeDelay(() => enterGame(), 900);
+          }
+        );
+      }
+      tryCreateRoom(5);
     };
   });
 
@@ -447,15 +469,24 @@ canvas { width: 100%; height: 100%; display: block; }
         enterGame();
       } else {
         // Catur & Tic-Tac-Toe tetap murni 2 pemain (p1 host, p2 joiner).
-        roomRef.child('presence/p2').once('value').then(p2snap => {
-          if(p2snap.val()){
-            alert('Room ini sudah penuh (2 pemain).');
-            return;
+        // PENTING: klaim slot p2 pakai transaction(), BUKAN check-then-set
+        // (once('value') lalu baru set belakangan di attachPresence). Kalau
+        // dua device klik "MASUK GAME" nyaris bersamaan, keduanya bisa lolos
+        // cek "slot kosong" dan sama-sama jadi p2. transaction() menjamin
+        // hanya SATU device yang berhasil menulis true ke node yang masih
+        // null; device kedua otomatis dapat committed=false dan ditolak.
+        roomRef.child('presence/p2').transaction(
+          (current) => (current === null ? true : undefined),
+          (err, committed) => {
+            if(err || !committed){
+              alert('Room ini sudah penuh (2 pemain).');
+              return;
+            }
+            myRole = 'p2';
+            showRoomBadge(targetId);
+            enterGame();
           }
-          myRole = 'p2';
-          showRoomBadge(targetId);
-          enterGame();
-        });
+        );
       }
     }).catch(() => {
       btnConnect.disabled = false;
@@ -569,8 +600,15 @@ canvas { width: 100%; height: 100%; display: block; }
   // ke-reset total buat kedua pemain. Sekarang yang di-onDisconnect cuma
   // status "presence" pribadi masing-masing, dan itu otomatis dipasang ulang
   // oleh Firebase SDK setiap kali koneksi tersambung lagi.
+  // Referensi presence node yang lagi aktif (dipasang ulang tiap attachPresence
+  // dipanggil per game). Dipakai supaya tombol "Kembali" di SEMUA game (bukan
+  // cuma Mario) bisa menghapus node presence-nya sendiri secara eksplisit -
+  // konsisten dengan Mario yang sudah begitu dari awal.
+  let activePresenceRef = null;
+
   function attachPresence(statusElId, roomLabel, onOpponentChange){
     const presenceRef = roomRef.child('presence/' + myRole);
+    activePresenceRef = presenceRef;
 
     dbRoot.ref('.info/connected').on('value', (snap) => {
       if(snap.val() === true){
@@ -578,6 +616,19 @@ canvas { width: 100%; height: 100%; display: block; }
         presenceRef.set(true);
       }
     });
+
+    if(!attachPresence._pagehideBound){
+      attachPresence._pagehideBound = true;
+      // Jaring pengaman: onDisconnect() butuh socket beneran putus, dan itu
+      // suka telat kedeteksi di WebView WhatsApp/mobile (tab dipindah, app
+      // di-minimize). Dulu cuma Mario yang punya pagehide ini; sekarang
+      // dipasang generik lewat activePresenceRef, jadi Catur & TTT juga
+      // langsung hapus node presence begitu halaman ditinggalkan - lawan
+      // tidak lagi lihat status "masih online" nyangkut.
+      window.addEventListener('pagehide', () => {
+        if(activePresenceRef) activePresenceRef.remove();
+      });
+    }
 
     const oppKey = myRole === 'p1' ? 'p2' : 'p1';
     roomRef.child('presence/' + oppKey).on('value', (snap) => {
@@ -617,6 +668,7 @@ canvas { width: 100%; height: 100%; display: block; }
   let mapSeed = 0, mapStartTime = 0;
   let chunkCache = {};         // { chunkIndex: {platforms,coins,enemies} }
   let coinsTakenSet = {};      // synced dari Firebase: { 'chunkIdx_coinIdx': true }
+  let killedEnemiesSet = {};   // synced dari Firebase: { 'chunkIdx_enemyIdx': true } -- musuh yang udah diinjek mati
   let myCoinCount = 0;         // koin milik kita SENDIRI (bukan total gabungan semua pemain)
   let marioActive = true;      // ON/OFF: kalau OFF, karakter kita ilang (dari layar sendiri & dari pemain lain)
 
@@ -638,6 +690,7 @@ canvas { width: 100%; height: 100%; display: block; }
     const platforms = [];
     const coins = [];
     const enemies = [];
+    const hazards = [];
 
     const platCount = 2 + Math.floor(rng() * 2);
     for(let i = 0; i < platCount; i++){
@@ -647,20 +700,31 @@ canvas { width: 100%; height: 100%; display: block; }
       platforms.push({ x: px, y: py, w: pw, h: 14 });
       const coinN = 1 + Math.floor(rng() * 2);
       for(let c = 0; c < coinN; c++){
-        coins.push({ x: px + 10 + c * 20, y: py - 30, chunk: idx, idx: coins.length, taken: false });
+        const cIdx = coins.length;
+        coins.push({ x: px + 10 + c * 20, y: py - 30, chunk: idx, idx: cIdx, taken: !!coinsTakenSet[idx + '_' + cIdx] });
       }
     }
     // koin tambahan melayang di udara sepanjang jalan
     if(rng() > 0.4){
-      coins.push({ x: baseX + 300 + rng() * 200, y: 70 + rng() * 40, chunk: idx, idx: coins.length, taken: false });
+      const cIdx = coins.length;
+      coins.push({ x: baseX + 300 + rng() * 200, y: 70 + rng() * 40, chunk: idx, idx: cIdx, taken: !!coinsTakenSet[idx + '_' + cIdx] });
     }
 
     const enemyCount = rng() > 0.25 ? 1 : 0;
     for(let i = 0; i < enemyCount; i++){
       enemies.push({
-        baseX: baseX + 200 + rng() * 300, y: GROUND_Y - 16, w: 16, h: 16,
-        range: 60 + rng() * 60, speed: 0.5 + rng() * 0.5, phase: rng() * Math.PI * 2
+        idx: i, baseX: baseX + 200 + rng() * 300, y: GROUND_Y - 16, w: 16, h: 16,
+        range: 60 + rng() * 60, speed: 0.5 + rng() * 0.5, phase: rng() * Math.PI * 2,
+        killed: !!killedEnemiesSet[idx + '_' + i]
       });
+    }
+
+    // Rintangan baru: duri statis di tanah. Beda dari hewan kecil (musuh),
+    // duri ini GAK BISA diinjek/dikalahkan -- kesentuh dari arah manapun
+    // langsung mati dan balik ke checkpoint terakhir.
+    if(rng() > 0.55){
+      const hw = 26 + rng() * 22;
+      hazards.push({ x: baseX + 380 + rng() * 140, y: GROUND_Y - 14, w: hw, h: 14 });
     }
 
     // sesekali ada platform melayang bergerak (deterministik lewat waktu, tanpa perlu sinkronisasi)
@@ -672,7 +736,7 @@ canvas { width: 100%; height: 100%; display: block; }
       };
     }
 
-    const chunk = { platforms, coins, enemies, movingPlat };
+    const chunk = { idx, platforms, coins, enemies, hazards, movingPlat };
     chunkCache[idx] = chunk;
     return chunk;
   }
@@ -697,6 +761,7 @@ canvas { width: 100%; height: 100%; display: block; }
     otherPlayers = {};
     chunkCache = {};
     coinsTakenSet = {};
+    killedEnemiesSet = {};
     myCoinCount = pendingResumeCoin || 0;
     pendingResumeCoin = 0;
     marioActive = true;
@@ -773,6 +838,16 @@ canvas { width: 100%; height: 100%; display: block; }
       });
     });
 
+    // Sinkronisasi musuh yang udah diinjek mati -- biar begitu satu pemain
+    // ngalahin musuh, musuh itu ilang juga di layar pemain lain (gak muncul
+    // lagi / gak bisa "membunuh" siapa-siapa lagi).
+    roomRef.child('enemiesKilled').on('value', (snap) => {
+      killedEnemiesSet = snap.val() || {};
+      Object.keys(chunkCache).forEach(ci => {
+        chunkCache[ci].enemies.forEach(e => { e.killed = !!killedEnemiesSet[ci + '_' + e.idx]; });
+      });
+    });
+
     window.marioPosInterval = setInterval(() => {
       if(!roomRef || !myChar) return;
       if(!marioActive) return; // OFF -> jangan kirim posisi, node kita udah dihapus dari Firebase
@@ -784,6 +859,10 @@ canvas { width: 100%; height: 100%; display: block; }
     myChar.x = myChar.checkX; myChar.y = myChar.checkY; myChar.vx = 0; myChar.vy = 0;
   }
 
+  function rectOverlap(a, b){
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
   function marioUpdate(dt){
     if(!myChar || currentGame !== 'mario') return;
     if(!marioActive) return; // mario lagi OFF -> jangan update fisika/posisi sama sekali
@@ -793,9 +872,7 @@ canvas { width: 100%; height: 100%; display: block; }
     else { myChar.vx *= 0.8; }
 
     myChar.vy += gravity * dt;
-    myChar.x += myChar.vx * dt;
-    if(myChar.x < 5) myChar.x = 5;
-    myChar.y += myChar.vy * dt;
+    if(myChar.vy > 12) myChar.vy = 12; // batasi kecepatan jatuh biar gak sempat "nembus" dataran tipis
 
     const lerp = Math.min(1, 0.35 * dt); // di-clamp biar gak overshoot pas dt gede (abis tab di-background)
     Object.values(otherPlayers).forEach(p => {
@@ -804,7 +881,58 @@ canvas { width: 100%; height: 100%; display: block; }
     });
 
     const nearChunks = chunksAround(myChar.x, 2);
+
+    // Kumpulkan semua "dataran" solid (platform diam + platform yang lagi
+    // bergerak) jadi satu daftar rect, dipakai buat tabrakan horizontal & vertikal.
+    const solids = [];
+    nearChunks.forEach(chunk => {
+      chunk.platforms.forEach(p => solids.push(p));
+      if(chunk.movingPlat){
+        const mp = chunk.movingPlat;
+        solids.push({ x: platCurrentX(mp), y: mp.y, w: mp.w, h: mp.h });
+      }
+    });
+
+    // ===== GERAK HORIZONTAL + TABRAKAN =====
+    myChar.x += myChar.vx * dt;
+    if(myChar.x < 5) myChar.x = 5;
+    solids.forEach(s => {
+      if(rectOverlap(myChar, s)){
+        if(myChar.vx > 0) myChar.x = s.x - myChar.w;
+        else if(myChar.vx < 0) myChar.x = s.x + s.w;
+        myChar.vx = 0;
+      }
+    });
+
+    // ===== GERAK VERTIKAL + TABRAKAN =====
+    // Sebelumnya di sini cuma dicek posisi AKHIR tiap frame, jadi kalau
+    // gerak vertikalnya cukup jauh dalam satu frame (abis loncat, atau HP
+    // sempat nge-lag lalu dt-nya gede), karakter bisa "loncat" dari atas
+    // ke bawah dataran (atau sebaliknya) tanpa pernah overlap di frame
+    // manapun -> nembus. Sekarang dibandingin posisi SEBELUM (prevY) vs
+    // SESUDAH (myChar.y) gerak, jadi tabrakan pasti kedeteksi walau
+    // gerakannya cepat.
+    const prevY = myChar.y;
+    myChar.y += myChar.vy * dt;
     myChar.grounded = false;
+    solids.forEach(s => {
+      const overlapX = myChar.x < s.x + s.w && myChar.x + myChar.w > s.x;
+      if(!overlapX) return;
+      if(myChar.vy >= 0){
+        // lagi jatuh/turun: berdiri di ATAS dataran begitu kaki "melewati" permukaannya
+        if(prevY + myChar.h <= s.y + 1 && myChar.y + myChar.h >= s.y){
+          myChar.y = s.y - myChar.h;
+          myChar.vy = 0;
+          myChar.grounded = true;
+        }
+      } else {
+        // lagi loncat ke atas: kejedot bagian BAWAH dataran, berhenti (bentrok), gak nembus
+        if(prevY >= s.y + s.h - 1 && myChar.y <= s.y + s.h){
+          myChar.y = s.y + s.h;
+          myChar.vy = 0;
+        }
+      }
+    });
 
     // Lantai dasar tak berujung (tidak ada jurang / garis finish)
     if(myChar.y + myChar.h >= GROUND_Y){
@@ -813,32 +941,12 @@ canvas { width: 100%; height: 100%; display: block; }
       myChar.grounded = true;
     }
 
-    nearChunks.forEach(chunk => {
-      chunk.platforms.forEach(p => {
-        if(myChar.x < p.x + p.w && myChar.x + myChar.w > p.x &&
-           myChar.y + myChar.h >= p.y && myChar.y + myChar.h <= p.y + p.h + myChar.vy + 2){
-          myChar.y = p.y - myChar.h;
-          myChar.vy = 0;
-          myChar.grounded = true;
-        }
-      });
-      if(chunk.movingPlat){
-        const mp = chunk.movingPlat;
-        const mx = platCurrentX(mp);
-        if(myChar.x < mx + mp.w && myChar.x + myChar.w > mx &&
-           myChar.y + myChar.h >= mp.y && myChar.y + myChar.h <= mp.y + mp.h + myChar.vy + 2){
-          myChar.y = mp.y - myChar.h;
-          myChar.vy = 0;
-          myChar.grounded = true;
-        }
-      }
-    });
-
     if(myChar.grounded) { myChar.checkX = myChar.x; myChar.checkY = myChar.y; }
 
     // Jatuh ke jurang virtual (di bawah layar) -> balik ke checkpoint terakhir, bukan game over
     if(myChar.y > canvas.height + 60) marioRespawnToCheckpoint();
 
+    // ===== KOIN =====
     nearChunks.forEach(chunk => {
       chunk.coins.forEach(c => {
         if(c.taken) return;
@@ -847,13 +955,40 @@ canvas { width: 100%; height: 100%; display: block; }
           roomRef.child('coinsTaken/' + c.chunk + '_' + c.idx).set(true);
           myCoinCount++;
           document.getElementById('coinCounter').textContent = '🪙 ' + myCoinCount;
+          // Simpan ulang sesi tiap koin nambah (bukan cuma sekali di enterGame
+          // sebelum koin mulai dikumpulkan) - supaya kalau ke-back/reload,
+          // "Lanjutkan Room" balikin counter pribadi yang akurat, sinkron
+          // dengan coinsTaken di Firebase yang memang tidak bisa diambil ulang.
+          saveSession();
         }
       });
+    });
+
+    // ===== HEWAN KECIL (musuh) =====
+    // Aturan: kalau KITA yang nginjek dari ATAS (lagi jatuh & posisi sebelumnya
+    // ada di atas musuh) -> musuhnya yang mati. Kalau kesenggol dari arah
+    // lain (samping/bawah) -> KITA yang mati, balik ke checkpoint terakhir.
+    nearChunks.forEach(chunk => {
       chunk.enemies.forEach(e => {
+        if(e.killed) return;
         const ex = enemyCurrentX(e);
-        if(myChar.x < ex + e.w && myChar.x + myChar.w > ex && myChar.y < e.y + e.h && myChar.y + myChar.h > e.y){
+        const eRect = { x: ex, y: e.y, w: e.w, h: e.h };
+        if(!rectOverlap(myChar, eRect)) return;
+        const wasAbove = prevY + myChar.h <= eRect.y + 6;
+        if(myChar.vy >= 0 && wasAbove){
+          e.killed = true;
+          roomRef.child('enemiesKilled/' + chunk.idx + '_' + e.idx).set(true);
+          myChar.vy = -6.5; // mantul dikit abis nginjek, kayak Mario asli
+        } else {
           marioRespawnToCheckpoint();
         }
+      });
+
+      // ===== RINTANGAN BARU: duri =====
+      // Beda dari hewan kecil, duri statis ini GAK bisa diinjek/dikalahkan --
+      // kesentuh dari arah manapun langsung bikin kita mati & balik ke checkpoint.
+      chunk.hazards.forEach(h => {
+        if(rectOverlap(myChar, h)) marioRespawnToCheckpoint();
       });
     });
   }
@@ -916,12 +1051,28 @@ canvas { width: 100%; height: 100%; display: block; }
         ctx.beginPath(); ctx.arc(c.x + 6, c.y + 6, 6, 0, Math.PI * 2); ctx.stroke();
       });
       chunk.enemies.forEach(e => {
+        if(e.killed) return;
         const ex = enemyCurrentX(e);
         ctx.fillStyle = '#a81000';
         ctx.fillRect(ex, e.y, e.w, e.h);
         ctx.fillStyle = '#fff';
         ctx.fillRect(ex + 2, e.y + 4, 3, 4);
         ctx.fillRect(ex + 11, e.y + 4, 3, 4);
+      });
+      chunk.hazards.forEach(h => {
+        // Duri: rintangan statis, gak bisa diinjek, kesentuh dari arah manapun = mati.
+        ctx.fillStyle = '#5a5a5a';
+        ctx.fillRect(h.x, h.y + h.h - 3, h.w, 3);
+        ctx.fillStyle = '#e8e8e8';
+        const spikeW = 8;
+        for(let sx = h.x; sx < h.x + h.w; sx += spikeW){
+          ctx.beginPath();
+          ctx.moveTo(sx, h.y + h.h);
+          ctx.lineTo(sx + spikeW / 2, h.y);
+          ctx.lineTo(sx + spikeW, h.y + h.h);
+          ctx.closePath();
+          ctx.fill();
+        }
       });
     });
 
@@ -1010,6 +1161,7 @@ canvas { width: 100%; height: 100%; display: block; }
 
   document.getElementById('btnMarioBack').onclick = () => {
     if(roomRef && myPlayerId) roomRef.child('players/' + myPlayerId).remove();
+    if(activePresenceRef) activePresenceRef.remove();
     clearSession();
     location.reload();
   };
@@ -1176,14 +1328,20 @@ canvas { width: 100%; height: 100%; display: block; }
   }
 
   document.getElementById('btnChessFlip').onclick = () => { chessFlipped = !chessFlipped; chessDraw(); };
-  document.getElementById('btnChessBack').onclick = () => { clearSession(); location.reload(); };
-  document.getElementById('btnChessMenu').onclick = () => { clearSession(); location.reload(); };
+  document.getElementById('btnChessBack').onclick = () => {
+    if(activePresenceRef) activePresenceRef.remove();
+    clearSession(); location.reload();
+  };
+  document.getElementById('btnChessMenu').onclick = () => {
+    if(activePresenceRef) activePresenceRef.remove();
+    clearSession(); location.reload();
+  };
 
   // ======================================================
   // =============== GAME 3: TIC TAC TOE =================
   // ======================================================
   const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-  let tttBoardState, tttTurn, mySymbol, tttWinSvg = null, tttRoundBusy = false;
+  let tttBoardState, tttTurn, mySymbol, tttWinSvg = null, tttRoundBusy = false, tttRound = 0;
 
   // CATATAN PENTING: kotak kosong direpresentasikan dengan string kosong '' —
   // BUKAN null. Firebase Realtime Database otomatis MEMBUANG nilai null saat
@@ -1221,6 +1379,7 @@ canvas { width: 100%; height: 100%; display: block; }
       if(!data) return;
       tttBoardState = data.board;
       tttTurn = data.turn;
+      tttRound = data.round || 0;
       renderTTTBoard();
       const result = tttEval(tttBoardState);
       if(result && !tttRoundBusy){
@@ -1229,13 +1388,25 @@ canvas { width: 100%; height: 100%; display: block; }
         document.getElementById('tttStatus').textContent = result.winner === 'draw' ? 'Seri!' :
           (result.winner === mySymbol ? '🏆 Kamu menang!' : '😢 Lawan menang!');
 
-        if(myRole === 'p1'){
-          const key = result.winner === 'draw' ? 'draw' : result.winner;
-          roomRef.child('score/' + key).transaction(v => (v || 0) + 1);
-          setTimeout(() => {
-            roomRef.child('state').set({ board: tttEmptyBoard(), turn: 'X' });
-          }, 2200);
-        }
+        // PENTING: reset papan TIDAK BOLEH cuma tanggung jawab p1. Kalau host
+        // disconnect tepat saat game berakhir, joiner tidak punya izin reset
+        // -> papan mangkrak selamanya di posisi menang/seri. Sekarang KEDUA
+        // pemain sama-sama mencoba, tapi dijaga transaction() di
+        // roundLocks/<round> supaya cuma SATU dari mereka yang berhasil
+        // "mengklaim" round ini (nilai null -> true berhasil, sisanya
+        // committed=false) - jadi skor tidak dobel-nambah walau keduanya
+        // mendeteksi hasil hampir bersamaan.
+        roomRef.child('roundLocks/' + tttRound).transaction(
+          (current) => (current === null ? true : undefined),
+          (err, committed) => {
+            if(err || !committed) return;
+            const key = result.winner === 'draw' ? 'draw' : result.winner;
+            roomRef.child('score/' + key).transaction(v => (v || 0) + 1);
+            setTimeout(() => {
+              roomRef.child('state').set({ board: tttEmptyBoard(), turn: 'X', round: tttRound + 1 });
+            }, 2200);
+          }
+        );
       } else if(!result) {
         tttRoundBusy = false;
         clearTTTWinLine();
@@ -1250,7 +1421,7 @@ canvas { width: 100%; height: 100%; display: block; }
       // tidak ke-reset tiba-tiba.
       roomRef.child('state').once('value').then(snap => {
         if(!snap.exists()){
-          roomRef.child('state').set({ board: tttEmptyBoard(), turn: 'X' });
+          roomRef.child('state').set({ board: tttEmptyBoard(), turn: 'X', round: 0 });
         }
       });
     }
@@ -1308,7 +1479,10 @@ canvas { width: 100%; height: 100%; display: block; }
     roomRef.child('state').set({ board: newBoard, turn: mySymbol === 'X' ? 'O' : 'X' });
   }
 
-  document.getElementById('btnTttBack').onclick = () => { clearSession(); location.reload(); };
+  document.getElementById('btnTttBack').onclick = () => {
+    if(activePresenceRef) activePresenceRef.remove();
+    clearSession(); location.reload();
+  };
 
 })();
 </script>
