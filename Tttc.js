@@ -48,45 +48,52 @@
       tttBoardState = data.board;
       tttTurn = data.turn;
       tttRound = data.round || 0;
-      renderTTTBoard();
+
       const result = tttEval(tttBoardState);
-      if(result && !tttRoundBusy){
-        tttRoundBusy = true;
+
+      // JIKA RONDE BARU / PAPAN KOSONG
+      if(!result) {
+        tttRoundBusy = false; // Buka kunci klik
+        clearTTTWinLine();
+        renderTTTBoard();
+        const myTurn = tttTurn === mySymbol;
+        document.getElementById('tttStatus').textContent = myTurn ? '🟢 Giliranmu' : '⏳ Giliran lawan...';
+      } 
+      // JIKA RONDE SELESAI (ADA WINNER / SERI)
+      else if(result && !tttRoundBusy) {
+        tttRoundBusy = true; // Kunci sementara pas animasi/teks menang
+        renderTTTBoard();
         if(result.line) drawTTTWinLine(result.line);
+        
         document.getElementById('tttStatus').textContent = result.winner === 'draw' ? 'Seri!' :
           (result.winner === mySymbol ? '🏆 Kamu menang!' : '😢 Lawan menang!');
 
-        // PENTING: reset papan TIDAK BOLEH cuma tanggung jawab p1. Kalau host
-        // disconnect tepat saat game berakhir, joiner tidak punya izin reset
-        // -> papan mangkrak selamanya di posisi menang/seri. Sekarang KEDUA
-        // pemain sama-sama mencoba, tapi dijaga transaction() di
-        // roundLocks/<round> supaya cuma SATU dari mereka yang berhasil
-        // "mengklaim" round ini (nilai null -> true berhasil, sisanya
-        // committed=false) - jadi skor tidak dobel-nambah walau keduanya
-        // mendeteksi hasil hampir bersamaan.
+        // Mencegah bentrok (race condition) antar 2 player
         roomRef.child('roundLocks/' + tttRound).transaction(
           (current) => (current === null ? true : undefined),
           (err, committed) => {
             if(err || !committed) return;
+            
+            // Tambah skor
             const key = result.winner === 'draw' ? 'draw' : result.winner;
             roomRef.child('score/' + key).transaction(v => (v || 0) + 1);
+
+            // AUTO RESET DALAM 2 DETIK (INFINITY ROUNDS)
             setTimeout(() => {
-              roomRef.child('state').set({ board: tttEmptyBoard(), turn: 'X', round: tttRound + 1 });
-            }, 2200);
+              // Pemenang ronde sebelumnya jalan duluan (atau default ke 'X' kalau seri)
+              const nextTurn = result.winner === 'draw' ? 'X' : result.winner;
+              roomRef.child('state').set({ 
+                board: tttEmptyBoard(), 
+                turn: nextTurn, 
+                round: tttRound + 1 
+              });
+            }, 2000); // 2000 ms = 2 Detik
           }
         );
-      } else if(!result) {
-        tttRoundBusy = false;
-        clearTTTWinLine();
-        const myTurn = tttTurn === mySymbol;
-        document.getElementById('tttStatus').textContent = myTurn ? '🟢 Giliranmu' : '⏳ Giliran lawan...';
       }
     });
 
     if(myRole === 'p1'){
-      // Cuma tulis papan kosong kalau memang belum ada state di server —
-      // supaya kalau host sempat reconnect/lag, game yang sedang jalan
-      // tidak ke-reset tiba-tiba.
       roomRef.child('state').once('value').then(snap => {
         if(!snap.exists()){
           roomRef.child('state').set({ board: tttEmptyBoard(), turn: 'X', round: 0 });
@@ -94,6 +101,7 @@
       });
     }
   }
+
 
   function buildTTTBoard(){
     const bd = document.getElementById('tttBoard');

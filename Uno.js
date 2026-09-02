@@ -283,6 +283,7 @@ function unoCatch() {
 }
 
 // ---------- Animasi Pembagian Kartu ----------
+// Animasi bagi kartu Uno: Per orang sampai selesai baru pindah, delay 0.3 detik (300ms)
 function unoAnimateDeal(done) {
   const table = document.querySelector('#unoScreen .capsa-table');
   if (!table) { done(); return; }
@@ -292,21 +293,24 @@ function unoAnimateDeal(done) {
   table.appendChild(overlay);
 
   const dealOrder = ['bottom', 'right', 'top', 'left'];
-  const rounds = 3;
-  const perCardDelay = 130;
+  const cardsPerPlayer = 7; // Uno 7 kartu di awal
+  const perCardDelay = 300; // 0.3 detik (300ms) per kartu
   const animDuration = 550;
 
   let cardIndex = 0;
-  for (let round = 0; round < rounds; round++) {
-    dealOrder.forEach(dir => {
+
+  // LOOP LUAR: Pindah ke Pemain Berikutnya
+  dealOrder.forEach(dir => {
+    // LOOP DALAM: Kasih 7 kartu berturut-turut ke pemain aktif
+    for (let c = 0; c < cardsPerPlayer; c++) {
       const img = document.createElement('img');
       img.src = UNO_CARD_URLS.back;
       img.className = 'capsa-deal-card deal-' + dir;
       img.style.animationDelay = (cardIndex * perCardDelay) + 'ms';
       overlay.appendChild(img);
       cardIndex++;
-    });
-  }
+    }
+  });
 
   const totalDuration = (cardIndex - 1) * perCardDelay + animDuration + 150;
   setTimeout(() => {

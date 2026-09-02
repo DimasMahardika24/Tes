@@ -1,148 +1,153 @@
 // ======================================================
 // shared.js — Logic bersama semua game (Game Hub 2P Realtime)
-// Berisi: koneksi Firebase, navigasi antar layar, buat/gabung/
-// lanjutkan room, presence, dan helper lain yang dipakai
-// Mario.js, Catur.js, maupun Tttc.js.
-//
-// PENTING soal urutan <script>: file ini TIDAK dibungkus IIFE
-// (function(){...})() seperti aslinya, supaya variabel top-level
-// (let/const) di sini bisa "kelihatan" dan dipakai bareng oleh
-// Mario.js, Catur.js, Tttc.js — persis seperti saat semuanya masih
-// jadi satu <script> besar. Ini valid karena script classic (bukan
-// type=module) yang dimuat di HTML yang sama berbagi satu lingkup
-// global yang sama. Makanya index.html WAJIB memuat file-file ini
-// berurutan: shared.js -> Mario.js -> Catur.js -> Tttc.js.
 // ======================================================
 
-  const firebaseConfig = {
-    databaseURL: "https://tester-b643b-default-rtdb.firebaseio.com/"
-  };
-  if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-  const dbRoot = firebase.database();
+const firebaseConfig = {
+  databaseURL: "https://tester-b643b-default-rtdb.firebaseio.com/"
+};
+if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const dbRoot = firebase.database();
 
-  // ID perangkat yang STABIL, disimpan di localStorage supaya sama terus
-  // walau halaman di-reload / sesi di-resume. Sebelumnya myPlayerId Mario
-  // dibikin acak (Math.random()) setiap initMario() dipanggil, jadi tiap
-  // reload/resume bikin entry BARU di Firebase 'players/' sementara entry
-  // LAMA belum tentu langsung kehapus (onDisconnect kadang telat, apalagi
-  // di WebView WhatsApp/mobile). Entry lama numpuk -> counter 👥 salah
-  // hitung, nambah terus padahal orangnya cuma reconnect, bukan orang baru.
-  // Dengan ID stabil, reconnect dari device yang sama akan nimpa
-  // (overwrite) node yang SAMA persis, bukan bikin node baru.
-  function getDeviceId(){
-    let id = null;
-    try{ id = localStorage.getItem('ghub_device_id'); }catch(e){}
-    if(!id){
-      id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-      try{ localStorage.setItem('ghub_device_id', id); }catch(e){}
-    }
-    return id;
+function getDeviceId(){
+  let id = null;
+  try{ id = localStorage.getItem('ghub_device_id'); }catch(e){}
+  if(!id){
+    id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    try{ localStorage.setItem('ghub_device_id', id); }catch(e){}
   }
+  return id;
+}
 
-  // ============ NAVIGASI ANTAR SCREEN ============
-  function showScreen(id){
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-  }
+// ============ NAVIGASI ANTAR SCREEN ============
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
 
-  let currentGame = null;   // 'mario' | 'chess' | 'ttt'
-  let myRole = null;        // 'p1' (host) | 'p2' (joiner)
-  let roomRef = null;
-  let roomIdGlobal = null;
-  // Dipindah ke sini (dari Catur.js) karena sudah dipakai di alur BUAT ROOM
-  // & GABUNG ROOM di bawah, sebelum Catur.js sempat dideklarasikan.
-  let chessTimeControl = 0; // detik per pemain yang dipilih saat BUAT room (0 = tanpa batas waktu)
+let currentGame = null;   
+let myRole = null;        
+let roomRef = null;
+let roomIdGlobal = null;
+let chessTimeControl = 0; 
 
-  // Badge ID room permanen (kiri atas), biar gampang dibagikan kapan saja tanpa hilang
-  const roomBadge = document.getElementById('roomBadge');
-  const roomBadgeText = document.getElementById('roomBadgeText');
-  function showRoomBadge(id){
-    roomBadgeText.textContent = 'Room: ' + id;
-    roomBadge.classList.add('show');
-  }
-  function hideRoomBadge(){ roomBadge.classList.remove('show'); }
-  function copyRoomId(onDone){
-    if(!roomIdGlobal) return;
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(roomIdGlobal).then(onDone).catch(onDone);
-    } else { onDone(); }
-  }
-  document.getElementById('roomBadgeCopy').onclick = (e) => {
-    e.stopPropagation();
-    copyRoomId(() => {
-      roomBadge.classList.add('copied');
-      document.getElementById('roomBadgeCopy').textContent = '✓ disalin';
-      setTimeout(() => {
-        roomBadge.classList.remove('copied');
-        document.getElementById('roomBadgeCopy').textContent = '⧉ salin';
-      }, 1500);
-    });
-  };
-  roomBadge.onclick = () => document.getElementById('roomBadgeCopy').click();
-  document.getElementById('btnCopyCreated').onclick = () => {
-    const btn = document.getElementById('btnCopyCreated');
-    copyRoomId(() => {
-      const original = btn.textContent;
-      btn.textContent = '✓ Kode Disalin!';
-      setTimeout(() => { btn.textContent = original; }, 1500);
-    });
-  };
+// Variable Penanganan Password Online Rooms
+let pendingJoinRoomId = null;
+let pendingRoomPass = null;
 
-  const gameMeta = {
+const roomBadge = document.getElementById('roomBadge');
+const roomBadgeText = document.getElementById('roomBadgeText');
+function showRoomBadge(id){
+  roomBadgeText.textContent = 'Room: ' + id;
+  roomBadge.classList.add('show');
+}
+function hideRoomBadge(){ roomBadge.classList.remove('show'); }
+function copyRoomId(onDone){
+  if(!roomIdGlobal) return;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(roomIdGlobal).then(onDone).catch(onDone);
+  } else { onDone(); }
+}
+document.getElementById('roomBadgeCopy').onclick = (e) => {
+  e.stopPropagation();
+  copyRoomId(() => {
+    roomBadge.classList.add('copied');
+    document.getElementById('roomBadgeCopy').textContent = '✓ disalin';
+    setTimeout(() => {
+      roomBadge.classList.remove('copied');
+      document.getElementById('roomBadgeCopy').textContent = '⧉ salin';
+    }, 1500);
+  });
+};
+roomBadge.onclick = () => document.getElementById('roomBadgeCopy').click();
+document.getElementById('btnCopyCreated').onclick = () => {
+  const btn = document.getElementById('btnCopyCreated');
+  copyRoomId(() => {
+    const original = btn.textContent;
+    btn.textContent = '✓ Kode Disalin!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  });
+};
+
+const gameMeta = {
   mario: { title: '🍄 Mario Coin Rush', screen: 'marioScreen' },
   chess: { title: '♟ Catur 2P Online', screen: 'chessScreen' },
   ttt:   { title: '⭕ Tic-Tac-Toe 2P', screen: 'tttScreen' },
   poker: { title: '🃏 Poker Capsa', screen: 'pokerScreen' },
-  uno:   { title: '🎴 Uno Battle Arena', screen: 'unoScreen' } // TAMBAHAN
+  uno:   { title: '🎴 Uno Battle Arena', screen: 'unoScreen' }
 };
 
-  document.getElementById('btnGoCreate').onclick = () => showScreen('gamePickScreen');
-  document.getElementById('btnGoJoin').onclick = () => showScreen('joinScreen');
-  document.getElementById('btnGamePickBack').onclick = () => showScreen('startScreen');
-  document.getElementById('btnJoinBack').onclick = () => showScreen('startScreen');
-  document.getElementById('btnChessTimeBack').onclick = () => showScreen('gamePickScreen');
-  document.getElementById('btnCreatedBack').onclick = () => {
-    if(roomRef && myRole === 'p1') roomRef.remove().catch(()=>{});
-    clearSession();
-    location.reload();
-  };
-
-  // PENTING: pakai transaction() buat klaim room ID, BUKAN langsung
-  // .set() begitu aja. Kalau langsung set(), room ID lama yang kebetulan
-  // masih dipakai (walau peluangnya kecil dari 900.000 kombinasi) akan
-  // tertimpa diam-diam. transaction() cuma berhasil nulis kalau node-nya
-  // masih null (belum ada isinya); kalau sudah kepakai, committed=false
-  // dan kita coba lagi dengan ID baru (max beberapa kali percobaan).
-  function proceedCreateRoom(){
-    function tryCreateRoom(attemptsLeft){
-      const roomId = Math.floor(100000 + Math.random() * 900000).toString();
-      const candidateRef = dbRoot.ref('rooms/' + roomId);
-      candidateRef.transaction(
-        (current) => (current === null
-          ? { created: Date.now(), game: currentGame, mapSeed: Math.floor(Math.random() * 1e9), timeControl: chessTimeControl }
-          : undefined),
-        (err, committed) => {
-          if(err || !committed){
-            if(attemptsLeft > 0){ tryCreateRoom(attemptsLeft - 1); return; }
-            alert('Gagal membuat room, coba lagi.');
-            return;
-          }
-          roomIdGlobal = roomId;
-          roomRef = candidateRef;
-          showRoomBadge(roomId);
-
-          document.getElementById('createdStatus').innerHTML =
-            '<span class="game-name">' + gameMeta[currentGame].title + '</span><span class="code-big">' + roomId + '</span>Bagikan kode ini ke teman kamu';
-          showScreen('createdScreen');
-
-          safeDelay(() => enterGame(), 900);
-        }
-      );
-    }
-    tryCreateRoom(5);
+document.getElementById('btnGoCreate').onclick = () => showScreen('gamePickScreen');
+document.getElementById('btnGoJoin').onclick = () => showScreen('joinScreen');
+document.getElementById('btnGamePickBack').onclick = () => showScreen('startScreen');
+document.getElementById('btnJoinBack').onclick = () => showScreen('startScreen');
+document.getElementById('btnChessTimeBack').onclick = () => showScreen('gamePickScreen');
+document.getElementById('btnCreatedBack').onclick = () => {
+  if(roomRef && myRole === 'p1') {
+    roomRef.remove().catch(()=>{});
+    if(roomIdGlobal) dbRoot.ref('publicRooms/' + roomIdGlobal).remove().catch(()=>{});
   }
+  clearSession();
+  location.reload();
+};
 
-  // ROOM ID baru dibuat SETELAH game dipilih (bukan sebelumnya). Khusus Catur,
+// ---------- ALUR BUAT ROOM + OPSI PASSWORD & PUBLIC ROOMS ----------
+function proceedCreateRoom(){
+  // Tanya password opsional saat Host membuat room
+  const askPass = prompt("Set Password Room? (Kosongkan jika ingin Public / Bebas Masuk):");
+  const roomPassword = askPass ? askPass.trim() : "";
+
+  function tryCreateRoom(attemptsLeft){
+    const roomId = Math.floor(100000 + Math.random() * 900000).toString();
+    const candidateRef = dbRoot.ref('rooms/' + roomId);
+    
+    // Tentukan Batas Maksimal Pemain
+    let maxP = 2;
+    if(currentGame === 'poker') maxP = 4;
+    if(currentGame === 'uno') maxP = window.unoSelectedMaxPlayers || 4;
+    if(currentGame === 'mario') maxP = 8;
+
+    candidateRef.transaction(
+      (current) => (current === null
+        ? { 
+            created: Date.now(), 
+            game: currentGame, 
+            mapSeed: Math.floor(Math.random() * 1e9), 
+            timeControl: chessTimeControl,
+            maxPlayers: maxP
+          }
+        : undefined),
+      (err, committed) => {
+        if(err || !committed){
+          if(attemptsLeft > 0){ tryCreateRoom(attemptsLeft - 1); return; }
+          alert('Gagal membuat room, coba lagi.');
+          return;
+        }
+        roomIdGlobal = roomId;
+        roomRef = candidateRef;
+        showRoomBadge(roomId);
+
+        // DAFTARKAN ROOM KE PATH publicRooms UNTUK LOBBY ONLINE ROOMS
+        const pubRef = dbRoot.ref('publicRooms/' + roomId);
+        pubRef.set({
+          game: currentGame,
+          hasPass: roomPassword !== "",
+          password: roomPassword,
+          maxPlayers: maxP,
+          createdAt: Date.now()
+        });
+        pubRef.onDisconnect().remove();
+
+        document.getElementById('createdStatus').innerHTML =
+          '<span class="game-name">' + gameMeta[currentGame].title + '</span><span class="code-big">' + roomId + '</span>Bagikan kode ini atau main via Online Rooms';
+        showScreen('createdScreen');
+
+        safeDelay(() => enterGame(), 900);
+      }
+    );
+  }
+  tryCreateRoom(5);
+}
+
 document.querySelectorAll('#gamePickScreen .btn-menu[data-game]').forEach(btn => {
   btn.onclick = () => {
     currentGame = btn.dataset.game;
@@ -150,7 +155,7 @@ document.querySelectorAll('#gamePickScreen .btn-menu[data-game]').forEach(btn =>
     if(currentGame === 'chess'){
       showScreen('chessTimeScreen');
     } else if(currentGame === 'uno'){
-      showScreen('unoPlayerCountScreen'); // TAMBAHAN: Arahkan ke pilih player dulu
+      showScreen('unoPlayerCountScreen');
     } else {
       chessTimeControl = 0;
       proceedCreateRoom();
@@ -158,7 +163,6 @@ document.querySelectorAll('#gamePickScreen .btn-menu[data-game]').forEach(btn =>
   };
 });
 
-// TAMBAHAN: Listener tombol jumlah player Uno
 document.querySelectorAll('#unoPlayerCountScreen .btn-menu[data-uno-players]').forEach(btn => {
   btn.onclick = () => {
     window.unoSelectedMaxPlayers = parseInt(btn.dataset.unoPlayers, 10) || 4;
@@ -167,88 +171,151 @@ document.querySelectorAll('#unoPlayerCountScreen .btn-menu[data-uno-players]').f
 });
 document.getElementById('btnUnoCountBack').onclick = () => showScreen('gamePickScreen');
 
+document.querySelectorAll('#chessTimeScreen .btn-menu[data-time]').forEach(btn => {
+  btn.onclick = () => {
+    chessTimeControl = parseInt(btn.dataset.time, 10) || 0;
+    proceedCreateRoom();
+  };
+});
 
-  document.querySelectorAll('#chessTimeScreen .btn-menu[data-time]').forEach(btn => {
-    btn.onclick = () => {
-      chessTimeControl = parseInt(btn.dataset.time, 10) || 0;
-      proceedCreateRoom();
-    };
-  });
-
-  // setTimeout/rAF dibekukan browser saat tab disembunyikan (misal host pindah
-  // app buat share kode room ke WhatsApp). Kalau host balik lagi, timer yang
-  // ketunda itu suka numpuk terus jalan sekaligus -> kelihatan kayak delay/nge-jump.
-  // safeDelay ngukur waktu asli pakai Date.now(), bukan cuma ngandelin timer,
-  // supaya begitu tab aktif lagi transisinya langsung pas, gak keteteran.
-  function safeDelay(fn, ms){
-    const target = Date.now() + ms;
-    let done = false;
-    function tick(){
-      if(done) return;
-      if(document.hidden){ setTimeout(tick, 200); return; }
-      if(Date.now() >= target){ done = true; fn(); return; }
-      setTimeout(tick, Math.min(150, target - Date.now()));
-    }
-    tick();
+function safeDelay(fn, ms){
+  const target = Date.now() + ms;
+  let done = false;
+  function tick(){
+    if(done) return;
+    if(document.hidden){ setTimeout(tick, 200); return; }
+    if(Date.now() >= target){ done = true; fn(); return; }
+    setTimeout(tick, Math.min(150, target - Date.now()));
   }
+  tick();
+}
 
-  // JOIN: cukup masukin ID, game-nya otomatis kedeteksi dari data room
-  document.getElementById('btnLobbyConnect').onclick = () => {
-    const targetId = document.getElementById('roomIdInputLobby').value.trim();
-    if(!targetId) return alert('Masukkan ID Room!');
+// ---------- MENGAMBIL DAFTAR ONLINE ROOMS (PUBLIC) ----------
+function fetchOnlineRooms() {
+  const listContainer = document.getElementById('onlineRoomList');
+  listContainer.innerHTML = '<div style="text-align:center; color:var(--ink-dim); font-size:13px; padding:20px;">Memuat daftar room...</div>';
 
-    const btnConnect = document.getElementById('btnLobbyConnect');
+  dbRoot.ref('publicRooms').once('value', snap => {
+    const rooms = snap.val();
+    listContainer.innerHTML = '';
+
+    if (!rooms) {
+      listContainer.innerHTML = '<div style="text-align:center; color:var(--ink-dim); font-size:13px; padding:20px;">Belum ada room publik aktif.</div>';
+      return;
+    }
+
+    Object.keys(rooms).forEach(roomId => {
+      const info = rooms[roomId];
+      
+      // Ambil data pemain online dari node presence
+      dbRoot.ref(`rooms/${roomId}/presence`).once('value', presSnap => {
+        const presence = presSnap.val() || {};
+        const onlineCount = Object.keys(presence).length;
+
+        const card = document.createElement('div');
+        card.className = 'room-item-card';
+        card.onclick = () => tryConnectToOnlineRoom(roomId, info);
+
+        const lockIcon = info.hasPass ? '🔒' : '🌐';
+        const gameTitle = (gameMeta[info.game] && gameMeta[info.game].title) || info.game.toUpperCase();
+
+        card.innerHTML = `
+          <div class="room-item-info">
+            <div class="room-item-title">${lockIcon} ${gameTitle} <span style="font-size:11px; opacity:.6;">(#${roomId})</span></div>
+            <div class="room-item-sub">${info.hasPass ? 'Terkunci Password' : 'Public (Bebas Masuk)'}</div>
+          </div>
+          <div class="room-item-badge">👥 ${onlineCount}/${info.maxPlayers || 2}</div>
+        `;
+        listContainer.appendChild(card);
+      });
+    });
+  });
+}
+
+function tryConnectToOnlineRoom(roomId, info) {
+  if (info.hasPass) {
+    pendingJoinRoomId = roomId;
+    pendingRoomPass = info.password;
+    document.getElementById('roomPassInput').value = '';
+    document.getElementById('roomPassOverlay').style.display = 'flex';
+  } else {
+    connectToRoomGlobal(roomId);
+  }
+}
+
+// Event Listener Modal Password
+document.getElementById('btnPassSubmit').onclick = () => {
+  const input = document.getElementById('roomPassInput').value.trim();
+  if (input === pendingRoomPass) {
+    document.getElementById('roomPassOverlay').style.display = 'none';
+    connectToRoomGlobal(pendingJoinRoomId);
+  } else {
+    alert("Password Salah!");
+  }
+};
+
+document.getElementById('btnPassCancel').onclick = () => {
+  document.getElementById('roomPassOverlay').style.display = 'none';
+};
+
+// Navigasi Online Rooms Screen
+document.getElementById('btnGoOnlineRooms').onclick = () => {
+  showScreen('onlineRoomScreen');
+  fetchOnlineRooms();
+};
+document.getElementById('btnOnlineRoomBack').onclick = () => {
+  showScreen('startScreen');
+};
+
+// LOGIKA KONEKSI ROOM GLOBAL
+function connectToRoomGlobal(targetId) {
+  const btnConnect = document.getElementById('btnLobbyConnect');
+  if(btnConnect) {
     btnConnect.disabled = true;
     btnConnect.textContent = 'MENGECEK ROOM...';
+  }
 
-    dbRoot.ref('rooms/' + targetId).get().then(snap => {
+  dbRoot.ref('rooms/' + targetId).get().then(snap => {
+    if(btnConnect) {
       btnConnect.disabled = false;
       btnConnect.textContent = 'MASUK GAME';
-      if(!snap.exists()){
-        alert('Room ID tidak ditemukan! Cek lagi kodenya.');
-        return;
-      }
-      const data = snap.val();
-      if(!data.game || !gameMeta[data.game]){
-        alert('Data room rusak / game tidak dikenali.');
-        return;
-      }
-      currentGame = data.game;
-      chessTimeControl = data.timeControl || 0;
-      roomIdGlobal = targetId;
-      roomRef = dbRoot.ref('rooms/' + targetId);
+    }
+    if(!snap.exists()){
+      alert('Room ID tidak ditemukan! Cek lagi kodenya.');
+      return;
+    }
+    const data = snap.val();
+    if(!data.game || !gameMeta[data.game]){
+      alert('Data room rusak / game tidak dikenali.');
+      return;
+    }
+    currentGame = data.game;
+    chessTimeControl = data.timeControl || 0;
+    roomIdGlobal = targetId;
+    roomRef = dbRoot.ref('rooms/' + targetId);
 
-      if(currentGame === 'mario'){
-        // Mario mendukung banyak pemain sekaligus, jadi tidak perlu slot p1/p2.
-        myRole = 'joiner';
-        showRoomBadge(targetId);
-        enterGame();
-      } else if(currentGame === 'poker'){
-        // Capsa Banting: 4 pemain (p1 host, p2/p3/p4 joiner). Coba klaim slot
-        // kosong berurutan pakai transaction() per node, sama prinsipnya
-        // dengan klaim p2 di Catur/TTT di bawah - biar gak ada 2 device yang
-        // kebetulan dapat slot yang sama.
-        const trySeat = (seats, i) => {
-          if(i >= seats.length){
-            btnConnect.disabled = false;
-            btnConnect.textContent = 'MASUK GAME';
-            alert('Room Capsa Banting ini sudah penuh (4 pemain).');
-            return;
+    if(currentGame === 'mario'){
+      myRole = 'joiner';
+      showRoomBadge(targetId);
+      enterGame();
+    } else if(currentGame === 'poker'){
+      const trySeat = (seats, i) => {
+        if(i >= seats.length){
+          alert('Room Capsa Banting ini sudah penuh (4 pemain).');
+          return;
+        }
+        roomRef.child('presence/' + seats[i]).transaction(
+          (current) => (current === null ? true : undefined),
+          (err, committed) => {
+            if(err || !committed){ trySeat(seats, i + 1); return; }
+            myRole = seats[i];
+            showRoomBadge(targetId);
+            enterGame();
           }
-          roomRef.child('presence/' + seats[i]).transaction(
-            (current) => (current === null ? true : undefined),
-            (err, committed) => {
-              if(err || !committed){ trySeat(seats, i + 1); return; }
-              myRole = seats[i];
-              showRoomBadge(targetId);
-              enterGame();
-            }
-          );
-        };
-        trySeat(['p2', 'p3', 'p4'], 0);
-        
-} else if(currentGame === 'uno'){
-      // TAMBAHAN: Logika klaim slot 2-6 player untuk Uno
+        );
+      };
+      trySeat(['p2', 'p3', 'p4'], 0);
+    } else if(currentGame === 'uno'){
       dbRoot.ref('rooms/' + targetId + '/uno').get().then(unoSnap => {
         const unoData = unoSnap.val() || {};
         const maxP = unoData.maxPlayers || 4;
@@ -256,8 +323,6 @@ document.getElementById('btnUnoCountBack').onclick = () => showScreen('gamePickS
 
         const tryUnoSeat = (seatList, i) => {
           if(i >= seatList.length){
-            btnConnect.disabled = false;
-            btnConnect.textContent = 'MASUK GAME';
             alert('Room Uno ini sudah penuh.');
             return;
           }
@@ -274,177 +339,152 @@ document.getElementById('btnUnoCountBack').onclick = () => showScreen('gamePickS
         tryUnoSeat(seats, 0);
       });
     } else {
-      // Catur & Tic-Tac-Toe tetap murni 2 pemain
-        roomRef.child('presence/p2').transaction(
-          (current) => (current === null ? true : undefined),
-          (err, committed) => {
-            if(err || !committed){
-              alert('Room ini sudah penuh (2 pemain).');
-              return;
-            }
-            myRole = 'p2';
-            showRoomBadge(targetId);
-            enterGame();
+      roomRef.child('presence/p2').transaction(
+        (current) => (current === null ? true : undefined),
+        (err, committed) => {
+          if(err || !committed){
+            alert('Room ini sudah penuh (2 pemain).');
+            return;
           }
-        );
-      }
-    }).catch(() => {
+          myRole = 'p2';
+          showRoomBadge(targetId);
+          enterGame();
+        }
+      );
+    }
+  }).catch(() => {
+    if(btnConnect) {
       btnConnect.disabled = false;
       btnConnect.textContent = 'MASUK GAME';
-      alert('Gagal cek room, coba lagi.');
-    });
-  };
+    }
+    alert('Gagal cek room, coba lagi.');
+  });
+}
 
-  function enterGame(){
+// JOIN DENGAN ID MANUAL
+document.getElementById('btnLobbyConnect').onclick = () => {
+  const targetId = document.getElementById('roomIdInputLobby').value.trim();
+  if(!targetId) return alert('Masukkan ID Room!');
+  connectToRoomGlobal(targetId);
+};
+
+function enterGame(){
   showScreen(gameMeta[currentGame].screen);
   saveSession();
   if(currentGame === 'mario') initMario();
   if(currentGame === 'chess') initChess();
   if(currentGame === 'ttt') initTTT();
   if(currentGame === 'poker') initPoker();
-  if(currentGame === 'uno') initUno(); // TAMBAHAN
+  if(currentGame === 'uno') initUno();
 }
 
+// ============ RESUME SESI ============
+const SESSION_KEY = 'ghub_session_v1';
+let pendingResumeCoin = 0;
+function saveSession(){
+  try{
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      roomId: roomIdGlobal, game: currentGame, role: myRole, coin: myCoinCount || 0
+    }));
+  }catch(e){}
+}
+function clearSession(){
+  try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
+}
+function loadSession(){
+  try{
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
 
-  // ============ RESUME SESI (ga sengaja balik ke menu / ke-back) ============
-  // Room & state game (papan, skor) udah otomatis kesimpan di Firebase. Yang
-  // KURANG selama ini cuma "ingatan lokal" di HP kita sendiri: begitu balik ke
-  // menu utama (sengaja ataupun ke-pencet gak sengaja), roomId/role di JS ilang
-  // dan kita harus ngetik ulang kode room manual. Simpan info sesi ke
-  // localStorage supaya begitu app dibuka lagi, kita bisa nawarin "Lanjutkan?"
-  // dan otomatis re-attach ke role (p1/p2) yang SAMA seperti sebelumnya -
-  // jadi gak perlu lewat pengecekan "slot penuh" lagi (itu cuma buat pemain baru).
-  const SESSION_KEY = 'ghub_session_v1';
-  let pendingResumeCoin = 0;
-  function saveSession(){
-    try{
-      localStorage.setItem(SESSION_KEY, JSON.stringify({
-        roomId: roomIdGlobal, game: currentGame, role: myRole, coin: myCoinCount || 0
-      }));
-    }catch(e){}
-  }
-  function clearSession(){
-    try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
-  }
-  function loadSession(){
-    try{
-      const raw = localStorage.getItem(SESSION_KEY);
-      return raw ? JSON.parse(raw) : null;
-    }catch(e){ return null; }
-  }
+const pendingSession = loadSession();
+if(pendingSession && pendingSession.roomId && gameMeta[pendingSession.game]){
+  document.getElementById('resumeGameName').textContent = gameMeta[pendingSession.game].title;
+  document.getElementById('resumeRoomCode').textContent = pendingSession.roomId;
+  showScreen('resumeScreen');
+}
 
-  const pendingSession = loadSession();
-  if(pendingSession && pendingSession.roomId && gameMeta[pendingSession.game]){
-    document.getElementById('resumeGameName').textContent = gameMeta[pendingSession.game].title;
-    document.getElementById('resumeRoomCode').textContent = pendingSession.roomId;
-    showScreen('resumeScreen');
-  }
+document.getElementById('btnResumeNew').onclick = () => {
+  clearSession();
+  location.reload();
+};
 
-  document.getElementById('btnResumeNew').onclick = () => {
-    clearSession();
-    location.reload();
-  };
-
-  document.getElementById('btnResumeContinue').onclick = () => {
-    if(!pendingSession) return location.reload();
-    const btn = document.getElementById('btnResumeContinue');
-    btn.disabled = true;
-    btn.textContent = 'MENYAMBUNGKAN...';
-    dbRoot.ref('rooms/' + pendingSession.roomId).get().then(snap => {
-      if(!snap.exists()){
-        alert('Room sudah tidak ada / sudah berakhir.');
-        clearSession();
-        location.reload();
-        return;
-      }
-      const data = snap.val();
-      if(data.game !== pendingSession.game){
-        alert('Data room udah berubah, gak bisa disambung otomatis.');
-        clearSession();
-        location.reload();
-        return;
-      }
-      // Langsung pasang balik role lama (p1/p2/joiner) TANPA lewat cek "slot
-      // penuh" - karena slot itu memang milik kita sendiri dari sesi sebelumnya.
-      currentGame = pendingSession.game;
-      myRole = pendingSession.role;
-      roomIdGlobal = pendingSession.roomId;
-      roomRef = dbRoot.ref('rooms/' + pendingSession.roomId);
-      pendingResumeCoin = pendingSession.coin || 0;
-      showRoomBadge(pendingSession.roomId);
-      enterGame();
-    }).catch(() => {
-      btn.disabled = false;
-      btn.textContent = '▶ Lanjutkan';
-      alert('Gagal cek room, coba lagi.');
-    });
-  };
-
-  // Tombol back HP / gesture back browser jangan langsung kabur ninggalin
-  // halaman gitu aja pas lagi di tengah game - kasih konfirmasi dulu. Kalau
-  // dibatalkan, sesi TETAP kesimpan jadi bisa di-resume kapan aja lewat layar
-  // "Lanjutkan Room?" di atas.
-  history.pushState({ghub:true}, '', location.href);
-  window.addEventListener('popstate', () => {
-    if(!currentGame) return; // bukan lagi di tengah game -> biarkan back jalan normal
-    const keluar = confirm('Keluar dari game? Kamu bisa lanjut lagi nanti lewat "Lanjutkan Room".');
-    if(keluar){
+document.getElementById('btnResumeContinue').onclick = () => {
+  if(!pendingSession) return location.reload();
+  const btn = document.getElementById('btnResumeContinue');
+  btn.disabled = true;
+  btn.textContent = 'MENYAMBUNGKAN...';
+  dbRoot.ref('rooms/' + pendingSession.roomId).get().then(snap => {
+    if(!snap.exists()){
+      alert('Room sudah tidak ada / sudah berakhir.');
+      clearSession();
       location.reload();
-    } else {
-      history.pushState({ghub:true}, '', location.href);
+      return;
+    }
+    const data = snap.val();
+    if(data.game !== pendingSession.game){
+      alert('Data room udah berubah, gak bisa disambung otomatis.');
+      clearSession();
+      location.reload();
+      return;
+    }
+    currentGame = pendingSession.game;
+    myRole = pendingSession.role;
+    roomIdGlobal = pendingSession.roomId;
+    roomRef = dbRoot.ref('rooms/' + pendingSession.roomId);
+    pendingResumeCoin = pendingSession.coin || 0;
+    showRoomBadge(pendingSession.roomId);
+    enterGame();
+  }).catch(() => {
+    btn.disabled = false;
+    btn.textContent = '▶ Lanjutkan';
+    alert('Gagal cek room, coba lagi.');
+  });
+};
+
+history.pushState({ghub:true}, '', location.href);
+window.addEventListener('popstate', () => {
+  if(!currentGame) return; 
+  const keluar = confirm('Keluar dari game? Kamu bisa lanjut lagi nanti lewat "Lanjutkan Room".');
+  if(keluar){
+    location.reload();
+  } else {
+    history.pushState({ghub:true}, '', location.href);
+  }
+});
+
+let activePresenceRef = null;
+
+function attachPresence(statusElId, roomLabel, onOpponentChange){
+  const presenceRef = roomRef.child('presence/' + myRole);
+  activePresenceRef = presenceRef;
+
+  dbRoot.ref('.info/connected').on('value', (snap) => {
+    if(snap.val() === true){
+      presenceRef.onDisconnect().remove();
+      presenceRef.set(true);
     }
   });
 
-  // Presence generik: dipakai semua game biar tau lawan connect/putus.
-  // PENTING: kita TIDAK PERNAH menghapus seluruh room di sini. Room cuma boleh
-  // hilang lewat aksi eksplisit user (tombol back/menu utama). Sebelumnya kode
-  // lama menghapus SELURUH room begitu host kehilangan koneksi walau sebentar
-  // (misal pindah app buat share kode room / layar kekunci), yang bikin game
-  // ke-reset total buat kedua pemain. Sekarang yang di-onDisconnect cuma
-  // status "presence" pribadi masing-masing, dan itu otomatis dipasang ulang
-  // oleh Firebase SDK setiap kali koneksi tersambung lagi.
-  // Referensi presence node yang lagi aktif (dipasang ulang tiap attachPresence
-  // dipanggil per game). Dipakai supaya tombol "Kembali" di SEMUA game (bukan
-  // cuma Mario) bisa menghapus node presence-nya sendiri secara eksplisit -
-  // konsisten dengan Mario yang sudah begitu dari awal.
-  let activePresenceRef = null;
-
-  function attachPresence(statusElId, roomLabel, onOpponentChange){
-    const presenceRef = roomRef.child('presence/' + myRole);
-    activePresenceRef = presenceRef;
-
-    dbRoot.ref('.info/connected').on('value', (snap) => {
-      if(snap.val() === true){
-        presenceRef.onDisconnect().remove();
-        presenceRef.set(true);
-      }
-    });
-
-    if(!attachPresence._pagehideBound){
-      attachPresence._pagehideBound = true;
-      // Jaring pengaman: onDisconnect() butuh socket beneran putus, dan itu
-      // suka telat kedeteksi di WebView WhatsApp/mobile (tab dipindah, app
-      // di-minimize). Dulu cuma Mario yang punya pagehide ini; sekarang
-      // dipasang generik lewat activePresenceRef, jadi Catur & TTT juga
-      // langsung hapus node presence begitu halaman ditinggalkan - lawan
-      // tidak lagi lihat status "masih online" nyangkut.
-      window.addEventListener('pagehide', () => {
-        if(activePresenceRef) activePresenceRef.remove();
-      });
-    }
-
-    const oppKey = myRole === 'p1' ? 'p2' : 'p1';
-    roomRef.child('presence/' + oppKey).on('value', (snap) => {
-      const online = !!snap.val();
-      const statusEl = document.getElementById(statusElId);
-      if(online){
-        statusEl.textContent = '🟢 Lawan terhubung! Main jalan...';
-      } else {
-        statusEl.textContent = myRole === 'p1'
-          ? '🟡 Room: ' + roomLabel + ' (Menunggu lawan...)'
-          : '🔴 Lawan terputus, menunggu balik lagi...';
-      }
-      if(onOpponentChange) onOpponentChange(online);
+  if(!attachPresence._pagehideBound){
+    attachPresence._pagehideBound = true;
+    window.addEventListener('pagehide', () => {
+      if(activePresenceRef) activePresenceRef.remove();
     });
   }
 
+  const oppKey = myRole === 'p1' ? 'p2' : 'p1';
+  roomRef.child('presence/' + oppKey).on('value', (snap) => {
+    const online = !!snap.val();
+    const statusEl = document.getElementById(statusElId);
+    if(online){
+      statusEl.textContent = '🟢 Lawan terhubung! Main jalan...';
+    } else {
+      statusEl.textContent = myRole === 'p1'
+        ? '🟡 Room: ' + roomLabel + ' (Menunggu lawan...)'
+        : '🔴 Lawan terputus, menunggu balik lagi...';
+    }
+    if(onOpponentChange) onOpponentChange(online);
+  });
+}

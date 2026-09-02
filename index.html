@@ -32,7 +32,7 @@ body {
   align-items: flex-start; min-height: 100vh; padding: 10px; overflow-x: hidden;
 }
 
-/* Diperbesar max-width dari 500px -> 680px */
+/* Container Card Diperbesar ke Max 680px */
 .card {
   width: 100%; max-width: 680px;
   background: var(--panel);
@@ -87,7 +87,7 @@ body {
 .room-badge.copied::before { background: var(--green); }
 
 /* Lobby */
-#gamePickScreen .lobby-title, #joinScreen .lobby-title, #createdScreen .lobby-title, #resumeScreen .lobby-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 20px; font-weight: 700; color: var(--ink); margin-bottom: 16px; text-align: center; }
+#gamePickScreen .lobby-title, #joinScreen .lobby-title, #createdScreen .lobby-title, #resumeScreen .lobby-title, #onlineRoomScreen .lobby-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 20px; font-weight: 700; color: var(--ink); margin-bottom: 16px; text-align: center; }
 #joinScreen .join-box, #createdScreen, #resumeScreen { display: flex; flex-direction: column; align-items: center; }
 #joinScreen .join-box { gap: 8px; margin-top: 4px; width: 100%; }
 #joinScreen .join-box input { width: 100%; background: var(--void); border: 1px solid var(--line); color: var(--ink); padding: 16px; border-radius: 12px; font-size: 22px; letter-spacing: 6px; text-align: center; outline: none; margin-bottom: 8px; font-weight: 700; font-family: 'Space Grotesk', monospace; transition: border-color .15s ease, box-shadow .15s ease; }
@@ -105,6 +105,48 @@ body {
 .btn-back:active { background: rgba(255,255,255,0.04); }
 .spinner { width:18px; height:18px; border-radius:50%; border:2px solid var(--line); border-top-color: var(--gold); display:inline-block; animation: spin .7s linear infinite; margin-top: 4px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ONLINE ROOMS ITEM STYLE */
+.room-item-card {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: transform .1s ease, border-color .1s ease;
+  cursor: pointer;
+}
+.room-item-card:active {
+  transform: scale(0.98);
+  border-color: var(--blue);
+}
+.room-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.room-item-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.room-item-sub {
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+.room-item-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 20px;
+  background: var(--panel-3);
+  color: var(--gold);
+}
 
 /* Shared game header */
 .g-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
@@ -133,17 +175,106 @@ canvas { width: 100%; height: 100%; display: block; }
 @keyframes popIn { from{ transform: scale(.7); opacity:0; } to{ transform:scale(1); opacity:1; } }
 .win-overlay .btn-menu { width: 80%; max-width: 240px; margin: 0; }
 
-/* Chess */
-#chessScreen .board-wrapper { width: 100%; aspect-ratio: 1/1; position: relative; border-radius: 10px; box-shadow: 0 14px 30px rgba(0,0,0,0.4); }
-#chessScreen .board { display: grid; grid-template-columns: repeat(8,1fr); grid-template-rows: repeat(8,1fr); width: 100%; height: 100%; background: var(--panel-3); border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
-#chessScreen .cell { display: flex; align-items: center; justify-content: center; font-size: clamp(22px,8vw,42px); cursor: pointer; position: relative; width: 100%; height: 100%; transition: background .1s ease; }
-#chessScreen .cell.light { background: #e9e5d8; }
-#chessScreen .cell.dark { background: #6f8560; }
-#chessScreen .cell.selected { background: #cdb64a !important; box-shadow: inset 0 0 0 3px rgba(255,255,255,0.55); }
-#chessScreen .cell.valid::after { content:''; width:26%; height:26%; background:rgba(0,0,0,0.28); border-radius:50%; position:absolute; pointer-events:none; }
-#chessScreen .cell.capture::after { content:''; width:82%; height:82%; background:transparent; border:3px solid var(--gold); border-radius:50%; position:absolute; pointer-events:none; }
-#chessScreen .piece.white { color:#ffffff; filter:drop-shadow(0 2px 3px rgba(0,0,0,0.85)); }
-#chessScreen .piece.black { color:#181818; filter:drop-shadow(0 2px 2px rgba(0,0,0,0.4)); }
+/* ============ CATUR REALISTIS KAYU ELEGANT ============ */
+#chessScreen .board-wrapper {
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+  aspect-ratio: 1/1;
+  position: relative;
+  border-radius: 12px;
+  padding: 18px; /* Bingkai Kayu untuk Koordinat A-H & 1-8 */
+  background: #2b1f1d;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.1);
+  border: 2px solid #3d2b27;
+}
+
+#chessScreen .board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+}
+
+/* Warna Petak Kayu Realistis */
+#chessScreen .cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: background .1s ease;
+}
+#chessScreen .cell.light {
+  background-color: #f0d9b5;
+  color: #b58863;
+}
+#chessScreen .cell.dark {
+  background-color: #b58863;
+  color: #f0d9b5;
+}
+
+/* Highlight Petak Terpilih & Langkah Terakhir (Last Move) */
+#chessScreen .cell.selected {
+  background-color: #bbcbfb !important;
+  box-shadow: inset 0 0 0 3px #3d6bf0;
+}
+#chessScreen .cell.last-move {
+  background-color: rgba(232, 172, 31, 0.45) !important;
+}
+
+/* Bidak Catur Bertekstur Shadow 3D */
+#chessScreen .piece {
+  font-size: clamp(26px, 9vw, 46px);
+  line-height: 1;
+  transition: transform 0.1s ease;
+}
+#chessScreen .piece.white {
+  color: #ffffff;
+  text-shadow: 0 3px 5px rgba(0,0,0,0.4), 0 0 2px rgba(0,0,0,0.8);
+}
+#chessScreen .piece.black {
+  color: #1a1a1a;
+  text-shadow: 0 2px 4px rgba(255,255,255,0.2), 0 0 2px rgba(0,0,0,0.9);
+}
+
+/* Marker Langkah Valid & Capture */
+#chessScreen .cell.valid::after {
+  content: '';
+  width: 28%;
+  height: 28%;
+  background: rgba(43, 182, 115, 0.6);
+  border-radius: 50%;
+  position: absolute;
+  pointer-events: none;
+}
+#chessScreen .cell.capture::after {
+  content: '';
+  width: 86%;
+  height: 86%;
+  background: transparent;
+  border: 4px solid rgba(228, 87, 79, 0.8);
+  border-radius: 50%;
+  position: absolute;
+  pointer-events: none;
+}
+
+/* Notasi Koordinat (A-H dan 1-8) di Pinggir Bingkai Kayu */
+.chess-coord {
+  position: absolute;
+  font-family: 'Space Grotesk', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8c7365;
+  pointer-events: none;
+}
+
 #chessScreen .chess-controls { display:flex; gap:8px; margin-bottom:12px; justify-content:center; }
 #chessScreen .btn-flip { flex:1; background: var(--panel-2); border:1px solid var(--line); color: var(--ink); padding:12px; border-radius:10px; font-size:13px; font-weight:700; border-bottom: 3px solid rgba(0,0,0,0.3); }
 #chessScreen .btn-flip:active { transform: translateY(2px); border-bottom-width: 1px; }
@@ -172,7 +303,7 @@ canvas { width: 100%; height: 100%; display: block; }
 #tttScreen .winline-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; padding: 6px; box-sizing: border-box; }
 #tttScreen .winline { stroke: var(--green); stroke-width:.07; stroke-linecap:round; }
 
-/* ============ CAPSA BANTING & UNO (POTRAIT MODE - UKURAN DIPERBESAR) ============ */
+/* ============ CAPSA BANTING & UNO ============ */
 .capsa-table {
   background: radial-gradient(120% 120% at 50% 30%, #1c4d34, #0d2e1f 70%);
   border: 1px solid rgba(255,255,255,0.08);
@@ -188,11 +319,11 @@ canvas { width: 100%; height: 100%; display: block; }
 .capsa-bottom { align-self: center; width: 100%; }
 .capsa-hand { display: flex; justify-content: center; align-items: center; min-height: 60px; }
 
-/* Area Kartu Kamu (Diperluas & Diperbesar) */
+/* Area Kartu Kamu */
 .capsa-hand-me { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; min-height: 95px; padding: 8px 4px; }
 .capsa-card-img, .capsa-card-back { border-radius: 7px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
 
-/* Kartu Tangan Utama (Dinaikkan ukurannya agar mudah dipencet) */
+/* Kartu Tangan Utama */
 .capsa-card-img { width: 52px; height: 74px; object-fit: contain; background: #fff; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; animation: cardDeal .25s cubic-bezier(.2,.8,.2,1); }
 .capsa-card-img.small { width: 40px; height: 56px; cursor: default; }
 .capsa-card-img.selected { transform: translateY(-14px); box-shadow: 0 0 0 3px var(--gold), 0 10px 20px rgba(0,0,0,0.7); }
@@ -247,7 +378,7 @@ canvas { width: 100%; height: 100%; display: block; }
 @keyframes dealToLeft { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(-190%,-50%) scale(.9); } }
 @keyframes dealToRight { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(190%,-50%) scale(.9); } }
 
-/* Khusus Kartu Meja Uno agar Kelihatan Jelas */
+/* Kartu Meja Uno */
 #unoTopCardImg {
   width: 64px !important;
   height: 90px !important;
@@ -262,11 +393,34 @@ canvas { width: 100%; height: 100%; display: block; }
 
 <div class="card">
 
+  <!-- START SCREEN: BUAT, GABUNG, ATAU ONLINE ROOMS -->
   <div class="screen active" id="startScreen">
     <div class="hub-title"><span class="badge-dot"></span>Game Hub</div>
     <div class="hub-sub">Main bareng temen secara online, tinggal share kode room</div>
     <button class="btn-menu g-chess" id="btnGoCreate" style="justify-content:center;text-align:center">🎮 BUAT ROOM</button>
     <button class="btn-menu g-ttt" id="btnGoJoin" style="justify-content:center;text-align:center">🔗 GABUNG ROOM</button>
+    <button class="btn-menu g-mario" id="btnGoOnlineRooms" style="justify-content:center;text-align:center; background:#3d6bf0; color:#fff;">🌐 ONLINE ROOMS (PUBLIC)</button>
+  </div>
+
+  <!-- ONLINE ROOMS (GLOBAL LOBBY) -->
+  <div class="screen" id="onlineRoomScreen">
+    <div class="lobby-title">🌐 Daftar Room Online</div>
+    <div id="onlineRoomList" style="display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto; margin-bottom:12px; padding-right:4px;">
+      <div style="text-align:center; color:var(--ink-dim); font-size:13px; padding:20px;">Memuat daftar room...</div>
+    </div>
+    <button class="btn-menu btn-back" id="btnOnlineRoomBack">‹ Kembali</button>
+  </div>
+
+  <!-- MODAL INPUT PASSWORD ROOM TERKUNCI -->
+  <div class="capsa-name-overlay" id="roomPassOverlay" style="display:none">
+    <div class="capsa-name-box">
+      <div class="capsa-name-title">🔒 Room Terkunci</div>
+      <input type="password" id="roomPassInput" placeholder="Masukkan Password...">
+      <div class="capsa-name-actions">
+        <button class="capsa-name-btn cancel" id="btnPassCancel">Batal</button>
+        <button class="capsa-name-btn save" id="btnPassSubmit">Masuk</button>
+      </div>
+    </div>
   </div>
 
   <div class="screen" id="gamePickScreen">
@@ -346,6 +500,7 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnMarioBack" style="margin-top:12px;text-align:center;justify-content:center">‹ Menu Utama</button>
   </div>
 
+  <!-- CHESS -->
   <div class="screen" id="chessScreen">
     <div class="g-header">
       <div class="g-title">♟ Catur 2P Online</div>
@@ -501,7 +656,9 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnUnoBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
   </div>
 
-</div> <script src="shared.js"></script>
+</div> 
+
+<script src="shared.js"></script>
 <script src="Mario.js"></script>
 <script src="Catur.js"></script>
 <script src="Tttc.js"></script>

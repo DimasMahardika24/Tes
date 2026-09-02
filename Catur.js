@@ -208,13 +208,19 @@
       const rights = state.castling || {};
       const homeRow = color === 'w' ? 7 : 0;
       const oppColor = color === 'w' ? 'b' : 'w';
+
+      // PERBAIKAN: Wajib cek hak rights.wK / rights.bK & rights.wQ / rights.bQ dari database!
       if(y===homeRow && x===4 && !chessSquareAttacked(board,x,y,oppColor)){
-        if((color==='w'?rights.wK:rights.bK) && !board[homeRow][5] && !board[homeRow][6] && board[homeRow][7]===(color==='w'?'R':'r')){
+        // Rokade Sayap Raja (Kingside)
+        const canCastleK = color === 'w' ? rights.wK : rights.bK;
+        if(canCastleK && !board[homeRow][5] && !board[homeRow][6] && board[homeRow][7]===(color==='w'?'R':'r')){
           if(!chessSquareAttacked(board,5,homeRow,oppColor) && !chessSquareAttacked(board,6,homeRow,oppColor)){
             moves.push({x1:x,y1:y,x2:6,y2:homeRow,capture:false,flag:'castleK',promotion:false});
           }
         }
-        if((color==='w'?rights.wQ:rights.bQ) && !board[homeRow][1] && !board[homeRow][2] && !board[homeRow][3] && board[homeRow][0]===(color==='w'?'R':'r')){
+        // Rokade Sayap Menteri (Queenside)
+        const canCastleQ = color === 'w' ? rights.wQ : rights.bQ;
+        if(canCastleQ && !board[homeRow][1] && !board[homeRow][2] && !board[homeRow][3] && board[homeRow][0]===(color==='w'?'R':'r')){
           if(!chessSquareAttacked(board,3,homeRow,oppColor) && !chessSquareAttacked(board,2,homeRow,oppColor)){
             moves.push({x1:x,y1:y,x2:2,y2:homeRow,capture:false,flag:'castleQ',promotion:false});
           }
@@ -283,18 +289,21 @@
     return { board: nb, castling: nc, ep: newEp, halfmove: newHalfmove, capturedPiece };
   }
 
-  function chessLegalMovesForSquare(board, state, x, y){
+    function chessLegalMovesForSquare(board, state, x, y){
     const p = board[y][x];
     if(!p) return [];
     const color = chessColorOf(p);
     const pseudo = chessPieceMoves(board, state, x, y);
     const legal = [];
     for(const m of pseudo){
-      const res = chessApplyMove(board, state, m, 'q');
-      if(!chessIsInCheck(res.board, color)) legal.push(m); // cegah self-check: langkah yang bikin Raja sendiri skak dibuang
+      // PERBAIKAN: Jika ini langkah promosi, uji pilihan promosi yang valid
+      const promoChoice = m.promotion ? 'q' : null;
+      const res = chessApplyMove(board, state, m, promoChoice);
+      if(!chessIsInCheck(res.board, color)) legal.push(m); // Cegah self-check
     }
     return legal;
   }
+
 
   function chessAllLegalMoves(board, state, color){
     let all = [];
@@ -441,7 +450,7 @@
     return (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
   }
 
-  function chessUpdateClockUI(){
+    function chessUpdateClockUI(){
     const wrap = document.getElementById('chessClockWrap');
     if(!chessClocks){ wrap.style.display = 'none'; return; }
     wrap.style.display = 'flex';
@@ -459,11 +468,13 @@
     meEl.classList.toggle('low', myLive < 30000);
     oppEl.classList.toggle('low', oppLive < 30000);
 
+    // PERBAIKAN: Izinkan klaim timeout dari HP mana saja (mencegah lawan nge-freeze/curang jam)
     if(!chessGameOver){
-      if(liveW <= 0) chessDeclareResult(chessRoleOfColor('b'), 'timeout');
-      else if(liveB <= 0) chessDeclareResult(chessRoleOfColor('w'), 'timeout');
+      if(liveW <= 0) chessDeclareResult('p2', 'timeout'); // Hitam Menang (p2)
+      else if(liveB <= 0) chessDeclareResult('p1', 'timeout'); // Putih Menang (p1)
     }
   }
+
 
   function showChessResult(r){
     const overlay = document.getElementById('chessWinOverlay');

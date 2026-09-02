@@ -524,10 +524,7 @@ function pokerRenderCore(data){
   }
 }
 
-// Animasi kartu "terbang" dari tengah meja pas ronde baru mulai —
-// dibagiin GANTIAN satu per satu ke tiap pemain (muter searah jarum
-// jam: aku -> kanan -> atas -> kiri -> aku lagi, dst), kayak orang
-// beneran ngebagiin kartu, bukan langsung ke 4 arah bareng-bareng.
+/// Animasi bagi kartu: dikasih PER ORANG sampai selesai baru pindah ke pemain berikutnya, delay 0.5s per kartu
 function pokerAnimateDeal(done){
   const table = document.querySelector('#pokerScreen .capsa-table');
   if(!table){ done(); return; }
@@ -535,22 +532,25 @@ function pokerAnimateDeal(done){
   overlay.className = 'capsa-deal-overlay';
   table.appendChild(overlay);
 
-  const dealOrder = ['bottom', 'right', 'top', 'left']; // muter searah jarum jam mulai dari kita
-  const rounds = 3; // jumlah "putaran" bagi-bagi (bukan 13x biar gak kelamaan, tapi tetep berasa gantian)
-  const perCardDelay = 130; // ms jeda antar kartu = efek gantian, bukan bareng-bareng
-  const animDuration = 550; // ms, samain kira-kira sama durasi keyframe-nya
+  const dealOrder = ['bottom', 'right', 'top', 'left']; // Urutan pemain: Kamu -> Kanan -> Atas -> Kiri
+  const cardsPerPlayer = 5; // Jumlah kartu animasi per pemain (bisa diubah, misal 5)
+  const perCardDelay = 300; // 0.5 detik per kartu
+  const animDuration = 550; // ms durasi animasi CSS
 
   let cardIndex = 0;
-  for(let round = 0; round < rounds; round++){
-    dealOrder.forEach(dir => {
+
+  // LOOP LUAR: Pindah ke Pemain Berikutnya setelah pemain sebelumnya selesai
+  dealOrder.forEach(dir => {
+    // LOOP DALAM: Bagikan kartu ke pemain tsb sampai jumlahnya cukup
+    for(let c = 0; c < cardsPerPlayer; c++){
       const img = document.createElement('img');
       img.src = CARD_BACK_IMG;
       img.className = 'capsa-deal-card deal-' + dir;
       img.style.animationDelay = (cardIndex * perCardDelay) + 'ms';
       overlay.appendChild(img);
       cardIndex++;
-    });
-  }
+    }
+  });
 
   const totalDuration = (cardIndex - 1) * perCardDelay + animDuration + 150;
   setTimeout(() => {
@@ -558,6 +558,7 @@ function pokerAnimateDeal(done){
     done();
   }, totalDuration);
 }
+
 
 function pokerRender(data){
   const freshHand = data.phase === 'playing' && !!data.handNumber && data.handNumber !== pokerLastAnimatedHand;
