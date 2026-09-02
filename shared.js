@@ -8,6 +8,32 @@ const firebaseConfig = {
 if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const dbRoot = firebase.database();
 
+// HELPER: POP-UP CUSTOM ALERT MODERN
+function showCustomAlert(text, title = "⚠️ Pemberitahuan") {
+  document.getElementById('customAlertTitle').textContent = title;
+  document.getElementById('customAlertText').textContent = text;
+  document.getElementById('customAlertOverlay').style.display = 'flex';
+}
+document.getElementById('btnCustomAlertOk').onclick = () => {
+  document.getElementById('customAlertOverlay').style.display = 'none';
+};
+
+// HELPER: POP-UP CUSTOM CONFIRM MODERN
+function showCustomConfirm(text, onConfirm, title = "❓ Konfirmasi") {
+  document.getElementById('customConfirmTitle').textContent = title;
+  document.getElementById('customConfirmText').textContent = text;
+  const overlay = document.getElementById('customConfirmOverlay');
+  overlay.style.display = 'flex';
+
+  document.getElementById('btnCustomConfirmOk').onclick = () => {
+    overlay.style.display = 'none';
+    if(onConfirm) onConfirm();
+  };
+  document.getElementById('btnCustomConfirmCancel').onclick = () => {
+    overlay.style.display = 'none';
+  };
+}
+
 function getDeviceId(){
   let id = null;
   try{ id = localStorage.getItem('ghub_device_id'); }catch(e){}
@@ -18,7 +44,6 @@ function getDeviceId(){
   return id;
 }
 
-// ============ NAVIGASI ANTAR SCREEN ============
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -30,9 +55,9 @@ let roomRef = null;
 let roomIdGlobal = null;
 let chessTimeControl = 0; 
 
-// Variable Penanganan Password Online Rooms
 let pendingJoinRoomId = null;
 let pendingRoomPass = null;
+let roomPasswordTemp = "";
 
 const roomBadge = document.getElementById('roomBadge');
 const roomBadgeText = document.getElementById('roomBadgeText');
@@ -90,17 +115,27 @@ document.getElementById('btnCreatedBack').onclick = () => {
   location.reload();
 };
 
-// ---------- ALUR BUAT ROOM + OPSI PASSWORD & PUBLIC ROOMS ----------
+// ---------- ALUR BUAT ROOM DENGAN MODAL CUSTOM PASSWORD ----------
 function proceedCreateRoom(){
-  // Tanya password opsional saat Host membuat room
-  const askPass = prompt("Set Password Room? (Kosongkan jika ingin Public / Bebas Masuk):");
-  const roomPassword = askPass ? askPass.trim() : "";
+  document.getElementById('createPassInput').value = '';
+  document.getElementById('createPassOverlay').style.display = 'flex';
+}
 
+document.getElementById('btnCreatePassSubmit').onclick = () => {
+  roomPasswordTemp = document.getElementById('createPassInput').value.trim();
+  document.getElementById('createPassOverlay').style.display = 'none';
+  executeCreateRoom();
+};
+
+document.getElementById('btnCreatePassCancel').onclick = () => {
+  document.getElementById('createPassOverlay').style.display = 'none';
+};
+
+function executeCreateRoom(){
   function tryCreateRoom(attemptsLeft){
     const roomId = Math.floor(100000 + Math.random() * 900000).toString();
     const candidateRef = dbRoot.ref('rooms/' + roomId);
     
-    // Tentukan Batas Maksimal Pemain
     let maxP = 2;
     if(currentGame === 'poker') maxP = 4;
     if(currentGame === 'uno') maxP = window.unoSelectedMaxPlayers || 4;
@@ -119,19 +154,18 @@ function proceedCreateRoom(){
       (err, committed) => {
         if(err || !committed){
           if(attemptsLeft > 0){ tryCreateRoom(attemptsLeft - 1); return; }
-          alert('Gagal membuat room, coba lagi.');
+          showCustomAlert('Gagal membuat room, coba lagi.');
           return;
         }
         roomIdGlobal = roomId;
         roomRef = candidateRef;
         showRoomBadge(roomId);
 
-        // DAFTARKAN ROOM KE PATH publicRooms UNTUK LOBBY ONLINE ROOMS
         const pubRef = dbRoot.ref('publicRooms/' + roomId);
         pubRef.set({
           game: currentGame,
-          hasPass: roomPassword !== "",
-          password: roomPassword,
+          hasPass: roomPasswordTemp !== "",
+          password: roomPasswordTemp,
           maxPlayers: maxP,
           createdAt: Date.now()
         });
@@ -190,7 +224,6 @@ function safeDelay(fn, ms){
   tick();
 }
 
-// ---------- MENGAMBIL DAFTAR ONLINE ROOMS (PUBLIC) ----------
 function fetchOnlineRooms() {
   const listContainer = document.getElementById('onlineRoomList');
   listContainer.innerHTML = '<div style="text-align:center; color:var(--ink-dim); font-size:13px; padding:20px;">Memuat daftar room...</div>';
@@ -207,7 +240,6 @@ function fetchOnlineRooms() {
     Object.keys(rooms).forEach(roomId => {
       const info = rooms[roomId];
       
-      // Ambil data pemain online dari node presence
       dbRoot.ref(`rooms/${roomId}/presence`).once('value', presSnap => {
         const presence = presSnap.val() || {};
         const onlineCount = Object.keys(presence).length;
@@ -243,14 +275,13 @@ function tryConnectToOnlineRoom(roomId, info) {
   }
 }
 
-// Event Listener Modal Password
 document.getElementById('btnPassSubmit').onclick = () => {
   const input = document.getElementById('roomPassInput').value.trim();
   if (input === pendingRoomPass) {
     document.getElementById('roomPassOverlay').style.display = 'none';
     connectToRoomGlobal(pendingJoinRoomId);
   } else {
-    alert("Password Salah!");
+    showCustomAlert("Password yang kamu masukkan salah!", "❌ Password Salah");
   }
 };
 
@@ -258,7 +289,6 @@ document.getElementById('btnPassCancel').onclick = () => {
   document.getElementById('roomPassOverlay').style.display = 'none';
 };
 
-// Navigasi Online Rooms Screen
 document.getElementById('btnGoOnlineRooms').onclick = () => {
   showScreen('onlineRoomScreen');
   fetchOnlineRooms();
@@ -267,7 +297,6 @@ document.getElementById('btnOnlineRoomBack').onclick = () => {
   showScreen('startScreen');
 };
 
-// LOGIKA KONEKSI ROOM GLOBAL
 function connectToRoomGlobal(targetId) {
   const btnConnect = document.getElementById('btnLobbyConnect');
   if(btnConnect) {
@@ -281,12 +310,12 @@ function connectToRoomGlobal(targetId) {
       btnConnect.textContent = 'MASUK GAME';
     }
     if(!snap.exists()){
-      alert('Room ID tidak ditemukan! Cek lagi kodenya.');
+      showCustomAlert('Room ID tidak ditemukan! Cek lagi kodenya.');
       return;
     }
     const data = snap.val();
     if(!data.game || !gameMeta[data.game]){
-      alert('Data room rusak / game tidak dikenali.');
+      showCustomAlert('Data room rusak / game tidak dikenali.');
       return;
     }
     currentGame = data.game;
@@ -301,7 +330,7 @@ function connectToRoomGlobal(targetId) {
     } else if(currentGame === 'poker'){
       const trySeat = (seats, i) => {
         if(i >= seats.length){
-          alert('Room Capsa Banting ini sudah penuh (4 pemain).');
+          showCustomAlert('Room Capsa Banting ini sudah penuh (4 pemain).');
           return;
         }
         roomRef.child('presence/' + seats[i]).transaction(
@@ -323,7 +352,7 @@ function connectToRoomGlobal(targetId) {
 
         const tryUnoSeat = (seatList, i) => {
           if(i >= seatList.length){
-            alert('Room Uno ini sudah penuh.');
+            showCustomAlert('Room Uno ini sudah penuh.');
             return;
           }
           roomRef.child('presence/' + seatList[i]).transaction(
@@ -343,7 +372,7 @@ function connectToRoomGlobal(targetId) {
         (current) => (current === null ? true : undefined),
         (err, committed) => {
           if(err || !committed){
-            alert('Room ini sudah penuh (2 pemain).');
+            showCustomAlert('Room ini sudah penuh (2 pemain).');
             return;
           }
           myRole = 'p2';
@@ -357,14 +386,13 @@ function connectToRoomGlobal(targetId) {
       btnConnect.disabled = false;
       btnConnect.textContent = 'MASUK GAME';
     }
-    alert('Gagal cek room, coba lagi.');
+    showCustomAlert('Gagal mengecek room, coba lagi.');
   });
 }
 
-// JOIN DENGAN ID MANUAL
 document.getElementById('btnLobbyConnect').onclick = () => {
   const targetId = document.getElementById('roomIdInputLobby').value.trim();
-  if(!targetId) return alert('Masukkan ID Room!');
+  if(!targetId) return showCustomAlert('Masukkan ID Room!');
   connectToRoomGlobal(targetId);
 };
 
@@ -378,7 +406,6 @@ function enterGame(){
   if(currentGame === 'uno') initUno();
 }
 
-// ============ RESUME SESI ============
 const SESSION_KEY = 'ghub_session_v1';
 let pendingResumeCoin = 0;
 function saveSession(){
@@ -417,14 +444,14 @@ document.getElementById('btnResumeContinue').onclick = () => {
   btn.textContent = 'MENYAMBUNGKAN...';
   dbRoot.ref('rooms/' + pendingSession.roomId).get().then(snap => {
     if(!snap.exists()){
-      alert('Room sudah tidak ada / sudah berakhir.');
+      showCustomAlert('Room sudah tidak ada / sudah berakhir.');
       clearSession();
       location.reload();
       return;
     }
     const data = snap.val();
     if(data.game !== pendingSession.game){
-      alert('Data room udah berubah, gak bisa disambung otomatis.');
+      showCustomAlert('Data room udah berubah, gak bisa disambung otomatis.');
       clearSession();
       location.reload();
       return;
@@ -439,19 +466,19 @@ document.getElementById('btnResumeContinue').onclick = () => {
   }).catch(() => {
     btn.disabled = false;
     btn.textContent = '▶ Lanjutkan';
-    alert('Gagal cek room, coba lagi.');
+    showCustomAlert('Gagal mengecek room, coba lagi.');
   });
 };
 
 history.pushState({ghub:true}, '', location.href);
 window.addEventListener('popstate', () => {
   if(!currentGame) return; 
-  const keluar = confirm('Keluar dari game? Kamu bisa lanjut lagi nanti lewat "Lanjutkan Room".');
-  if(keluar){
-    location.reload();
-  } else {
-    history.pushState({ghub:true}, '', location.href);
-  }
+  showCustomConfirm(
+    'Keluar dari game? Kamu bisa lanjut lagi nanti lewat "Lanjutkan Room".',
+    () => { location.reload(); },
+    '🚪 Keluar Game'
+  );
+  history.pushState({ghub:true}, '', location.href);
 });
 
 let activePresenceRef = null;
