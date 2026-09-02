@@ -282,26 +282,46 @@ function unoCatch() {
   });
 }
 
-// ---------- Animasi Pembagian Kartu ----------
-// Animasi bagi kartu Uno: Per orang sampai selesai baru pindah, delay 0.3 detik (300ms)
+// Animasi Uno Dinamis 2 - 6 Pemain
 function unoAnimateDeal(done) {
   const table = document.querySelector('#unoScreen .capsa-table');
-  if (!table) { done(); return; }
+  if (!table || !latestUnoData) { done(); return; }
 
   const overlay = document.createElement('div');
   overlay.className = 'capsa-deal-overlay';
   table.appendChild(overlay);
 
-  const dealOrder = ['bottom', 'right', 'top', 'left'];
+  // Ambil daftar role pemain aktif dari data game (misal: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'])
+  const activeRoles = getUnoRoles(latestUnoData.maxPlayers || 4);
+  
+  // Pemain utama (kamu) selalu di posisi bottom
+  let dealTargets = ['bottom']; 
+
+  // Tentukan arah meluncur untuk lawan-lawan sesuai jumlah total pemain
+  activeRoles.forEach(role => {
+    if (role === myRole) return; // Lewati diri sendiri karena sudah 'bottom'
+
+    if (activeRoles.length === 2) {
+      dealTargets.push('top');
+    } else if (activeRoles.length === 3) {
+      dealTargets.push('right', 'left');
+    } else if (activeRoles.length === 4) {
+      dealTargets.push('right', 'top', 'left');
+    } else {
+      // Untuk 5 dan 6 pemain (meluncur melingkar ke kanan, atas, dan kiri)
+      const dirs = ['right', 'right', 'top', 'left', 'left'];
+      dealTargets.push(dirs[dealTargets.length - 1] || 'top');
+    }
+  });
+
   const cardsPerPlayer = 7; // Uno 7 kartu di awal
-  const perCardDelay = 300; // 0.3 detik (300ms) per kartu
+  const perCardDelay = 300; // 0.3 detik per kartu
   const animDuration = 550;
 
   let cardIndex = 0;
 
-  // LOOP LUAR: Pindah ke Pemain Berikutnya
-  dealOrder.forEach(dir => {
-    // LOOP DALAM: Kasih 7 kartu berturut-turut ke pemain aktif
+  // Bagikan kartu per pemain aktif (Selesaikan 1 orang dulu baru pindah)
+  dealTargets.forEach(dir => {
     for (let c = 0; c < cardsPerPlayer; c++) {
       const img = document.createElement('img');
       img.src = UNO_CARD_URLS.back;

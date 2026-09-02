@@ -525,23 +525,24 @@ function pokerRenderCore(data){
 }
 
 /// Animasi bagi kartu: dikasih PER ORANG sampai selesai baru pindah ke pemain berikutnya, delay 0.5s per kartu
+// Animasi Capsa: Disesuaikan dengan 4 pemain aktif di meja
 function pokerAnimateDeal(done){
   const table = document.querySelector('#pokerScreen .capsa-table');
   if(!table){ done(); return; }
+
   const overlay = document.createElement('div');
   overlay.className = 'capsa-deal-overlay';
   table.appendChild(overlay);
 
-  const dealOrder = ['bottom', 'right', 'top', 'left']; // Urutan pemain: Kamu -> Kanan -> Atas -> Kiri
-  const cardsPerPlayer = 5; // Jumlah kartu animasi per pemain (bisa diubah, misal 5)
-  const perCardDelay = 300; // 0.5 detik per kartu
-  const animDuration = 550; // ms durasi animasi CSS
+  // Urutan pemain aktif di meja Capsa 4P
+  const dealTargets = ['bottom', 'right', 'top', 'left']; 
+  const cardsPerPlayer = 5; // Kartu animasi meluncur per pemain
+  const perCardDelay = 300; // 0.3 detik per kartu
+  const animDuration = 550;
 
   let cardIndex = 0;
 
-  // LOOP LUAR: Pindah ke Pemain Berikutnya setelah pemain sebelumnya selesai
-  dealOrder.forEach(dir => {
-    // LOOP DALAM: Bagikan kartu ke pemain tsb sampai jumlahnya cukup
+  dealTargets.forEach(dir => {
     for(let c = 0; c < cardsPerPlayer; c++){
       const img = document.createElement('img');
       img.src = CARD_BACK_IMG;
@@ -558,6 +559,7 @@ function pokerAnimateDeal(done){
     done();
   }, totalDuration);
 }
+
 
 
 function pokerRender(data){
