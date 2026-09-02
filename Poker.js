@@ -36,9 +36,17 @@ let selectedKeys = new Set();
 const ROLES = ['p1', 'p2', 'p3', 'p4'];
 
 // ---------- Kartu & Deck ----------
+// Gambar kartu dipakai dari Deck of Cards API (deckofcardsapi.com) - gratis,
+// gak perlu hosting sendiri, dan gak akan 404 kayak folder Cards lokal yang
+// kemarin filenya gak cocok. Formatnya: static/img/{RANK}{SUIT}.png, dengan
+// keunikan: kartu "10" kodenya "0" (bukan "10"), bukan bug dari kita.
+const CARD_IMG_BASE = 'https://deckofcardsapi.com/static/img/';
+const CARD_BACK_IMG = CARD_IMG_BASE + 'back.png';
+
 const RANKS = ['03','04','05','06','07','08','09','10','J','Q','K','A','02'];
 const SUITS = ['c','d','h','s'];
-const SUIT_FILE = { c: 'clubs', d: 'diamonds', h: 'hearts', s: 'spades' };
+const RANK_TO_API = { '03':'3','04':'4','05':'5','06':'6','07':'7','08':'8','09':'9','10':'0','J':'J','Q':'Q','K':'K','A':'A','02':'2' };
+const SUIT_TO_API = { c:'C', d:'D', h:'H', s:'S' };
 const RANK_ORDER = { '03':0,'04':1,'05':2,'06':3,'07':4,'08':5,'09':6,'10':7,'J':8,'Q':9,'K':10,'A':11,'02':12 };
 const SUIT_ORDER = { c:0, d:1, h:2, s:3 };
 
@@ -55,7 +63,7 @@ function shuffleDeck(deck){
   }
   return d;
 }
-function cardImg(c){ return './Cards/cards_' + SUIT_FILE[c.suit] + '_' + c.rank + '.png'; }
+function cardImg(c){ return CARD_IMG_BASE + RANK_TO_API[c.rank] + SUIT_TO_API[c.suit] + '.png'; }
 function cardValue(c){ return RANK_ORDER[c.rank] * 4 + SUIT_ORDER[c.suit]; }
 function cardKey(c){ return c.rank + '|' + c.suit; }
 function sortCards(hand){
@@ -264,10 +272,18 @@ function seatPosFor(role){
 function pokerRenderBackHand(container, count){
   container.innerHTML = '';
   if(count <= 0) return;
-  const back = document.createElement('div');
-  back.className = 'capsa-card-back';
-  back.textContent = count;
-  container.appendChild(back);
+  const wrap = document.createElement('div');
+  wrap.className = 'capsa-card-back-wrap';
+  const img = document.createElement('img');
+  img.className = 'capsa-card-back';
+  img.src = CARD_BACK_IMG;
+  img.alt = 'kartu tertutup';
+  const badge = document.createElement('span');
+  badge.className = 'capsa-card-back-count';
+  badge.textContent = count;
+  wrap.appendChild(img);
+  wrap.appendChild(badge);
+  container.appendChild(wrap);
 }
 
 function pokerRenderMyHand(data){
