@@ -524,30 +524,39 @@ function pokerRenderCore(data){
   }
 }
 
-// Animasi kartu "terbang" dari tengah meja pas ronde baru mulai
-// (dipicu ketika player ke-4 join & host bikin game baru). Cuma
-// jalan kalau perubahan ronde ini kejadian pas kita udah nongkrong
-// di layar (bukan pas baru buka/refresh halaman di tengah game).
+// Animasi kartu "terbang" dari tengah meja pas ronde baru mulai —
+// dibagiin GANTIAN satu per satu ke tiap pemain (muter searah jarum
+// jam: aku -> kanan -> atas -> kiri -> aku lagi, dst), kayak orang
+// beneran ngebagiin kartu, bukan langsung ke 4 arah bareng-bareng.
 function pokerAnimateDeal(done){
   const table = document.querySelector('#pokerScreen .capsa-table');
   if(!table){ done(); return; }
   const overlay = document.createElement('div');
   overlay.className = 'capsa-deal-overlay';
-  const dirs = ['top', 'left', 'right', 'bottom'];
-  dirs.forEach((dir, i) => {
-    for(let k = 0; k < 3; k++){
+  table.appendChild(overlay);
+
+  const dealOrder = ['bottom', 'right', 'top', 'left']; // muter searah jarum jam mulai dari kita
+  const rounds = 3; // jumlah "putaran" bagi-bagi (bukan 13x biar gak kelamaan, tapi tetep berasa gantian)
+  const perCardDelay = 130; // ms jeda antar kartu = efek gantian, bukan bareng-bareng
+  const animDuration = 550; // ms, samain kira-kira sama durasi keyframe-nya
+
+  let cardIndex = 0;
+  for(let round = 0; round < rounds; round++){
+    dealOrder.forEach(dir => {
       const img = document.createElement('img');
       img.src = CARD_BACK_IMG;
       img.className = 'capsa-deal-card deal-' + dir;
-      img.style.animationDelay = (i * 90 + k * 70) + 'ms';
+      img.style.animationDelay = (cardIndex * perCardDelay) + 'ms';
       overlay.appendChild(img);
-    }
-  });
-  table.appendChild(overlay);
+      cardIndex++;
+    });
+  }
+
+  const totalDuration = (cardIndex - 1) * perCardDelay + animDuration + 150;
   setTimeout(() => {
     overlay.remove();
     done();
-  }, 850);
+  }, totalDuration);
 }
 
 function pokerRender(data){
@@ -625,7 +634,13 @@ function pokerSaveName(){
 function initPoker(){
   pokerRef = roomRef.child('poker');
   document.getElementById('pokerRoleTag').textContent = myRole.toUpperCase();
+
+  // Auto-landscape: paksa tampilan Capsa jadi mode landscape via CSS
+  // transform, TANPA perlu pemain fisik muterin HP-nya.
+  document.documentElement.classList.add('force-landscape');
+
   document.getElementById('btnPokerBack').onclick = () => {
+    document.documentElement.classList.remove('force-landscape');
     if(activePresenceRef) activePresenceRef.remove();
     clearSession();
     location.reload();
