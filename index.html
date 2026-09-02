@@ -208,7 +208,53 @@ canvas { width: 100%; height: 100%; display: block; }
 .capsa-act:disabled { opacity: .35; pointer-events: none; }
 .capsa-act.pass { background: var(--blue); color: #fff; }
 .capsa-act.play { background: var(--gold); color: var(--gold-ink); }
-.capsa-result { margin-top: 10px; text-align: center; font-size: 15px; font-weight: 800; color: var(--gold); background: var(--void); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.capsa-result { margin-top: 10px; text-align: center; font-size: 15px; font-weight: 800; color: var(--gold); background: var(--void); border: 1px solid var(--line); border-radius: 12px; padding: 12px; line-height: 1.6; }
+.capsa-seat-done { opacity: .55; }
+
+/* Rank bar (Juara 1/2/3 muncul begitu ada yang habis kartu) */
+.capsa-rankbar { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 8px; }
+.capsa-rank-chip { background: var(--panel-3); border: 1px solid var(--line); color: var(--ink); font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 20px; white-space: nowrap; }
+
+/* Edit Nama */
+.capsa-seat-info { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.capsa-edit-name-btn { background: var(--panel-3); border: 1px solid var(--line); color: var(--ink); font-size: 11px; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; }
+.capsa-edit-name-btn:active { transform: scale(0.9); }
+.capsa-name-overlay { position: fixed; inset: 0; background: rgba(10,12,17,0.82); backdrop-filter: blur(3px); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeSlide .2s ease; }
+.capsa-name-box { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: 100%; max-width: 320px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+.capsa-name-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-weight: 700; font-size: 15px; margin-bottom: 12px; text-align: center; }
+.capsa-name-box input { width: 100%; background: var(--void); border: 1px solid var(--line); color: var(--ink); padding: 13px; border-radius: 10px; font-size: 15px; text-align: center; outline: none; margin-bottom: 12px; font-family: 'Inter', sans-serif; }
+.capsa-name-box input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(61,107,240,0.18); }
+.capsa-name-actions { display: flex; gap: 8px; }
+.capsa-name-btn { flex: 1; padding: 11px; border: none; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; border-bottom: 3px solid rgba(0,0,0,0.3); font-family: 'Inter', sans-serif; }
+.capsa-name-btn:active { transform: translateY(2px); border-bottom-width: 1px; }
+.capsa-name-btn.cancel { background: var(--panel-3); color: var(--ink); }
+.capsa-name-btn.save { background: var(--gold); color: var(--gold-ink); }
+
+/* Animasi bagi kartu dari tengah meja pas ronde baru mulai */
+.capsa-deal-overlay { position: absolute; inset: 0; z-index: 30; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+.capsa-deal-card { position: absolute; top: 50%; left: 50%; width: 36px; height: 50px; object-fit: contain; border-radius: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); opacity: 0; transform: translate(-50%, -50%) scale(.6); }
+.capsa-deal-card.deal-top { animation: dealToTop .6s ease-out forwards; }
+.capsa-deal-card.deal-bottom { animation: dealToBottom .6s ease-out forwards; }
+.capsa-deal-card.deal-left { animation: dealToLeft .6s ease-out forwards; }
+.capsa-deal-card.deal-right { animation: dealToRight .6s ease-out forwards; }
+@keyframes dealToTop { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(-50%,-230%) scale(.9); } }
+@keyframes dealToBottom { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(-50%,190%) scale(.9); } }
+@keyframes dealToLeft { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(-190%,-50%) scale(.9); } }
+@keyframes dealToRight { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(190%,-50%) scale(.9); } }
+
+/* Mode landscape — biar kartu gak kekecilan pas HP dimiringin */
+@media (orientation: landscape) and (max-height: 520px) {
+  body { align-items: center; padding: 6px; }
+  .card { max-width: 780px; }
+  #pokerScreen .capsa-table { padding: 10px 18px; }
+  #pokerScreen .capsa-card-img { width: 46px; height: 64px; }
+  #pokerScreen .capsa-card-img.small { width: 36px; height: 50px; }
+  #pokerScreen .capsa-card-back { width: 42px; height: 58px; }
+  #pokerScreen .capsa-hand-me { min-height: 84px; gap: 5px; }
+  #pokerScreen .capsa-mid-row { gap: 18px; }
+  #pokerScreen .capsa-center { min-height: 78px; }
+  #pokerScreen .capsa-hint { display: none; }
+}
 </style>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -358,6 +404,7 @@ canvas { width: 100%; height: 100%; display: block; }
       <div class="g-role" id="pokerRoleTag">-</div>
     </div>
     <div class="g-status" id="pokerStatus">-</div>
+    <div class="capsa-rankbar" id="capsaRankBar" style="display:none"></div>
 
     <div class="capsa-table">
       <!-- Atas: Opponent 1 (di seberang) -->
@@ -389,11 +436,26 @@ canvas { width: 100%; height: 100%; display: block; }
       <!-- Bawah: Pemain Utama (kartu terbuka, bisa dipilih) -->
       <div class="capsa-seat capsa-bottom" id="capsaSeatBottom">
         <div class="capsa-hand-me" id="capsaHandMe"></div>
-        <div class="capsa-seat-info">Kamu</div>
+        <div class="capsa-seat-info">
+          <span id="capsaMyNameLabel">Kamu</span>
+          <button class="capsa-edit-name-btn" id="capsaBtnEditName" title="Ganti nama">✏️</button>
+        </div>
       </div>
     </div>
 
-    <div class="capsa-hint">Ketuk kartu untuk pilih, lalu tekan "Banting!" atau "Pass".</div>
+    <!-- Overlay ganti nama panggilan -->
+    <div class="capsa-name-overlay" id="capsaNameOverlay" style="display:none">
+      <div class="capsa-name-box">
+        <div class="capsa-name-title">✏️ Ganti Nama Kamu</div>
+        <input type="text" id="capsaNameInput" maxlength="14" placeholder="Nama panggilan...">
+        <div class="capsa-name-actions">
+          <button class="capsa-name-btn cancel" id="capsaNameCancel">Batal</button>
+          <button class="capsa-name-btn save" id="capsaNameSave">Simpan</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="capsa-hint">Ketuk kartu untuk pilih, lalu tekan "Banting!" atau "Pass". As gak bisa dibantai As, Poker gak bisa dibantai Poker.</div>
 
     <div class="capsa-actions" id="capsaActions" style="display:none">
       <button class="capsa-act pass" id="capsaBtnPass">Pass</button>
