@@ -91,7 +91,8 @@
   const gameMeta = {
     mario: { title: '🍄 Mario Coin Rush', screen: 'marioScreen' },
     chess: { title: '♟ Catur 2P Online', screen: 'chessScreen' },
-    ttt:   { title: '⭕ Tic-Tac-Toe 2P', screen: 'tttScreen' }
+    ttt:   { title: '⭕ Tic-Tac-Toe 2P', screen: 'tttScreen' },
+    poker: { title: '🃏 Capsa Banting 4P', screen: 'pokerScreen' }
   };
 
   document.getElementById('btnGoCreate').onclick = () => showScreen('gamePickScreen');
@@ -210,6 +211,29 @@
         myRole = 'joiner';
         showRoomBadge(targetId);
         enterGame();
+      } else if(currentGame === 'poker'){
+        // Capsa Banting: 4 pemain (p1 host, p2/p3/p4 joiner). Coba klaim slot
+        // kosong berurutan pakai transaction() per node, sama prinsipnya
+        // dengan klaim p2 di Catur/TTT di bawah - biar gak ada 2 device yang
+        // kebetulan dapat slot yang sama.
+        const trySeat = (seats, i) => {
+          if(i >= seats.length){
+            btnConnect.disabled = false;
+            btnConnect.textContent = 'MASUK GAME';
+            alert('Room Capsa Banting ini sudah penuh (4 pemain).');
+            return;
+          }
+          roomRef.child('presence/' + seats[i]).transaction(
+            (current) => (current === null ? true : undefined),
+            (err, committed) => {
+              if(err || !committed){ trySeat(seats, i + 1); return; }
+              myRole = seats[i];
+              showRoomBadge(targetId);
+              enterGame();
+            }
+          );
+        };
+        trySeat(['p2', 'p3', 'p4'], 0);
       } else {
         // Catur & Tic-Tac-Toe tetap murni 2 pemain (p1 host, p2 joiner).
         // PENTING: klaim slot p2 pakai transaction(), BUKAN check-then-set
@@ -244,6 +268,7 @@
     if(currentGame === 'mario') initMario();
     if(currentGame === 'chess') initChess();
     if(currentGame === 'ttt') initTTT();
+    if(currentGame === 'poker') initPoker();
   }
 
   // ============ RESUME SESI (ga sengaja balik ke menu / ke-back) ============

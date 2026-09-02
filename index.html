@@ -58,6 +58,7 @@ body {
 .g-mario span.ic { filter: none; }
 .g-chess { background: var(--blue); color: #fff; }
 .g-ttt { background: var(--green); color: #06251a; }
+.g-poker { background: linear-gradient(135deg, #7a1f2b, #a8283a); color: #fff; }
 .hub-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 3px; display: flex; align-items: center; gap: 9px; }
 .hub-title .badge-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 4px rgba(232,172,31,0.15); flex-shrink: 0; animation: pulseDot 2.4s ease-in-out infinite; }
 @keyframes pulseDot { 0%,100%{ box-shadow: 0 0 0 4px rgba(232,172,31,0.15);} 50%{ box-shadow: 0 0 0 7px rgba(232,172,31,0.05);} }
@@ -172,6 +173,45 @@ canvas { width: 100%; height: 100%; display: block; }
 @keyframes tttDrawLine { from { stroke-dashoffset: 85; } to { stroke-dashoffset: 0; } }
 #tttScreen .winline-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; padding: 5px; box-sizing: border-box; }
 #tttScreen .winline { stroke: var(--green); stroke-width:.07; stroke-linecap:round; }
+
+/* ============ CAPSA BANTING (4 Pemain) ============ */
+.capsa-table {
+  background: radial-gradient(120% 120% at 50% 30%, #1c4d34, #0d2e1f 70%);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px; padding: 12px 8px; position: relative;
+  box-shadow: 0 14px 30px rgba(0,0,0,0.45), inset 0 0 40px rgba(0,0,0,0.35);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.capsa-seat { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px; border-radius: 12px; min-width: 74px; transition: box-shadow .2s ease, background .2s ease; }
+.capsa-seat.active-turn { box-shadow: 0 0 0 2px var(--gold) inset; background: rgba(232,172,31,0.08); }
+.capsa-seat-info { font-size: 11px; font-weight: 700; color: var(--ink-dim); text-align: center; white-space: nowrap; }
+.capsa-top { align-self: center; }
+.capsa-mid-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.capsa-bottom { align-self: center; width: 100%; }
+.capsa-hand { display: flex; justify-content: center; align-items: center; min-height: 48px; }
+.capsa-hand-me { display: flex; gap: 3px; justify-content: center; flex-wrap: wrap; min-height: 70px; padding: 4px 2px; }
+.capsa-card-img, .capsa-card-back { border-radius: 5px; box-shadow: 0 3px 8px rgba(0,0,0,0.5); }
+.capsa-card-img { width: 38px; height: 53px; object-fit: contain; background: #fff; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; animation: cardDeal .25s cubic-bezier(.2,.8,.2,1); }
+.capsa-card-img.small { width: 30px; height: 42px; cursor: default; }
+.capsa-card-img.selected { transform: translateY(-10px); box-shadow: 0 0 0 2px var(--gold), 0 8px 16px rgba(0,0,0,0.6); }
+.capsa-card-back {
+  width: 36px; height: 50px; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: #fff;
+  background: repeating-linear-gradient(45deg, #2c3550, #2c3550 4px, #232a42 4px, #232a42 8px);
+  border: 2px solid #3d4a72; animation: cardDeal .25s cubic-bezier(.2,.8,.2,1);
+}
+@keyframes cardDeal { from{ opacity:0; transform: translateY(-8px) scale(.9); } to{ opacity:1; transform:none; } }
+.capsa-center { flex: 1; min-height: 96px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: rgba(0,0,0,0.25); border-radius: 12px; padding: 8px 4px; border: 1px dashed rgba(255,255,255,0.12); }
+.capsa-lastplay { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; min-height: 42px; align-items: center; }
+.capsa-last-by { font-size: 11px; color: var(--ink-dim); font-weight: 600; text-align: center; }
+.capsa-hint { font-size: 11.5px; color: var(--ink-dim); text-align: center; margin-top: 8px; }
+.capsa-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.capsa-act { padding: 14px 6px; border: none; border-radius: 12px; font-weight: 700; font-size: 14px; font-family: 'Space Grotesk', 'Inter', sans-serif; cursor: pointer; border-bottom: 3px solid rgba(0,0,0,0.3); transition: transform .08s ease, border-bottom-width .08s ease, opacity .15s ease; }
+.capsa-act:active { transform: translateY(2px); border-bottom-width: 1px; }
+.capsa-act:disabled { opacity: .35; pointer-events: none; }
+.capsa-act.pass { background: var(--blue); color: #fff; }
+.capsa-act.play { background: var(--gold); color: var(--gold-ink); }
+.capsa-result { margin-top: 10px; text-align: center; font-size: 15px; font-weight: 800; color: var(--gold); background: var(--void); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
 </style>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -196,6 +236,7 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu g-mario" data-game="mario"><span class="ic">🍄</span> Mario Coin Rush (Multiplayer)</button>
     <button class="btn-menu g-chess" data-game="chess"><span class="ic">♟</span> Catur 2P Online</button>
     <button class="btn-menu g-ttt" data-game="ttt"><span class="ic">⭕</span> Tic-Tac-Toe 2P</button>
+    <button class="btn-menu g-poker" data-game="poker"><span class="ic">🃏</span> Capsa Banting (4 Pemain)</button>
     <button class="btn-menu btn-back" id="btnGamePickBack">‹ Kembali</button>
   </div>
 
@@ -313,6 +354,60 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnTttBack" style="margin-top:10px;text-align:center;justify-content:center">‹ Menu Utama</button>
   </div>
 
+  <!-- CAPSA BANTING (4 Pemain) -->
+  <div class="screen" id="pokerScreen">
+    <div class="g-header">
+      <div class="g-title">🃏 Capsa Banting 4P</div>
+      <div class="g-role" id="pokerRoleTag">-</div>
+    </div>
+    <div class="g-status" id="pokerStatus">-</div>
+
+    <div class="capsa-table">
+      <!-- Atas: Opponent 1 (di seberang) -->
+      <div class="capsa-seat capsa-top" id="capsaSeatTop">
+        <div class="capsa-seat-info" id="capsaNameTop">P?</div>
+        <div class="capsa-hand" id="capsaHandTop"></div>
+      </div>
+
+      <div class="capsa-mid-row">
+        <!-- Kiri: Opponent 2 -->
+        <div class="capsa-seat capsa-left" id="capsaSeatLeft">
+          <div class="capsa-seat-info" id="capsaNameLeft">P?</div>
+          <div class="capsa-hand" id="capsaHandLeft"></div>
+        </div>
+
+        <!-- Tengah: combo terakhir yang dibanting -->
+        <div class="capsa-center" id="capsaCenter">
+          <div class="capsa-lastplay" id="capsaLastPlay"></div>
+          <div class="capsa-last-by" id="capsaLastBy"></div>
+        </div>
+
+        <!-- Kanan: Opponent 3 -->
+        <div class="capsa-seat capsa-right" id="capsaSeatRight">
+          <div class="capsa-seat-info" id="capsaNameRight">P?</div>
+          <div class="capsa-hand" id="capsaHandRight"></div>
+        </div>
+      </div>
+
+      <!-- Bawah: Pemain Utama (kartu terbuka, bisa dipilih) -->
+      <div class="capsa-seat capsa-bottom" id="capsaSeatBottom">
+        <div class="capsa-hand-me" id="capsaHandMe"></div>
+        <div class="capsa-seat-info">Kamu</div>
+      </div>
+    </div>
+
+    <div class="capsa-hint">Ketuk kartu untuk pilih, lalu tekan "Banting!" atau "Pass".</div>
+
+    <div class="capsa-actions" id="capsaActions" style="display:none">
+      <button class="capsa-act pass" id="capsaBtnPass">Pass</button>
+      <button class="capsa-act play" id="capsaBtnPlay">🔥 Banting!</button>
+    </div>
+
+    <div class="capsa-result" id="capsaResult" style="display:none"></div>
+    <button class="btn-menu btn-copy-code" id="capsaBtnNext" style="display:none;justify-content:center;text-align:center">▶ Main Lagi</button>
+    <button class="btn-menu btn-back" id="btnPokerBack" style="margin-top:10px;text-align:center;justify-content:center">‹ Menu Utama</button>
+  </div>
+
 </div>
 
 
@@ -320,5 +415,6 @@ canvas { width: 100%; height: 100%; display: block; }
 <script src="Mario.js"></script>
 <script src="Catur.js"></script>
 <script src="Tttc.js"></script>
+<script src="Poker.js"></script>
 </body>
 </html>
