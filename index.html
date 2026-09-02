@@ -252,27 +252,41 @@ canvas { width: 100%; height: 100%; display: block; }
   html.force-landscape {
     width: 100vh;
     height: 100vw;
-    overflow-x: hidden;
+    overflow: hidden;
     position: absolute;
-    top: 100%;
-    left: 0;
-    transform: rotate(-90deg);
+    top: 0;
+    left: 100%;
+    transform: rotate(90deg); /* Muter 90 derajat ke kanan (ala ala mode game HP) */
     transform-origin: left top;
   }
   html.force-landscape body {
     min-height: 100vw;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
   }
-  /* Abis dirotasi, lebar visual layar itu sama dengan 100vh asli & tinggi
-     visualnya sama dengan 100vw asli (soalnya cuma diputer, viewport unit
-     gak ikut ketuker). Jadi .card dipatok pake vh buat lebar & vw buat
-     tinggi biar bener-bener ngisi layar, bukan ngambang kecil di tengah. */
+  /* Ukuran disesuaikan agar pas di layar (tidak oversized) */
   html.force-landscape .card {
-    width: min(96vh, 1100px);
-    max-width: min(96vh, 1100px);
-    height: min(94vw, 96vw);
-    max-height: 96vw;
+    width: min(88vh, 850px);
+    max-width: min(88vh, 850px);
+    height: min(88vw, 420px);
+    max-height: 88vw;
+    padding: 10px 14px;
+    border-radius: 14px;
   }
 }
+
+/* Penyesuaian ukuran kartu & elemen di dalam Uno/Capsa saat mode landscape */
+html.force-landscape #unoScreen .capsa-table,
+html.force-landscape #pokerScreen .capsa-table {
+  padding: 6px 12px;
+}
+html.force-landscape #unoScreen .capsa-card-img,
+html.force-landscape #pokerScreen .capsa-card-img {
+  width: 36px;
+  height: 52px;
+}
+
 
 @media screen and (orientation: landscape) {
   /* HP/tablet yang emang udah fisik landscape (gak butuh trik rotate),
@@ -595,5 +609,5 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
 <script src="Poker.js"></script>
 <script src="Uno.js"></script> <!-- TAMBAHAN SCRIPT UNO -->
 </body>
-
+    
 </html>
