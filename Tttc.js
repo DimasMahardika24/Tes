@@ -1,0 +1,154 @@
+// ======================================================
+// Tttc.js — Game 3: Tic-Tac-Toe 2P
+// Membutuhkan shared.js sudah dimuat lebih dulu (pakai variabel
+// & fungsi bersama seperti dbRoot, roomRef, myRole, currentGame,
+// attachPresence, clearSession, dst).
+// ======================================================
+
+  // ======================================================
+  // =============== GAME 3: TIC TAC TOE =================
+  // ======================================================
+  const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  let tttBoardState, tttTurn, mySymbol, tttWinSvg = null, tttRoundBusy = false, tttRound = 0;
+
+  // CATATAN PENTING: kotak kosong direpresentasikan dengan string kosong '' —
+  // BUKAN null. Firebase Realtime Database otomatis MEMBUANG nilai null saat
+  // disimpan, jadi papan kosong (dulu Array(9).fill(null)) berubah jadi
+  // "undefined" begitu dibaca balik dari server. Itu bikin seluruh fungsi
+  // game meledak diam-diam (error di dalam listener) dan tttBoardState jadi
+  // permanen kosong/falsy — makanya klik di papan tidak pernah bereaksi
+  // setelah lawan join. Pakai '' supaya array tetap array asli dari Firebase.
+  function tttEmptyBoard(){ return Array(9).fill(''); }
+  function tttEmptyCells(b){ const r=[]; for(let i=0;i<9;i++) if(!b[i]) r.push(i); return r; }
+
+  function tttEval(b){
+    for(const l of LINES){ if(b[l[0]] && b[l[0]] === b[l[1]] && b[l[0]] === b[l[2]]) return {winner:b[l[0]], line:l}; }
+    if(tttEmptyCells(b).length === 0) return {winner:'draw', line:null};
+    return null;
+  }
+
+  function initTTT(){
+    mySymbol = myRole === 'p1' ? 'X' : 'O';
+    document.getElementById('tttRoleTag').textContent = myRole === 'p1' ? 'HOST (X)' : 'JOINER (O)';
+    tttRoundBusy = false;
+
+    attachPresence('tttStatus', roomIdGlobal);
+    buildTTTBoard();
+
+    roomRef.child('score').on('value', (snap) => {
+      const s = snap.val() || {};
+      document.getElementById('tttScoreYou').textContent = s[mySymbol] || 0;
+      document.getElementById('tttScoreOpp').textContent = s[mySymbol === 'X' ? 'O' : 'X'] || 0;
+      document.getElementById('tttScoreDraw').textContent = s.draw || 0;
+    });
+
+    roomRef.child('state').on('value', (snap) => {
+      const data = snap.val();
+      if(!data) return;
+      tttBoardState = data.board;
+      tttTurn = data.turn;
+      tttRound = data.round || 0;
+      renderTTTBoard();
+      const result = tttEval(tttBoardState);
+      if(result && !tttRoundBusy){
+        tttRoundBusy = true;
+        if(result.line) drawTTTWinLine(result.line);
+        document.getElementById('tttStatus').textContent = result.winner === 'draw' ? 'Seri!' :
+          (result.winner === mySymbol ? '🏆 Kamu menang!' : '😢 Lawan menang!');
+
+        // PENTING: reset papan TIDAK BOLEH cuma tanggung jawab p1. Kalau host
+        // disconnect tepat saat game berakhir, joiner tidak punya izin reset
+        // -> papan mangkrak selamanya di posisi menang/seri. Sekarang KEDUA
+        // pemain sama-sama mencoba, tapi dijaga transaction() di
+        // roundLocks/<round> supaya cuma SATU dari mereka yang berhasil
+        // "mengklaim" round ini (nilai null -> true berhasil, sisanya
+        // committed=false) - jadi skor tidak dobel-nambah walau keduanya
+        // mendeteksi hasil hampir bersamaan.
+        roomRef.child('roundLocks/' + tttRound).transaction(
+          (current) => (current === null ? true : undefined),
+          (err, committed) => {
+            if(err || !committed) return;
+            const key = result.winner === 'draw' ? 'draw' : result.winner;
+            roomRef.child('score/' + key).transaction(v => (v || 0) + 1);
+            setTimeout(() => {
+              roomRef.child('state').set({ board: tttEmptyBoard(), turn: 'X', round: tttRound + 1 });
+            }, 2200);
+          }
+        );
+      } else if(!result) {
+        tttRoundBusy = false;
+        clearTTTWinLine();
+        const myTurn = tttTurn === mySymbol;
+        document.getElementById('tttStatus').textContent = myTurn ? '🟢 Giliranmu' : '⏳ Giliran lawan...';
+      }
+    });
+
+    if(myRole === 'p1'){
+      // Cuma tulis papan kosong kalau memang belum ada state di server —
+      // supaya kalau host sempat reconnect/lag, game yang sedang jalan
+      // tidak ke-reset tiba-tiba.
+      roomRef.child('state').once('value').then(snap => {
+        if(!snap.exists()){
+          roomRef.child('state').set({ board: tttEmptyBoard(), turn: 'X', round: 0 });
+        }
+      });
+    }
+  }
+
+  function buildTTTBoard(){
+    const bd = document.getElementById('tttBoard');
+    bd.innerHTML = '';
+    for(let i=0;i<9;i++){
+      const btn = document.createElement('button');
+      btn.className = 'ttt-cell';
+      btn.dataset.i = i;
+      btn.addEventListener('pointerdown', (e)=>{ e.preventDefault(); tttCellClick(i); });
+      bd.appendChild(btn);
+    }
+  }
+
+  function renderTTTBoard(){
+    if(!tttBoardState) return;
+    const cells = document.querySelectorAll('#tttBoard .ttt-cell');
+    cells.forEach((cell, i) => {
+      const v = tttBoardState[i];
+      if(v === 'O') cell.innerHTML = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="34" class="o-circle"/></svg>';
+      else if(v === 'X') cell.innerHTML = '<svg viewBox="0 0 100 100"><line x1="20" y1="20" x2="80" y2="80" class="x-line"/><line x1="80" y1="20" x2="20" y2="80" class="x-line"/></svg>';
+      else cell.innerHTML = '';
+    });
+  }
+
+  function tttCellCenter(i){ const col = i % 3, row = Math.floor(i/3); return {x: col+0.5, y: row+0.5}; }
+
+  function drawTTTWinLine(line){
+    clearTTTWinLine();
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 3 3');
+    svg.setAttribute('class', 'winline-svg');
+    const p1 = tttCellCenter(line[0]), p2 = tttCellCenter(line[2]);
+    const ln = document.createElementNS(ns, 'line');
+    ln.setAttribute('x1', p1.x); ln.setAttribute('y1', p1.y);
+    ln.setAttribute('x2', p2.x); ln.setAttribute('y2', p2.y);
+    ln.setAttribute('class', 'winline');
+    svg.appendChild(ln);
+    document.getElementById('tttBoardWrap').appendChild(svg);
+    tttWinSvg = svg;
+  }
+
+  function clearTTTWinLine(){ if(tttWinSvg){ tttWinSvg.remove(); tttWinSvg = null; } }
+
+  function tttCellClick(idx){
+    if(!tttBoardState || tttRoundBusy) return;
+    if(tttTurn !== mySymbol) return;
+    if(tttBoardState[idx]) return;
+    const newBoard = tttBoardState.slice();
+    newBoard[idx] = mySymbol;
+    roomRef.child('state').set({ board: newBoard, turn: mySymbol === 'X' ? 'O' : 'X' });
+  }
+
+  document.getElementById('btnTttBack').onclick = () => {
+    if(activePresenceRef) activePresenceRef.remove();
+    clearSession(); location.reload();
+  };
+
