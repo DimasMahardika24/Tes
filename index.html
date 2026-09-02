@@ -262,20 +262,46 @@ canvas { width: 100%; height: 100%; display: block; }
   html.force-landscape body {
     min-height: 100vw;
   }
+  /* Abis dirotasi, lebar visual layar itu sama dengan 100vh asli & tinggi
+     visualnya sama dengan 100vw asli (soalnya cuma diputer, viewport unit
+     gak ikut ketuker). Jadi .card dipatok pake vh buat lebar & vw buat
+     tinggi biar bener-bener ngisi layar, bukan ngambang kecil di tengah. */
+  html.force-landscape .card {
+    width: min(96vh, 1100px);
+    max-width: min(96vh, 1100px);
+    height: min(94vw, 96vw);
+    max-height: 96vw;
+  }
+}
+
+@media screen and (orientation: landscape) {
+  /* HP/tablet yang emang udah fisik landscape (gak butuh trik rotate),
+     di sini vw/vh normal, jadi lebar ngikut vw & tinggi ngikut vh. */
+  html.force-landscape .card {
+    width: min(96vw, 1100px);
+    max-width: min(96vw, 1100px);
+    height: min(94vh, 96vh);
+    max-height: 96vh;
+  }
 }
 
 /* Ukuran diperbesar & layout dirapetin — berlaku tiap kali lagi di layar
-   Capsa (baik hasil auto-rotate di atas, maupun HP yang emang udah landscape). */
+   Capsa (baik hasil auto-rotate di atas, maupun HP yang emang udah landscape).
+   .card dijadiin kolom flex & capsa-table dibikin ngisi sisa tinggi biar
+   "full layar" tapi tetep dalam batas wajar — kalo kontennya kepanjangan,
+   kartu/tombol tetep bisa keliatan lewat scroll dalem kartu, gak kepotong. */
 html.force-landscape body { align-items: center; padding: 6px; }
-html.force-landscape .card { max-width: 780px; }
-html.force-landscape #pokerScreen .capsa-table { padding: 10px 18px; }
+html.force-landscape .card { display: flex; flex-direction: column; overflow-y: auto; padding: 14px 16px; }
+html.force-landscape #pokerScreen.active { display: flex !important; flex-direction: column; flex: 1; min-height: 0; }
+html.force-landscape #pokerScreen .capsa-table { flex: 1; min-height: 0; padding: 10px 18px; }
+html.force-landscape #pokerScreen .capsa-mid-row { flex: 1; min-height: 0; gap: 18px; }
 html.force-landscape #pokerScreen .capsa-card-img { width: 46px; height: 64px; }
 html.force-landscape #pokerScreen .capsa-card-img.small { width: 36px; height: 50px; }
 html.force-landscape #pokerScreen .capsa-card-back { width: 42px; height: 58px; }
 html.force-landscape #pokerScreen .capsa-hand-me { min-height: 84px; gap: 5px; }
-html.force-landscape #pokerScreen .capsa-mid-row { gap: 18px; }
 html.force-landscape #pokerScreen .capsa-center { min-height: 78px; }
 html.force-landscape #pokerScreen .capsa-hint { display: none; }
+html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
 
 /* Fallback: kalau karena suatu hal JS gagal nambahin class di atas, tetep
    ada pembesaran otomatis begitu device beneran diputar ke landscape. */
@@ -305,15 +331,18 @@ html.force-landscape #pokerScreen .capsa-hint { display: none; }
     <button class="btn-menu g-ttt" id="btnGoJoin" style="justify-content:center;text-align:center">🔗 GABUNG ROOM</button>
   </div>
 
-  <!-- PILIH GAME (cuma muncul kalau Buat Room) -->
-  <div class="screen" id="gamePickScreen">
-    <div class="lobby-title">Pilih Game</div>
-    <button class="btn-menu g-mario" data-game="mario"><span class="ic">🍄</span> Mario Coin Rush (Multiplayer)</button>
-    <button class="btn-menu g-chess" data-game="chess"><span class="ic">♟</span> Catur 2P Online</button>
-    <button class="btn-menu g-ttt" data-game="ttt"><span class="ic">⭕</span> Tic-Tac-Toe 2P</button>
-    <button class="btn-menu g-poker" data-game="poker"><span class="ic">🃏</span> Capsa Banting (4 Pemain)</button>
-    <button class="btn-menu btn-back" id="btnGamePickBack">‹ Kembali</button>
-  </div>
+<!-- PILIH GAME (cuma muncul kalau Buat Room) -->
+<div class="screen" id="gamePickScreen">
+  <div class="lobby-title">Pilih Game</div>
+  <button class="btn-menu g-mario" data-game="mario"><span class="ic">🍄</span> Mario Coin Rush (Multiplayer)</button>
+  <button class="btn-menu g-chess" data-game="chess"><span class="ic">♟</span> Catur 2P Online</button>
+  <button class="btn-menu g-ttt" data-game="ttt"><span class="ic">⭕</span> Tic-Tac-Toe 2P</button>
+  <button class="btn-menu g-poker" data-game="poker"><span class="ic">🃏</span> Poker Capsa (4 Pemain)</button>
+  <!-- TAMBAHAN TOMBOL UNO -->
+  <button class="btn-menu g-mario" data-game="uno" style="background: #e4574f; color:#fff;"><span class="ic">🃏</span> Uno Battle Arena (2-6 Player)</button>
+  <button class="btn-menu btn-back" id="btnGamePickBack">‹ Kembali</button>
+</div>
+
 
   <!-- PILIH WAKTU JALAN CATUR (cuma muncul kalau pilih Catur di atas) -->
   <div class="screen" id="chessTimeScreen">
@@ -498,8 +527,65 @@ html.force-landscape #pokerScreen .capsa-hint { display: none; }
     <button class="btn-menu btn-copy-code" id="capsaBtnNext" style="display:none;justify-content:center;text-align:center">▶ Main Lagi</button>
     <button class="btn-menu btn-back" id="btnPokerBack" style="margin-top:10px;text-align:center;justify-content:center">‹ Menu Utama</button>
   </div>
+ 
 
-</div>
+  <!-- TAMBAHAN: PILIH JUMLAH PEMAIN UNO -->
+  <div class="screen" id="unoPlayerCountScreen">
+    <div class="lobby-title">Pilih Jumlah Pemain Uno</div>
+    <button class="btn-menu g-mario" data-uno-players="2">👥 2 Pemain</button>
+    <button class="btn-menu g-mario" data-uno-players="3">👥 3 Pemain</button>
+    <button class="btn-menu g-mario" data-uno-players="4">👥 4 Pemain</button>
+    <button class="btn-menu g-mario" data-uno-players="5">👥 5 Pemain</button>
+    <button class="btn-menu g-mario" data-uno-players="6">👥 6 Pemain</button>
+    <button class="btn-menu btn-back" id="btnUnoCountBack">‹ Kembali</button>
+  </div>
+
+  <!-- TAMBAHAN: ARENA UNO -->
+  <div class="screen" id="unoScreen">
+    <div class="g-header">
+      <div class="g-title">🃏 Uno Battle Arena</div>
+      <div class="g-role" id="unoRoleTag">-</div>
+    </div>
+    <div class="g-status" id="unoStatus">-</div>
+
+    <div class="capsa-table">
+      <div id="unoOpponentsWrap" style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap;"></div>
+
+      <div class="capsa-center" style="margin: 10px 0;">
+        <div style="font-size:11px; color:var(--ink-dim);">Kartu Meja</div>
+        <img id="unoTopCardImg" class="capsa-card-img" src="" style="width:50px; height:70px; cursor:default;">
+      </div>
+
+      <div class="capsa-seat capsa-bottom">
+        <div class="capsa-hand-me" id="unoHandMe"></div>
+      </div>
+    </div>
+
+    <div class="capsa-actions" id="unoActions" style="display:none; margin-top:10px;">
+      <button class="capsa-act pass" id="unoBtnDraw">📥 Ambil Kartu</button>
+      <button class="capsa-act play" id="unoBtnPlay">🔥 Buang!</button>
+    </div>
+
+    <div class="capsa-name-overlay" id="unoColorPickerOverlay" style="display:none;">
+      <div class="capsa-name-box" style="text-align:center;">
+        <div class="capsa-name-title">🌈 Pilih Warna Kartu</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
+          <button class="capsa-name-btn uno-color-btn" data-color="merah" style="background:#e4574f; color:#fff;">🟥 Merah</button>
+          <button class="capsa-name-btn uno-color-btn" data-color="kuning" style="background:#e8ac1f; color:#000;">🟨 Kuning</button>
+          <button class="capsa-name-btn uno-color-btn" data-color="hijau" style="background:#2bb673; color:#fff;">🟩 Hijau</button>
+          <button class="capsa-name-btn uno-color-btn" data-color="biru" style="background:#3d6bf0; color:#fff;">🟦 Biru</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="capsa-result" id="unoResult" style="display:none;"></div>
+    <button class="btn-menu btn-copy-code" id="unoBtnNext" style="display:none; margin-top:10px; justify-content:center;">▶ Main Lagi</button>
+    <button class="btn-menu btn-back" id="btnUnoBack" style="margin-top:10px; text-align:center; justify-content:center">‹ Menu Utama</button>
+  </div>
+
+</div> <!-- Penutup .card -->
+
+
 
 
 <script src="shared.js"></script>
@@ -507,5 +593,7 @@ html.force-landscape #pokerScreen .capsa-hint { display: none; }
 <script src="Catur.js"></script>
 <script src="Tttc.js"></script>
 <script src="Poker.js"></script>
+<script src="Uno.js"></script> <!-- TAMBAHAN SCRIPT UNO -->
 </body>
+
 </html>

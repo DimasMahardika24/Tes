@@ -89,11 +89,12 @@
   };
 
   const gameMeta = {
-    mario: { title: '🍄 Mario Coin Rush', screen: 'marioScreen' },
-    chess: { title: '♟ Catur 2P Online', screen: 'chessScreen' },
-    ttt:   { title: '⭕ Tic-Tac-Toe 2P', screen: 'tttScreen' },
-    poker: { title: '🃏 Capsa Banting 4P', screen: 'pokerScreen' }
-  };
+  mario: { title: '🍄 Mario Coin Rush', screen: 'marioScreen' },
+  chess: { title: '♟ Catur 2P Online', screen: 'chessScreen' },
+  ttt:   { title: '⭕ Tic-Tac-Toe 2P', screen: 'tttScreen' },
+  poker: { title: '🃏 Poker Capsa', screen: 'pokerScreen' },
+  uno:   { title: '🎴 Uno Battle Arena', screen: 'unoScreen' } // TAMBAHAN
+};
 
   document.getElementById('btnGoCreate').onclick = () => showScreen('gamePickScreen');
   document.getElementById('btnGoJoin').onclick = () => showScreen('joinScreen');
@@ -142,19 +143,30 @@
   }
 
   // ROOM ID baru dibuat SETELAH game dipilih (bukan sebelumnya). Khusus Catur,
-  // ada langkah tambahan: pilih waktu jalan dulu sebelum room benar-benar dibuat.
-  document.querySelectorAll('#gamePickScreen .btn-menu[data-game]').forEach(btn => {
-    btn.onclick = () => {
-      currentGame = btn.dataset.game;
-      myRole = 'p1';
-      if(currentGame === 'chess'){
-        showScreen('chessTimeScreen');
-      } else {
-        chessTimeControl = 0;
-        proceedCreateRoom();
-      }
-    };
-  });
+document.querySelectorAll('#gamePickScreen .btn-menu[data-game]').forEach(btn => {
+  btn.onclick = () => {
+    currentGame = btn.dataset.game;
+    myRole = 'p1';
+    if(currentGame === 'chess'){
+      showScreen('chessTimeScreen');
+    } else if(currentGame === 'uno'){
+      showScreen('unoPlayerCountScreen'); // TAMBAHAN: Arahkan ke pilih player dulu
+    } else {
+      chessTimeControl = 0;
+      proceedCreateRoom();
+    }
+  };
+});
+
+// TAMBAHAN: Listener tombol jumlah player Uno
+document.querySelectorAll('#unoPlayerCountScreen .btn-menu[data-uno-players]').forEach(btn => {
+  btn.onclick = () => {
+    window.unoSelectedMaxPlayers = parseInt(btn.dataset.unoPlayers, 10) || 4;
+    proceedCreateRoom();
+  };
+});
+document.getElementById('btnUnoCountBack').onclick = () => showScreen('gamePickScreen');
+
 
   document.querySelectorAll('#chessTimeScreen .btn-menu[data-time]').forEach(btn => {
     btn.onclick = () => {
@@ -234,14 +246,35 @@
           );
         };
         trySeat(['p2', 'p3', 'p4'], 0);
-      } else {
-        // Catur & Tic-Tac-Toe tetap murni 2 pemain (p1 host, p2 joiner).
-        // PENTING: klaim slot p2 pakai transaction(), BUKAN check-then-set
-        // (once('value') lalu baru set belakangan di attachPresence). Kalau
-        // dua device klik "MASUK GAME" nyaris bersamaan, keduanya bisa lolos
-        // cek "slot kosong" dan sama-sama jadi p2. transaction() menjamin
-        // hanya SATU device yang berhasil menulis true ke node yang masih
-        // null; device kedua otomatis dapat committed=false dan ditolak.
+        
+} else if(currentGame === 'uno'){
+      // TAMBAHAN: Logika klaim slot 2-6 player untuk Uno
+      dbRoot.ref('rooms/' + targetId + '/uno').get().then(unoSnap => {
+        const unoData = unoSnap.val() || {};
+        const maxP = unoData.maxPlayers || 4;
+        const seats = ['p2', 'p3', 'p4', 'p5', 'p6'].slice(0, maxP - 1);
+
+        const tryUnoSeat = (seatList, i) => {
+          if(i >= seatList.length){
+            btnConnect.disabled = false;
+            btnConnect.textContent = 'MASUK GAME';
+            alert('Room Uno ini sudah penuh.');
+            return;
+          }
+          roomRef.child('presence/' + seatList[i]).transaction(
+            (current) => (current === null ? true : undefined),
+            (err, committed) => {
+              if(err || !committed){ tryUnoSeat(seatList, i + 1); return; }
+              myRole = seatList[i];
+              showRoomBadge(targetId);
+              enterGame();
+            }
+          );
+        };
+        tryUnoSeat(seats, 0);
+      });
+    } else {
+      // Catur & Tic-Tac-Toe tetap murni 2 pemain
         roomRef.child('presence/p2').transaction(
           (current) => (current === null ? true : undefined),
           (err, committed) => {
@@ -263,13 +296,15 @@
   };
 
   function enterGame(){
-    showScreen(gameMeta[currentGame].screen);
-    saveSession();
-    if(currentGame === 'mario') initMario();
-    if(currentGame === 'chess') initChess();
-    if(currentGame === 'ttt') initTTT();
-    if(currentGame === 'poker') initPoker();
-  }
+  showScreen(gameMeta[currentGame].screen);
+  saveSession();
+  if(currentGame === 'mario') initMario();
+  if(currentGame === 'chess') initChess();
+  if(currentGame === 'ttt') initTTT();
+  if(currentGame === 'poker') initPoker();
+  if(currentGame === 'uno') initUno(); // TAMBAHAN
+}
+
 
   // ============ RESUME SESI (ga sengaja balik ke menu / ke-back) ============
   // Room & state game (papan, skor) udah otomatis kesimpan di Firebase. Yang
