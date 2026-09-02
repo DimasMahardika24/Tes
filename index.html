@@ -31,11 +31,13 @@ body {
   font-family: 'Inter', 'Segoe UI', Tahoma, sans-serif; color: var(--ink); display: flex; justify-content: center;
   align-items: flex-start; min-height: 100vh; padding: 10px; overflow-x: hidden;
 }
+
+/* Diperbesar max-width dari 500px -> 680px */
 .card {
-  width: 100%; max-width: 500px;
+  width: 100%; max-width: 680px;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 18px; padding: 18px; position: relative; overflow: hidden;
+  border-radius: 18px; padding: 20px; position: relative; overflow: hidden;
   box-shadow: 0 24px 60px rgba(0,0,0,0.5);
   animation: cardIn .4s cubic-bezier(.2,.8,.2,1);
 }
@@ -44,7 +46,7 @@ body {
 .screen.active { display: block !important; animation: fadeSlide .28s cubic-bezier(.2,.8,.2,1); }
 @keyframes fadeSlide { from{ opacity:0; transform: translateY(6px);} to{ opacity:1; transform:none; } }
 .btn-menu {
-  width: 100%; padding: 15px 16px; border: none; border-radius: 12px; font-weight: 700; font-size: 14.5px;
+  width: 100%; padding: 16px 18px; border: none; border-radius: 12px; font-weight: 700; font-size: 15px;
   font-family: 'Space Grotesk', 'Inter', sans-serif; letter-spacing: .2px;
   cursor: pointer; text-align: left; margin-bottom: 10px; color: var(--ink); display: flex; align-items: center; gap: 10px;
   box-shadow: 0 2px 0 rgba(0,0,0,0.3) inset, 0 1px 0 rgba(255,255,255,0.06) inset;
@@ -53,24 +55,24 @@ body {
   position: relative;
 }
 .btn-menu:active { transform: translateY(2px); border-bottom-width: 1px; filter: brightness(0.96); }
-.btn-menu span.ic { font-size: 20px; }
+.btn-menu span.ic { font-size: 22px; }
 .g-mario { background: var(--gold); color: var(--gold-ink); }
 .g-mario span.ic { filter: none; }
 .g-chess { background: var(--blue); color: #fff; }
 .g-ttt { background: var(--green); color: #06251a; }
 .g-poker { background: linear-gradient(135deg, #7a1f2b, #a8283a); color: #fff; }
-.hub-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 3px; display: flex; align-items: center; gap: 9px; }
+.hub-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 24px; font-weight: 700; color: var(--ink); margin-bottom: 3px; display: flex; align-items: center; gap: 9px; }
 .hub-title .badge-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 4px rgba(232,172,31,0.15); flex-shrink: 0; animation: pulseDot 2.4s ease-in-out infinite; }
 @keyframes pulseDot { 0%,100%{ box-shadow: 0 0 0 4px rgba(232,172,31,0.15);} 50%{ box-shadow: 0 0 0 7px rgba(232,172,31,0.05);} }
-.hub-sub { font-size: 13px; color: var(--ink-dim); margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.hub-sub { font-size: 13.5px; color: var(--ink-dim); margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 
-/* Persistent Room ID badge - selalu kelihatan biar gampang share ke temen */
+/* Persistent Room ID badge */
 .room-badge {
   position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 999;
   background: var(--panel-3);
   border: 1px solid var(--line);
-  color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: .5px;
-  padding: 9px 14px; border-radius: 30px; cursor: pointer;
+  color: var(--ink); font-size: 13px; font-weight: 700; letter-spacing: .5px;
+  padding: 10px 16px; border-radius: 30px; cursor: pointer;
   box-shadow: 0 10px 24px rgba(0,0,0,0.45);
   display: none; align-items: center; gap: 8px;
   transition: transform .12s ease;
@@ -79,66 +81,62 @@ body {
 .room-badge:active { transform: translateX(-50%) scale(0.95); }
 .room-badge.show { display: inline-flex; animation: badgeDrop .3s cubic-bezier(.2,1.2,.4,1); }
 @keyframes badgeDrop { from { opacity:0; transform: translateX(-50%) translateY(-10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
-.room-badge .rb-copy { font-size: 10px; color: var(--ink-dim); padding-left: 8px; border-left: 1px solid var(--line); }
+.room-badge .rb-copy { font-size: 11px; color: var(--ink-dim); padding-left: 8px; border-left: 1px solid var(--line); }
 .room-badge.copied { border-color: var(--green); }
 .room-badge.copied .rb-copy { color: var(--green); }
 .room-badge.copied::before { background: var(--green); }
 
 /* Lobby */
-#gamePickScreen .lobby-title, #joinScreen .lobby-title, #createdScreen .lobby-title, #resumeScreen .lobby-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 18px; font-weight: 700; color: var(--ink); margin-bottom: 16px; text-align: center; }
+#gamePickScreen .lobby-title, #joinScreen .lobby-title, #createdScreen .lobby-title, #resumeScreen .lobby-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 20px; font-weight: 700; color: var(--ink); margin-bottom: 16px; text-align: center; }
 #joinScreen .join-box, #createdScreen, #resumeScreen { display: flex; flex-direction: column; align-items: center; }
 #joinScreen .join-box { gap: 8px; margin-top: 4px; width: 100%; }
-#joinScreen .join-box input { width: 100%; background: var(--void); border: 1px solid var(--line); color: var(--ink); padding: 16px; border-radius: 12px; font-size: 20px; letter-spacing: 6px; text-align: center; outline: none; margin-bottom: 8px; font-weight: 700; font-family: 'Space Grotesk', monospace; transition: border-color .15s ease, box-shadow .15s ease; }
+#joinScreen .join-box input { width: 100%; background: var(--void); border: 1px solid var(--line); color: var(--ink); padding: 16px; border-radius: 12px; font-size: 22px; letter-spacing: 6px; text-align: center; outline: none; margin-bottom: 8px; font-weight: 700; font-family: 'Space Grotesk', monospace; transition: border-color .15s ease, box-shadow .15s ease; }
 #joinScreen .join-box input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(61,107,240,0.18); }
-#joinScreen .join-icon, #createdScreen .created-icon, #resumeScreen .created-icon { font-size: 34px; margin-bottom: 8px; opacity: .9; }
-#createdScreen .status, #resumeScreen .status { font-size: 13px; color: var(--ink-dim); margin: 4px 0 16px; font-weight: 500; text-align: center; background: var(--void); padding: 20px 16px; border-radius: 14px; border: 1px solid var(--line); line-height: 1.7; width: 100%; min-height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-#createdScreen .status .code-big, #resumeScreen .status .code-big { display: block; font-family: 'Space Grotesk', monospace; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: var(--gold); margin: 10px 0; }
+#joinScreen .join-icon, #createdScreen .created-icon, #resumeScreen .created-icon { font-size: 38px; margin-bottom: 8px; opacity: .9; }
+#createdScreen .status, #resumeScreen .status { font-size: 14px; color: var(--ink-dim); margin: 4px 0 16px; font-weight: 500; text-align: center; background: var(--void); padding: 20px 16px; border-radius: 14px; border: 1px solid var(--line); line-height: 1.7; width: 100%; min-height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#createdScreen .status .code-big, #resumeScreen .status .code-big { display: block; font-family: 'Space Grotesk', monospace; font-size: 34px; font-weight: 700; letter-spacing: 8px; color: var(--gold); margin: 10px 0; }
 #createdScreen .status .game-name, #resumeScreen .status .game-name { color: var(--ink); font-weight: 700; }
 #createdScreen .btn-copy-code, #resumeScreen .btn-copy-code { background: var(--blue); color: #fff; width: 100%; text-align: center; justify-content: center; margin-bottom: 10px; }
-/* Tombol "MASUK GAME" sebelumnya gak ada style-nya sama sekali (class
-   .btn-join-mode dipakai di HTML tapi CSS-nya gak pernah dibikin), jadi
-   browser jatuh ke tombol putih default bawaan. Disamain ke tema biru
-   kayak tombol utama lainnya, termasuk state disabled pas lagi "MENGECEK
-   ROOM...". */
+
 .btn-join-mode { background: var(--blue); color: #fff; border-bottom: 3px solid #1f3f9e; margin-top: 6px; }
 .btn-join-mode:active { background: #3560d6; }
 .btn-join-mode:disabled { background: var(--panel-3); color: var(--ink-dim); border-bottom-color: rgba(0,0,0,0.28); cursor: not-allowed; }
 .btn-back { background: transparent; color: var(--ink-dim); border: 1px solid var(--line); text-align: center; justify-content: center; box-shadow: none; width: 100%; }
 .btn-back:active { background: rgba(255,255,255,0.04); }
-.spinner { width:16px; height:16px; border-radius:50%; border:2px solid var(--line); border-top-color: var(--gold); display:inline-block; animation: spin .7s linear infinite; margin-top: 4px; }
+.spinner { width:18px; height:18px; border-radius:50%; border:2px solid var(--line); border-top-color: var(--gold); display:inline-block; animation: spin .7s linear infinite; margin-top: 4px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Shared game header */
-.g-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.g-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 16px; font-weight: 700; color: var(--ink); }
-.g-role { font-size: 11px; color: var(--ink); font-weight: 700; background: var(--panel-3); padding: 5px 10px; border-radius: 20px; border: 1px solid var(--line); }
-.g-status { font-size: 12px; color: var(--green); margin-bottom: 10px; font-weight: 600; text-align: center; background: var(--void); padding: 9px; border-radius: 10px; border: 1px solid var(--line); transition: color .2s ease; }
+.g-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.g-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 18px; font-weight: 700; color: var(--ink); }
+.g-role { font-size: 12px; color: var(--ink); font-weight: 700; background: var(--panel-3); padding: 6px 12px; border-radius: 20px; border: 1px solid var(--line); }
+.g-status { font-size: 13px; color: var(--green); margin-bottom: 12px; font-weight: 600; text-align: center; background: var(--void); padding: 10px; border-radius: 10px; border: 1px solid var(--line); transition: color .2s ease; }
 
 /* Mario */
 .game-wrapper { width: 100%; aspect-ratio: 16/9; background: #5c94fc; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); position: relative; box-shadow: 0 10px 26px rgba(0,0,0,0.4); }
 canvas { width: 100%; height: 100%; display: block; }
 .touch-controls { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
-.dpad, .actions { display: flex; gap: 10px; }
-.btn-game { width: 52px; height: 52px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); border-radius: 13px; font-size: 19px; font-weight: bold; display: flex; align-items: center; justify-content: center; touch-action: manipulation; border-bottom: 3px solid rgba(0,0,0,0.35); transition: transform .08s ease, border-bottom-width .08s ease; }
+.dpad, .actions { display: flex; gap: 12px; }
+.btn-game { width: 58px; height: 58px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); border-radius: 14px; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; touch-action: manipulation; border-bottom: 3px solid rgba(0,0,0,0.35); transition: transform .08s ease, border-bottom-width .08s ease; }
 .btn-game:active { transform: translateY(2px); border-bottom-width: 1px; background: var(--panel-3); }
-.btn-jump { width: 84px; background: var(--red); color: #fff; border-bottom: 3px solid #96201b; }
+.btn-jump { width: 96px; background: var(--red); color: #fff; border-bottom: 3px solid #96201b; }
 .btn-jump:active { background: #c8443d; border-bottom-width: 1px; }
-.coin-counter { position: absolute; top: 8px; right: 8px; background: rgba(10,12,17,0.82); color: var(--gold); font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 20px; z-index: 5; border: 1px solid rgba(255,255,255,0.08); }
-.players-counter { position: absolute; top: 8px; left: 8px; background: rgba(10,12,17,0.82); color: var(--green); font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 20px; z-index: 5; border: 1px solid rgba(255,255,255,0.08); }
-.mario-toggle { font-size: 11px; font-weight: 700; color: var(--gold-ink); background: var(--gold); border: none; padding: 6px 11px; border-radius: 20px; cursor: pointer; transition: transform .1s ease, background .15s ease, color .15s ease; }
+.coin-counter { position: absolute; top: 8px; right: 8px; background: rgba(10,12,17,0.82); color: var(--gold); font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 20px; z-index: 5; border: 1px solid rgba(255,255,255,0.08); }
+.players-counter { position: absolute; top: 8px; left: 8px; background: rgba(10,12,17,0.82); color: var(--green); font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 20px; z-index: 5; border: 1px solid rgba(255,255,255,0.08); }
+.mario-toggle { font-size: 12px; font-weight: 700; color: var(--gold-ink); background: var(--gold); border: none; padding: 6px 12px; border-radius: 20px; cursor: pointer; transition: transform .1s ease, background .15s ease, color .15s ease; }
 .mario-toggle:active { transform: scale(0.94); }
 .mario-toggle.off { background: var(--panel-3); color: var(--ink-dim); }
-.mario-off-banner { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10,12,17,0.78); backdrop-filter: blur(2px); z-index: 6; color: var(--ink); font-size: 12px; font-weight: 600; text-align: center; align-items: center; justify-content: center; padding: 0 20px; }
+.mario-off-banner { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10,12,17,0.78); backdrop-filter: blur(2px); z-index: 6; color: var(--ink); font-size: 13px; font-weight: 600; text-align: center; align-items: center; justify-content: center; padding: 0 20px; }
 .mario-off-banner.show { display: flex; }
 .win-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10,12,17,0.92); backdrop-filter: blur(3px); z-index: 20; flex-direction: column; justify-content: center; align-items: center; gap: 14px; animation: fadeSlide .22s ease; }
-.win-text { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 24px; font-weight: 700; text-align: center; color: var(--gold); padding: 0 16px; animation: popIn .3s cubic-bezier(.2,1.3,.4,1); }
+.win-text { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 26px; font-weight: 700; text-align: center; color: var(--gold); padding: 0 16px; animation: popIn .3s cubic-bezier(.2,1.3,.4,1); }
 @keyframes popIn { from{ transform: scale(.7); opacity:0; } to{ transform:scale(1); opacity:1; } }
-.win-overlay .btn-menu { width: 80%; max-width: 220px; margin: 0; }
+.win-overlay .btn-menu { width: 80%; max-width: 240px; margin: 0; }
 
 /* Chess */
 #chessScreen .board-wrapper { width: 100%; aspect-ratio: 1/1; position: relative; border-radius: 10px; box-shadow: 0 14px 30px rgba(0,0,0,0.4); }
 #chessScreen .board { display: grid; grid-template-columns: repeat(8,1fr); grid-template-rows: repeat(8,1fr); width: 100%; height: 100%; background: var(--panel-3); border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
-#chessScreen .cell { display: flex; align-items: center; justify-content: center; font-size: clamp(18px,7vw,32px); cursor: pointer; position: relative; width: 100%; height: 100%; transition: background .1s ease; }
+#chessScreen .cell { display: flex; align-items: center; justify-content: center; font-size: clamp(22px,8vw,42px); cursor: pointer; position: relative; width: 100%; height: 100%; transition: background .1s ease; }
 #chessScreen .cell.light { background: #e9e5d8; }
 #chessScreen .cell.dark { background: #6f8560; }
 #chessScreen .cell.selected { background: #cdb64a !important; box-shadow: inset 0 0 0 3px rgba(255,255,255,0.55); }
@@ -146,24 +144,24 @@ canvas { width: 100%; height: 100%; display: block; }
 #chessScreen .cell.capture::after { content:''; width:82%; height:82%; background:transparent; border:3px solid var(--gold); border-radius:50%; position:absolute; pointer-events:none; }
 #chessScreen .piece.white { color:#ffffff; filter:drop-shadow(0 2px 3px rgba(0,0,0,0.85)); }
 #chessScreen .piece.black { color:#181818; filter:drop-shadow(0 2px 2px rgba(0,0,0,0.4)); }
-#chessScreen .chess-controls { display:flex; gap:8px; margin-bottom:10px; justify-content:center; }
-#chessScreen .btn-flip { flex:1; background: var(--panel-2); border:1px solid var(--line); color: var(--ink); padding:10px; border-radius:10px; font-size:12px; font-weight:700; border-bottom: 3px solid rgba(0,0,0,0.3); }
+#chessScreen .chess-controls { display:flex; gap:8px; margin-bottom:12px; justify-content:center; }
+#chessScreen .btn-flip { flex:1; background: var(--panel-2); border:1px solid var(--line); color: var(--ink); padding:12px; border-radius:10px; font-size:13px; font-weight:700; border-bottom: 3px solid rgba(0,0,0,0.3); }
 #chessScreen .btn-flip:active { transform: translateY(2px); border-bottom-width: 1px; }
-#chessScreen .chess-clocks { display:flex; gap:8px; margin-bottom:10px; }
-#chessScreen .chess-clock { flex:1; background: var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:7px 10px; font-size:11px; font-weight:700; color: var(--ink-dim); text-align:center; }
-#chessScreen .chess-clock span { display:block; font-size:18px; color: var(--ink); margin-top:2px; font-family:'Space Grotesk', monospace; }
+#chessScreen .chess-clocks { display:flex; gap:10px; margin-bottom:12px; }
+#chessScreen .chess-clock { flex:1; background: var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:8px 12px; font-size:12px; font-weight:700; color: var(--ink-dim); text-align:center; }
+#chessScreen .chess-clock span { display:block; font-size:20px; color: var(--ink); margin-top:2px; font-family:'Space Grotesk', monospace; }
 #chessScreen .chess-clock.me { border-color: rgba(232,172,31,0.45); }
 #chessScreen .chess-clock span.low { color: var(--red); }
 #chessScreen .promo-choices { display:flex; gap:10px; }
-#chessScreen .promo-btn { width:54px; height:54px; border-radius:12px; background: var(--panel-2); border:1px solid var(--line); font-size:30px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+#chessScreen .promo-btn { width:60px; height:60px; border-radius:12px; background: var(--panel-2); border:1px solid var(--line); font-size:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
 #chessScreen .promo-btn:active { transform: scale(0.92); background: var(--panel-3); }
 
 /* Tic Tac Toe */
-#tttScreen .ttt-scoreline { display:flex; justify-content:center; gap:16px; font-size:13px; color: var(--ink-dim); margin-bottom:10px; background: var(--void); padding:9px; border-radius:10px; border:1px solid var(--line); }
-#tttScreen .ttt-scoreline b { color: var(--ink); margin-left:4px; }
+#tttScreen .ttt-scoreline { display:flex; justify-content:center; gap:20px; font-size:14px; color: var(--ink-dim); margin-bottom:12px; background: var(--void); padding:10px; border-radius:10px; border:1px solid var(--line); }
+#tttScreen .ttt-scoreline b { color: var(--ink); margin-left:4px; font-size: 15px; }
 #tttScreen .ttt-board-wrap { position: relative; margin-bottom: 6px; border-radius: 14px; box-shadow: 0 14px 30px rgba(0,0,0,0.4); }
-#tttScreen .ttt-board { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; background: var(--void); border-radius:14px; overflow:hidden; padding: 5px; }
-#tttScreen .ttt-cell { aspect-ratio:1; background: var(--panel-2); border:none; border-radius: 8px; padding:16%; cursor:pointer; transition: transform .08s ease, background .12s ease; }
+#tttScreen .ttt-board { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; background: var(--void); border-radius:14px; overflow:hidden; padding: 6px; }
+#tttScreen .ttt-cell { aspect-ratio:1; background: var(--panel-2); border:none; border-radius: 10px; padding:16%; cursor:pointer; transition: transform .08s ease, background .12s ease; }
 #tttScreen .ttt-cell:active { transform: scale(0.94); background: var(--panel-3); }
 #tttScreen .ttt-cell svg { width:100%; height:100%; display:block; overflow: visible; }
 #tttScreen .o-circle { fill:none; stroke: var(--green); stroke-width:9; stroke-linecap:round; stroke-dasharray: 214; stroke-dashoffset: 214; animation: tttDrawCircle .38s ease-out forwards; }
@@ -171,68 +169,75 @@ canvas { width: 100%; height: 100%; display: block; }
 #tttScreen .x-line:nth-child(2) { animation-delay: .16s; }
 @keyframes tttDrawCircle { from { stroke-dashoffset: 214; transform: rotate(-90deg); transform-origin: 50% 50%; } to { stroke-dashoffset: 0; transform: rotate(270deg); transform-origin: 50% 50%; } }
 @keyframes tttDrawLine { from { stroke-dashoffset: 85; } to { stroke-dashoffset: 0; } }
-#tttScreen .winline-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; padding: 5px; box-sizing: border-box; }
+#tttScreen .winline-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; padding: 6px; box-sizing: border-box; }
 #tttScreen .winline { stroke: var(--green); stroke-width:.07; stroke-linecap:round; }
 
-/* ============ CAPSA BANTING (4 Pemain) ============ */
+/* ============ CAPSA BANTING & UNO (POTRAIT MODE - UKURAN DIPERBESAR) ============ */
 .capsa-table {
   background: radial-gradient(120% 120% at 50% 30%, #1c4d34, #0d2e1f 70%);
   border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px; padding: 12px 8px; position: relative;
+  border-radius: 18px; padding: 16px 12px; position: relative;
   box-shadow: 0 14px 30px rgba(0,0,0,0.45), inset 0 0 40px rgba(0,0,0,0.35);
-  display: flex; flex-direction: column; gap: 6px;
+  display: flex; flex-direction: column; gap: 10px;
 }
-.capsa-seat { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px; border-radius: 12px; min-width: 74px; transition: box-shadow .2s ease, background .2s ease; }
+.capsa-seat { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px; border-radius: 12px; min-width: 80px; transition: box-shadow .2s ease, background .2s ease; }
 .capsa-seat.active-turn { box-shadow: 0 0 0 2px var(--gold) inset; background: rgba(232,172,31,0.08); }
-.capsa-seat-info { font-size: 11px; font-weight: 700; color: var(--ink-dim); text-align: center; white-space: nowrap; }
+.capsa-seat-info { font-size: 12px; font-weight: 700; color: var(--ink-dim); text-align: center; white-space: nowrap; }
 .capsa-top { align-self: center; }
-.capsa-mid-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.capsa-mid-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .capsa-bottom { align-self: center; width: 100%; }
-.capsa-hand { display: flex; justify-content: center; align-items: center; min-height: 48px; }
-.capsa-hand-me { display: flex; gap: 3px; justify-content: center; flex-wrap: wrap; min-height: 70px; padding: 4px 2px; }
-.capsa-card-img, .capsa-card-back { border-radius: 5px; box-shadow: 0 3px 8px rgba(0,0,0,0.5); }
-.capsa-card-img { width: 38px; height: 53px; object-fit: contain; background: #fff; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; animation: cardDeal .25s cubic-bezier(.2,.8,.2,1); }
-.capsa-card-img.small { width: 30px; height: 42px; cursor: default; }
-.capsa-card-img.selected { transform: translateY(-10px); box-shadow: 0 0 0 2px var(--gold), 0 8px 16px rgba(0,0,0,0.6); }
+.capsa-hand { display: flex; justify-content: center; align-items: center; min-height: 60px; }
+
+/* Area Kartu Kamu (Diperluas & Diperbesar) */
+.capsa-hand-me { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; min-height: 95px; padding: 8px 4px; }
+.capsa-card-img, .capsa-card-back { border-radius: 7px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+
+/* Kartu Tangan Utama (Dinaikkan ukurannya agar mudah dipencet) */
+.capsa-card-img { width: 52px; height: 74px; object-fit: contain; background: #fff; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; animation: cardDeal .25s cubic-bezier(.2,.8,.2,1); }
+.capsa-card-img.small { width: 40px; height: 56px; cursor: default; }
+.capsa-card-img.selected { transform: translateY(-14px); box-shadow: 0 0 0 3px var(--gold), 0 10px 20px rgba(0,0,0,0.7); }
+
 .capsa-card-back-wrap { position: relative; display: inline-block; }
-.capsa-card-back { width: 36px; height: 50px; object-fit: contain; background: #fff; display: block; animation: cardDeal .25s cubic-bezier(.2,.8,.2,1); }
-.capsa-card-back-count { position: absolute; bottom: -6px; right: -8px; background: var(--gold); color: var(--gold-ink); font-size: 10px; font-weight: 800; border-radius: 10px; padding: 1px 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+.capsa-card-back { width: 44px; height: 62px; object-fit: contain; background: #fff; display: block; animation: cardDeal .25s cubic-bezier(.2,.8,.2,1); }
+.capsa-card-back-count { position: absolute; bottom: -6px; right: -8px; background: var(--gold); color: var(--gold-ink); font-size: 11px; font-weight: 800; border-radius: 10px; padding: 2px 7px; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
 @keyframes cardDeal { from{ opacity:0; transform: translateY(-8px) scale(.9); } to{ opacity:1; transform:none; } }
-.capsa-center { flex: 1; min-height: 96px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: rgba(0,0,0,0.25); border-radius: 12px; padding: 8px 4px; border: 1px dashed rgba(255,255,255,0.12); }
-.capsa-lastplay { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; min-height: 42px; align-items: center; }
-.capsa-last-by { font-size: 11px; color: var(--ink-dim); font-weight: 600; text-align: center; }
-.capsa-hint { font-size: 11.5px; color: var(--ink-dim); text-align: center; margin-top: 8px; }
-.capsa-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-.capsa-act { padding: 14px 6px; border: none; border-radius: 12px; font-weight: 700; font-size: 14px; font-family: 'Space Grotesk', 'Inter', sans-serif; cursor: pointer; border-bottom: 3px solid rgba(0,0,0,0.3); transition: transform .08s ease, border-bottom-width .08s ease, opacity .15s ease; }
+
+.capsa-center { flex: 1; min-height: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: rgba(0,0,0,0.25); border-radius: 14px; padding: 10px 6px; border: 1px dashed rgba(255,255,255,0.12); }
+.capsa-lastplay { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; min-height: 54px; align-items: center; }
+.capsa-last-by { font-size: 12px; color: var(--ink-dim); font-weight: 600; text-align: center; }
+.capsa-hint { font-size: 12px; color: var(--ink-dim); text-align: center; margin-top: 10px; line-height: 1.4; }
+
+.capsa-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.capsa-act { padding: 16px 8px; border: none; border-radius: 12px; font-weight: 700; font-size: 15px; font-family: 'Space Grotesk', 'Inter', sans-serif; cursor: pointer; border-bottom: 3px solid rgba(0,0,0,0.3); transition: transform .08s ease, border-bottom-width .08s ease, opacity .15s ease; }
 .capsa-act:active { transform: translateY(2px); border-bottom-width: 1px; }
 .capsa-act:disabled { opacity: .35; pointer-events: none; }
 .capsa-act.pass { background: var(--blue); color: #fff; }
 .capsa-act.play { background: var(--gold); color: var(--gold-ink); }
-.capsa-result { margin-top: 10px; text-align: center; font-size: 15px; font-weight: 800; color: var(--gold); background: var(--void); border: 1px solid var(--line); border-radius: 12px; padding: 12px; line-height: 1.6; }
+.capsa-result { margin-top: 12px; text-align: center; font-size: 16px; font-weight: 800; color: var(--gold); background: var(--void); border: 1px solid var(--line); border-radius: 12px; padding: 14px; line-height: 1.6; }
 .capsa-seat-done { opacity: .55; }
 
-/* Rank bar (Juara 1/2/3 muncul begitu ada yang habis kartu) */
-.capsa-rankbar { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 8px; }
-.capsa-rank-chip { background: var(--panel-3); border: 1px solid var(--line); color: var(--ink); font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 20px; white-space: nowrap; }
+/* Rank bar */
+.capsa-rankbar { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 10px; }
+.capsa-rank-chip { background: var(--panel-3); border: 1px solid var(--line); color: var(--ink); font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 20px; white-space: nowrap; }
 
 /* Edit Nama */
 .capsa-seat-info { display: flex; align-items: center; justify-content: center; gap: 6px; }
-.capsa-edit-name-btn { background: var(--panel-3); border: 1px solid var(--line); color: var(--ink); font-size: 11px; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; }
+.capsa-edit-name-btn { background: var(--panel-3); border: 1px solid var(--line); color: var(--ink); font-size: 12px; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; }
 .capsa-edit-name-btn:active { transform: scale(0.9); }
 .capsa-name-overlay { position: fixed; inset: 0; background: rgba(10,12,17,0.82); backdrop-filter: blur(3px); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeSlide .2s ease; }
-.capsa-name-box { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: 100%; max-width: 320px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-.capsa-name-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-weight: 700; font-size: 15px; margin-bottom: 12px; text-align: center; }
-.capsa-name-box input { width: 100%; background: var(--void); border: 1px solid var(--line); color: var(--ink); padding: 13px; border-radius: 10px; font-size: 15px; text-align: center; outline: none; margin-bottom: 12px; font-family: 'Inter', sans-serif; }
+.capsa-name-box { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px; width: 100%; max-width: 360px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+.capsa-name-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-weight: 700; font-size: 16px; margin-bottom: 14px; text-align: center; }
+.capsa-name-box input { width: 100%; background: var(--void); border: 1px solid var(--line); color: var(--ink); padding: 14px; border-radius: 10px; font-size: 16px; text-align: center; outline: none; margin-bottom: 14px; font-family: 'Inter', sans-serif; }
 .capsa-name-box input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(61,107,240,0.18); }
-.capsa-name-actions { display: flex; gap: 8px; }
-.capsa-name-btn { flex: 1; padding: 11px; border: none; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; border-bottom: 3px solid rgba(0,0,0,0.3); font-family: 'Inter', sans-serif; }
+.capsa-name-actions { display: flex; gap: 10px; }
+.capsa-name-btn { flex: 1; padding: 12px; border: none; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; border-bottom: 3px solid rgba(0,0,0,0.3); font-family: 'Inter', sans-serif; }
 .capsa-name-btn:active { transform: translateY(2px); border-bottom-width: 1px; }
 .capsa-name-btn.cancel { background: var(--panel-3); color: var(--ink); }
 .capsa-name-btn.save { background: var(--gold); color: var(--gold-ink); }
 
-/* Animasi bagi kartu dari tengah meja pas ronde baru mulai */
+/* Animasi bagi kartu */
 .capsa-deal-overlay { position: absolute; inset: 0; z-index: 30; pointer-events: none; display: flex; align-items: center; justify-content: center; }
-.capsa-deal-card { position: absolute; top: 50%; left: 50%; width: 36px; height: 50px; object-fit: contain; border-radius: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); opacity: 0; transform: translate(-50%, -50%) scale(.6); }
+.capsa-deal-card { position: absolute; top: 50%; left: 50%; width: 44px; height: 62px; object-fit: contain; border-radius: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); opacity: 0; transform: translate(-50%, -50%) scale(.6); }
 .capsa-deal-card.deal-top { animation: dealToTop .6s ease-out forwards; }
 .capsa-deal-card.deal-bottom { animation: dealToBottom .6s ease-out forwards; }
 .capsa-deal-card.deal-left { animation: dealToLeft .6s ease-out forwards; }
@@ -242,90 +247,10 @@ canvas { width: 100%; height: 100%; display: block; }
 @keyframes dealToLeft { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(-190%,-50%) scale(.9); } }
 @keyframes dealToRight { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(190%,-50%) scale(.9); } }
 
-/* ============ AUTO-LANDSCAPE (dipaksa via CSS, TANPA perlu muter HP) ============
-   Trik: pas HP masih posisi tegak (portrait) tapi lagi di layar Capsa,
-   JS nambahin class "force-landscape" ke <html>. Class itu cuma benar-benar
-   MEROTASI layar (via transform) kalau device-nya emang lagi portrait asli
-   (dicek pakai @media orientation:portrait) — jadi kalau device udah
-   landscape asli (tablet dll), gak dobel-rotate, cuma dibesarin aja. */
-@media screen and (orientation: portrait) {
-  html.force-landscape {
-    width: 100vh;
-    height: 100vw;
-    overflow: hidden;
-    position: absolute;
-    top: 0;
-    left: 100%;
-    transform: rotate(90deg); /* Muter 90 derajat ke kanan (ala ala mode game HP) */
-    transform-origin: left top;
-  }
-  html.force-landscape body {
-    min-height: 100vw;
-    padding: 0;
-    align-items: center;
-    justify-content: center;
-  }
-  /* Ukuran disesuaikan agar pas di layar (tidak oversized) */
-  html.force-landscape .card {
-    width: min(88vh, 850px);
-    max-width: min(88vh, 850px);
-    height: min(88vw, 420px);
-    max-height: 88vw;
-    padding: 10px 14px;
-    border-radius: 14px;
-  }
-}
-
-/* Penyesuaian ukuran kartu & elemen di dalam Uno/Capsa saat mode landscape */
-html.force-landscape #unoScreen .capsa-table,
-html.force-landscape #pokerScreen .capsa-table {
-  padding: 6px 12px;
-}
-html.force-landscape #unoScreen .capsa-card-img,
-html.force-landscape #pokerScreen .capsa-card-img {
-  width: 36px;
-  height: 52px;
-}
-
-
-@media screen and (orientation: landscape) {
-  /* HP/tablet yang emang udah fisik landscape (gak butuh trik rotate),
-     di sini vw/vh normal, jadi lebar ngikut vw & tinggi ngikut vh. */
-  html.force-landscape .card {
-    width: min(96vw, 1100px);
-    max-width: min(96vw, 1100px);
-    height: min(94vh, 96vh);
-    max-height: 96vh;
-  }
-}
-
-/* Ukuran diperbesar & layout dirapetin — berlaku tiap kali lagi di layar
-   Capsa (baik hasil auto-rotate di atas, maupun HP yang emang udah landscape).
-   .card dijadiin kolom flex & capsa-table dibikin ngisi sisa tinggi biar
-   "full layar" tapi tetep dalam batas wajar — kalo kontennya kepanjangan,
-   kartu/tombol tetep bisa keliatan lewat scroll dalem kartu, gak kepotong. */
-html.force-landscape body { align-items: center; padding: 6px; }
-html.force-landscape .card { display: flex; flex-direction: column; overflow-y: auto; padding: 14px 16px; }
-html.force-landscape #pokerScreen.active { display: flex !important; flex-direction: column; flex: 1; min-height: 0; }
-html.force-landscape #pokerScreen .capsa-table { flex: 1; min-height: 0; padding: 10px 18px; }
-html.force-landscape #pokerScreen .capsa-mid-row { flex: 1; min-height: 0; gap: 18px; }
-html.force-landscape #pokerScreen .capsa-card-img { width: 46px; height: 64px; }
-html.force-landscape #pokerScreen .capsa-card-img.small { width: 36px; height: 50px; }
-html.force-landscape #pokerScreen .capsa-card-back { width: 42px; height: 58px; }
-html.force-landscape #pokerScreen .capsa-hand-me { min-height: 84px; gap: 5px; }
-html.force-landscape #pokerScreen .capsa-center { min-height: 78px; }
-html.force-landscape #pokerScreen .capsa-hint { display: none; }
-html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
-
-/* Fallback: kalau karena suatu hal JS gagal nambahin class di atas, tetep
-   ada pembesaran otomatis begitu device beneran diputar ke landscape. */
-@media (orientation: landscape) and (max-height: 520px) {
-  #pokerScreen .capsa-table { padding: 10px 18px; }
-  #pokerScreen .capsa-card-img { width: 46px; height: 64px; }
-  #pokerScreen .capsa-card-img.small { width: 36px; height: 50px; }
-  #pokerScreen .capsa-card-back { width: 42px; height: 58px; }
-  #pokerScreen .capsa-hand-me { min-height: 84px; gap: 5px; }
-  #pokerScreen .capsa-hint { display: none; }
+/* Khusus Kartu Meja Uno agar Kelihatan Jelas */
+#unoTopCardImg {
+  width: 64px !important;
+  height: 90px !important;
 }
 </style>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -337,7 +262,6 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
 
 <div class="card">
 
-  <!-- START: Create atau Join -->
   <div class="screen active" id="startScreen">
     <div class="hub-title"><span class="badge-dot"></span>Game Hub</div>
     <div class="hub-sub">Main bareng temen secara online, tinggal share kode room</div>
@@ -345,20 +269,16 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
     <button class="btn-menu g-ttt" id="btnGoJoin" style="justify-content:center;text-align:center">🔗 GABUNG ROOM</button>
   </div>
 
-<!-- PILIH GAME (cuma muncul kalau Buat Room) -->
-<div class="screen" id="gamePickScreen">
-  <div class="lobby-title">Pilih Game</div>
-  <button class="btn-menu g-mario" data-game="mario"><span class="ic">🍄</span> Mario Coin Rush (Multiplayer)</button>
-  <button class="btn-menu g-chess" data-game="chess"><span class="ic">♟</span> Catur 2P Online</button>
-  <button class="btn-menu g-ttt" data-game="ttt"><span class="ic">⭕</span> Tic-Tac-Toe 2P</button>
-  <button class="btn-menu g-poker" data-game="poker"><span class="ic">🃏</span> Poker Capsa (4 Pemain)</button>
-  <!-- TAMBAHAN TOMBOL UNO -->
-  <button class="btn-menu g-mario" data-game="uno" style="background: #e4574f; color:#fff;"><span class="ic">🃏</span> Uno Battle Arena (2-6 Player)</button>
-  <button class="btn-menu btn-back" id="btnGamePickBack">‹ Kembali</button>
-</div>
+  <div class="screen" id="gamePickScreen">
+    <div class="lobby-title">Pilih Game</div>
+    <button class="btn-menu g-mario" data-game="mario"><span class="ic">🍄</span> Mario Coin Rush (Multiplayer)</button>
+    <button class="btn-menu g-chess" data-game="chess"><span class="ic">♟</span> Catur 2P Online</button>
+    <button class="btn-menu g-ttt" data-game="ttt"><span class="ic">⭕</span> Tic-Tac-Toe 2P</button>
+    <button class="btn-menu g-poker" data-game="poker"><span class="ic">🃏</span> Poker Capsa (4 Pemain)</button>
+    <button class="btn-menu g-mario" data-game="uno" style="background: #e4574f; color:#fff;"><span class="ic">🃏</span> Uno Battle Arena (2-6 Player)</button>
+    <button class="btn-menu btn-back" id="btnGamePickBack">‹ Kembali</button>
+  </div>
 
-
-  <!-- PILIH WAKTU JALAN CATUR (cuma muncul kalau pilih Catur di atas) -->
   <div class="screen" id="chessTimeScreen">
     <div class="lobby-title">Pilih Waktu Jalan</div>
     <button class="btn-menu g-chess" data-time="180" style="justify-content:center;text-align:center">⏱ 3 Menit</button>
@@ -368,7 +288,6 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
     <button class="btn-menu btn-back" id="btnChessTimeBack">‹ Kembali</button>
   </div>
 
-  <!-- STATUS SETELAH BUAT ROOM (nunggu lawan) -->
   <div class="screen" id="createdScreen">
     <div class="lobby-title">Room Dibuat!</div>
     <div class="created-icon">🎉</div>
@@ -378,7 +297,6 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
     <button class="btn-menu btn-back" id="btnCreatedBack">‹ Batal</button>
   </div>
 
-  <!-- JOIN ROOM -->
   <div class="screen" id="joinScreen">
     <div class="lobby-title">Gabung Room</div>
     <div class="join-box" style="display:flex">
@@ -389,7 +307,6 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
     <button class="btn-menu btn-back" id="btnJoinBack">‹ Kembali</button>
   </div>
 
-  <!-- RESUME: muncul kalau ada sesi game yang belum sengaja ditutup -->
   <div class="screen" id="resumeScreen">
     <div class="lobby-title">Lanjutkan Room?</div>
     <div class="created-icon">🔌</div>
@@ -402,7 +319,6 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
     <button class="btn-menu btn-back" id="btnResumeNew">✕ Room Baru / Menu Utama</button>
   </div>
 
-  <!-- MARIO -->
   <div class="screen" id="marioScreen">
     <div class="g-header">
       <div class="g-title">🍄 Mario Coin Rush</div>
@@ -427,10 +343,9 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
         <div class="btn-game btn-jump" id="btnJump">LOMPAT</div>
       </div>
     </div>
-    <button class="btn-menu btn-back" id="btnMarioBack" style="margin-top:10px;text-align:center;justify-content:center">‹ Menu Utama</button>
+    <button class="btn-menu btn-back" id="btnMarioBack" style="margin-top:12px;text-align:center;justify-content:center">‹ Menu Utama</button>
   </div>
 
-  <!-- CHESS -->
   <div class="screen" id="chessScreen">
     <div class="g-header">
       <div class="g-title">♟ Catur 2P Online</div>
@@ -458,7 +373,6 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
     </div>
   </div>
 
-  <!-- TIC TAC TOE -->
   <div class="screen" id="tttScreen">
     <div class="g-header">
       <div class="g-title">⭕ Tic-Tac-Toe 2P</div>
@@ -469,10 +383,9 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
     <div class="ttt-board-wrap" id="tttBoardWrap">
       <div class="ttt-board" id="tttBoard"></div>
     </div>
-    <button class="btn-menu btn-back" id="btnTttBack" style="margin-top:10px;text-align:center;justify-content:center">‹ Menu Utama</button>
+    <button class="btn-menu btn-back" id="btnTttBack" style="margin-top:12px;text-align:center;justify-content:center">‹ Menu Utama</button>
   </div>
 
-  <!-- CAPSA BANTING (4 Pemain) -->
   <div class="screen" id="pokerScreen">
     <div class="g-header">
       <div class="g-title">🃏 Capsa Banting 4P</div>
@@ -482,33 +395,28 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
     <div class="capsa-rankbar" id="capsaRankBar" style="display:none"></div>
 
     <div class="capsa-table">
-      <!-- Atas: Opponent 1 (di seberang) -->
       <div class="capsa-seat capsa-top" id="capsaSeatTop">
         <div class="capsa-seat-info" id="capsaNameTop">P?</div>
         <div class="capsa-hand" id="capsaHandTop"></div>
       </div>
 
       <div class="capsa-mid-row">
-        <!-- Kiri: Opponent 2 -->
         <div class="capsa-seat capsa-left" id="capsaSeatLeft">
           <div class="capsa-seat-info" id="capsaNameLeft">P?</div>
           <div class="capsa-hand" id="capsaHandLeft"></div>
         </div>
 
-        <!-- Tengah: combo terakhir yang dibanting -->
         <div class="capsa-center" id="capsaCenter">
           <div class="capsa-lastplay" id="capsaLastPlay"></div>
           <div class="capsa-last-by" id="capsaLastBy"></div>
         </div>
 
-        <!-- Kanan: Opponent 3 -->
         <div class="capsa-seat capsa-right" id="capsaSeatRight">
           <div class="capsa-seat-info" id="capsaNameRight">P?</div>
           <div class="capsa-hand" id="capsaHandRight"></div>
         </div>
       </div>
 
-      <!-- Bawah: Pemain Utama (kartu terbuka, bisa dipilih) -->
       <div class="capsa-seat capsa-bottom" id="capsaSeatBottom">
         <div class="capsa-hand-me" id="capsaHandMe"></div>
         <div class="capsa-seat-info">
@@ -518,7 +426,6 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
       </div>
     </div>
 
-    <!-- Overlay ganti nama panggilan -->
     <div class="capsa-name-overlay" id="capsaNameOverlay" style="display:none">
       <div class="capsa-name-box">
         <div class="capsa-name-title">✏️ Ganti Nama Kamu</div>
@@ -530,7 +437,7 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
       </div>
     </div>
 
-    <div class="capsa-hint">Ketuk kartu untuk pilih, lalu tekan "Banting!" atau "Pass". As gak bisa dibantai As, Poker gak bisa dibantai Poker.</div>
+    <div class="capsa-hint">Ketuk kartu untuk pilih, lalu tekan "Banting!" atau "Pass".</div>
 
     <div class="capsa-actions" id="capsaActions" style="display:none">
       <button class="capsa-act pass" id="capsaBtnPass">Pass</button>
@@ -538,12 +445,10 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
     </div>
 
     <div class="capsa-result" id="capsaResult" style="display:none"></div>
-    <button class="btn-menu btn-copy-code" id="capsaBtnNext" style="display:none;justify-content:center;text-align:center">▶ Main Lagi</button>
-    <button class="btn-menu btn-back" id="btnPokerBack" style="margin-top:10px;text-align:center;justify-content:center">‹ Menu Utama</button>
+    <button class="btn-menu btn-copy-code" id="capsaBtnNext" style="display:none;justify-content:center;text-align:center;margin-top:10px;">▶ Main Lagi</button>
+    <button class="btn-menu btn-back" id="btnPokerBack" style="margin-top:12px;text-align:center;justify-content:center">‹ Menu Utama</button>
   </div>
- 
 
-  <!-- TAMBAHAN: PILIH JUMLAH PEMAIN UNO -->
   <div class="screen" id="unoPlayerCountScreen">
     <div class="lobby-title">Pilih Jumlah Pemain Uno</div>
     <button class="btn-menu g-mario" data-uno-players="2">👥 2 Pemain</button>
@@ -554,7 +459,6 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
     <button class="btn-menu btn-back" id="btnUnoCountBack">‹ Kembali</button>
   </div>
 
-  <!-- TAMBAHAN: ARENA UNO -->
   <div class="screen" id="unoScreen">
     <div class="g-header">
       <div class="g-title">🃏 Uno Battle Arena</div>
@@ -566,8 +470,8 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
       <div id="unoOpponentsWrap" style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap;"></div>
 
       <div class="capsa-center" style="margin: 10px 0;">
-        <div style="font-size:11px; color:var(--ink-dim);">Kartu Meja</div>
-        <img id="unoTopCardImg" class="capsa-card-img" src="" style="width:50px; height:70px; cursor:default;">
+        <div style="font-size:12px; color:var(--ink-dim); font-weight:600;">Kartu Meja</div>
+        <img id="unoTopCardImg" class="capsa-card-img" src="" style="cursor:default;">
       </div>
 
       <div class="capsa-seat capsa-bottom">
@@ -575,7 +479,7 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
       </div>
     </div>
 
-    <div class="capsa-actions" id="unoActions" style="display:none; margin-top:10px;">
+    <div class="capsa-actions" id="unoActions" style="display:none; margin-top:12px;">
       <button class="capsa-act pass" id="unoBtnDraw">📥 Ambil Kartu</button>
       <button class="capsa-act play" id="unoBtnPlay">🔥 Buang!</button>
     </div>
@@ -593,21 +497,15 @@ html.force-landscape #pokerScreen .capsa-actions { flex-shrink: 0; }
     </div>
 
     <div class="capsa-result" id="unoResult" style="display:none;"></div>
-    <button class="btn-menu btn-copy-code" id="unoBtnNext" style="display:none; margin-top:10px; justify-content:center;">▶ Main Lagi</button>
-    <button class="btn-menu btn-back" id="btnUnoBack" style="margin-top:10px; text-align:center; justify-content:center">‹ Menu Utama</button>
+    <button class="btn-menu btn-copy-code" id="unoBtnNext" style="display:none; margin-top:12px; justify-content:center;">▶ Main Lagi</button>
+    <button class="btn-menu btn-back" id="btnUnoBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
   </div>
 
-</div> <!-- Penutup .card -->
-
-
-
-
-<script src="shared.js"></script>
+</div> <script src="shared.js"></script>
 <script src="Mario.js"></script>
 <script src="Catur.js"></script>
 <script src="Tttc.js"></script>
 <script src="Poker.js"></script>
-<script src="Uno.js"></script> <!-- TAMBAHAN SCRIPT UNO -->
+<script src="Uno.js"></script>
 </body>
-    
 </html>
