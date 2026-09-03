@@ -329,33 +329,49 @@
     return 'k' + s;
   }
 
-  // ---------- Render & Visual ----------
   function chessDraw(){
     const bd = document.getElementById('chessBoard');
     if(!bd) return;
     bd.innerHTML = '';
+
+    // FALLBACK: Jika Firebase belum kirim data, gunakan papan default sementara
+    const board = chessBoardState || [
+      ['r','n','b','q','k','b','n','r'],
+      ['p','p','p','p','p','p','p','p'],
+      ['','','','','','','',''],
+      ['','','','','','','',''],
+      ['','','','','','','',''],
+      ['','','','','','','',''],
+      ['P','P','P','P','P','P','P','P'],
+      ['R','N','B','Q','K','B','N','R']
+    ];
+
     let validMoves = [];
     if(chessSelected && chessBoardState){
       validMoves = chessLegalMovesForSquare(chessBoardState, {castling:chessCastling, ep:chessEP}, chessSelected.x, chessSelected.y);
     }
+
     for(let y=0; y<8; y++){
       for(let x=0; x<8; x++){
         const ry = chessFlipped ? 7 - y : y;
         const rx = chessFlipped ? 7 - x : x;
         const cell = document.createElement('div');
         cell.className = 'cell ' + ((rx + ry) % 2 ? 'dark' : 'light');
+        
         if(chessSelected && chessSelected.x === rx && chessSelected.y === ry) cell.classList.add('selected');
+        
         const move = validMoves.find(m => m.x2 === rx && m.y2 === ry);
         if(move) cell.classList.add(move.capture ? 'capture' : 'valid');
         
-        if(chessBoardState){
-          const p = chessBoardState[ry][rx];
-          if(p) cell.innerHTML = '<span class="piece ' + (chessColorOf(p)==='w' ? 'white' : 'black') + '">' + pieceUnicode[p] + '</span>';
-        }
+        // Aman dari error undefined
+        const p = board[ry][rx];
+        if(p) cell.innerHTML = '<span class="piece ' + (chessColorOf(p)==='w' ? 'white' : 'black') + '">' + pieceUnicode[p] + '</span>';
+        
         cell.onclick = () => chessHandleClick(rx, ry);
         bd.appendChild(cell);
       }
     }
+
     const myTurn = chessTurn === myChessColor && !chessGameOver;
     let statusTxt;
     if(chessGameOver){
@@ -364,6 +380,7 @@
       statusTxt = myTurn ? '🟢 Giliranmu (' + (myChessColor==='w'?'Putih':'Hitam') + ')' : '⏳ Giliran lawan...';
       if(chessBoardState && chessIsInCheck(chessBoardState, chessTurn)) statusTxt += (myTurn ? ' — Rajamu SKAK!' : ' — Raja lawan skak');
     }
+    
     const statusEl = document.getElementById('chessStatus');
     if(statusEl) statusEl.textContent = statusTxt;
   }
