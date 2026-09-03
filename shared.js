@@ -94,12 +94,38 @@ document.getElementById('btnCopyCreated').onclick = () => {
 };
 
 const gameMeta = {
-  mario: { title: '🍄 Mario Coin Rush', screen: 'marioScreen' },
-  chess: { title: '♟ Catur 2P Online', screen: 'chessScreen' },
-  ttt:   { title: '⭕ Tic-Tac-Toe 2P', screen: 'tttScreen' },
-  poker: { title: '🃏 Poker Capsa', screen: 'pokerScreen' },
-  uno:   { title: '🎴 Uno Battle Arena', screen: 'unoScreen' }
+  mario:    { title: '🍄 Mario Coin Rush', screen: 'marioScreen' },
+  chess:    { title: '♟ Catur 2P Online', screen: 'chessScreen' },
+  ttt:      { title: '⭕ Tic-Tac-Toe 2P', screen: 'tttScreen' },
+  poker:    { title: '🃏 Poker Capsa', screen: 'pokerScreen' },
+  uno:      { title: '🎴 Uno Battle Arena', screen: 'unoScreen' },
+  monopoli: { title: '🎩 Monopoli Klasik', screen: 'monopoliScreen' }
 };
+
+document.querySelectorAll('#gamePickScreen .btn-menu[data-game]').forEach(btn => {
+  btn.onclick = () => {
+    currentGame = btn.dataset.game;
+    myRole = 'p1';
+    if(currentGame === 'chess'){
+      showScreen('chessTimeScreen');
+    } else if(currentGame === 'uno'){
+      showScreen('unoPlayerCountScreen');
+    } else if(currentGame === 'monopoli'){
+      showScreen('monopoliPlayerCountScreen');
+    } else {
+      chessTimeControl = 0;
+      proceedCreateRoom();
+    }
+  };
+});
+
+document.querySelectorAll('#monopoliPlayerCountScreen .btn-menu[data-mp-players]').forEach(btn => {
+  btn.onclick = () => {
+    window.mpSelectedMaxPlayers = parseInt(btn.dataset.mpPlayers, 10) || 3;
+    proceedCreateRoom();
+  };
+});
+document.getElementById('btnMpCountBack').onclick = () => showScreen('gamePickScreen');
 
 document.getElementById('btnGoCreate').onclick = () => showScreen('gamePickScreen');
 document.getElementById('btnGoJoin').onclick = () => showScreen('joinScreen');
@@ -139,6 +165,7 @@ function executeCreateRoom(){
     let maxP = 2;
     if(currentGame === 'poker') maxP = 4;
     if(currentGame === 'uno') maxP = window.unoSelectedMaxPlayers || 4;
+    if(currentGame === 'monopoli') maxP = window.mpSelectedMaxPlayers || 3;
     if(currentGame === 'mario') maxP = 8;
 
     candidateRef.transaction(
@@ -181,21 +208,6 @@ function executeCreateRoom(){
   }
   tryCreateRoom(5);
 }
-
-document.querySelectorAll('#gamePickScreen .btn-menu[data-game]').forEach(btn => {
-  btn.onclick = () => {
-    currentGame = btn.dataset.game;
-    myRole = 'p1';
-    if(currentGame === 'chess'){
-      showScreen('chessTimeScreen');
-    } else if(currentGame === 'uno'){
-      showScreen('unoPlayerCountScreen');
-    } else {
-      chessTimeControl = 0;
-      proceedCreateRoom();
-    }
-  };
-});
 
 document.querySelectorAll('#unoPlayerCountScreen .btn-menu[data-uno-players]').forEach(btn => {
   btn.onclick = () => {
@@ -367,6 +379,29 @@ function connectToRoomGlobal(targetId) {
         };
         tryUnoSeat(seats, 0);
       });
+    } else if(currentGame === 'monopoli'){
+      dbRoot.ref('rooms/' + targetId + '/monopoli').get().then(mpSnap => {
+        const mpData = mpSnap.val() || {};
+        const maxP = mpData.maxPlayers || 3;
+        const seats = ['p2', 'p3', 'p4', 'p5', 'p6'].slice(0, maxP - 1);
+
+        const tryMpSeat = (seatList, i) => {
+          if(i >= seatList.length){
+            showCustomAlert('Room Monopoli ini sudah penuh.');
+            return;
+          }
+          roomRef.child('presence/' + seatList[i]).transaction(
+            (current) => (current === null ? true : undefined),
+            (err, committed) => {
+              if(err || !committed){ tryMpSeat(seatList, i + 1); return; }
+              myRole = seatList[i];
+              showRoomBadge(targetId);
+              enterGame();
+            }
+          );
+        };
+        tryMpSeat(seats, 0);
+      });
     } else {
       roomRef.child('presence/p2').transaction(
         (current) => (current === null ? true : undefined),
@@ -404,6 +439,7 @@ function enterGame(){
   if(currentGame === 'ttt') initTTT();
   if(currentGame === 'poker') initPoker();
   if(currentGame === 'uno') initUno();
+  if(currentGame === 'monopoli') initMonopoli();
 }
 
 const SESSION_KEY = 'ghub_session_v1';
@@ -483,35 +519,56 @@ window.addEventListener('popstate', () => {
 
 let activePresenceRef = null;
 
-function attachPresence(statusElId, roomLabel, onOpponentChange){
+// ======================================================
+// FIX PERMANEN PRESENCE MULTIPLAYER (shared.js)
+// ======================================================
+let activePresenceRef = null;
+
+function setupPresence(statusElId, roomLabel, onPresenceChange) {
+  if (!roomRef || !myRole) return;
+
   const presenceRef = roomRef.child('presence/' + myRole);
   activePresenceRef = presenceRef;
 
+  // 1. Set status online saat terhubung ke server Firebase
+  dbRoot.ref('.info/connected').off('value'); // Hapus listener lama biar gak numpuk
   dbRoot.ref('.info/connected').on('value', (snap) => {
-    if(snap.val() === true){
+    if (snap.val() === true) {
+      // Pastikan saat terputus otomatis terhapus dari Firebase
       presenceRef.onDisconnect().remove();
       presenceRef.set(true);
     }
   });
 
-  if(!attachPresence._pagehideBound){
-    attachPresence._pagehideBound = true;
+  // 2. Bersihkan presence jika tab/browser ditutup
+  if (!setupPresence._pagehideBound) {
+    setupPresence._pagehideBound = true;
     window.addEventListener('pagehide', () => {
-      if(activePresenceRef) activePresenceRef.remove();
+      if (activePresenceRef) activePresenceRef.remove();
+    });
+    window.addEventListener('beforeunload', () => {
+      if (activePresenceRef) activePresenceRef.remove();
     });
   }
 
-  const oppKey = myRole === 'p1' ? 'p2' : 'p1';
-  roomRef.child('presence/' + oppKey).on('value', (snap) => {
-    const online = !!snap.val();
+  // 3. Listen SEMUA pemain di room, bukan cuma 1 lawan
+  roomRef.child('presence').off('value'); // Clear listener ganda
+  roomRef.child('presence').on('value', (snap) => {
+    const presenceData = snap.val() || {};
     const statusEl = document.getElementById(statusElId);
-    if(online){
-      statusEl.textContent = '🟢 Lawan terhubung! Main jalan...';
-    } else {
-      statusEl.textContent = myRole === 'p1'
-        ? '🟡 Room: ' + roomLabel + ' (Menunggu lawan...)'
-        : '🔴 Lawan terputus, menunggu balik lagi...';
+    
+    if (statusEl) {
+      const onlineRoles = Object.keys(presenceData);
+      if (onlineRoles.length > 1) {
+        statusEl.textContent = `🟢 ${onlineRoles.length} Pemain terhubung! Game berjalan...`;
+        statusEl.style.color = 'var(--green)';
+      } else {
+        statusEl.textContent = `🟡 Room: ${roomLabel} (Menunggu pemain lain...)`;
+        statusEl.style.color = 'var(--gold)';
+      }
     }
-    if(onOpponentChange) onOpponentChange(online);
+
+    // Callback untuk re-render UI game lokal
+    if (onPresenceChange) onPresenceChange(presenceData);
   });
 }

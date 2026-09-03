@@ -24,13 +24,12 @@
 * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
 html, body { height: 100%; }
 body {
-  background:
-    radial-gradient(560px 380px at 15% -8%, rgba(61,107,240,0.16), transparent 60%),
-    radial-gradient(520px 360px at 100% 0%, rgba(232,172,31,0.10), transparent 55%),
-    var(--void);
+  background: url('https://cdn.jsdelivr.net/gh/dikzzgans424-star/CDN-Miwa-botz@main/uploads/1788436685269.jpg') no-repeat center center fixed;
+  background-size: cover;
   font-family: 'Inter', 'Segoe UI', Tahoma, sans-serif; color: var(--ink); display: flex; justify-content: center;
   align-items: flex-start; min-height: 100vh; padding: 10px; overflow-x: hidden;
 }
+
 
 .card {
   width: 100%; max-width: 680px;
@@ -356,7 +355,44 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu g-ttt" data-game="ttt"><span class="ic">⭕</span> Tic-Tac-Toe 2P</button>
     <button class="btn-menu g-poker" data-game="poker"><span class="ic">🃏</span> Poker Capsa (4 Pemain)</button>
     <button class="btn-menu g-mario" data-game="uno" style="background: #e4574f; color:#fff;"><span class="ic">🎴</span> Uno Battle Arena (2-6 Player)</button>
+    <button class="btn-menu g-poker" data-game="monopoli" style="background: linear-gradient(135deg, #2b6cb0, #2c5282); color:#fff;"><span class="ic">🎩</span> Monopoli Klasik (3-6 Player)</button>
     <button class="btn-menu btn-back" id="btnGamePickBack">‹ Kembali</button>
+  </div>
+
+  <div class="screen" id="monopoliPlayerCountScreen">
+    <div class="lobby-title">Pilih Jumlah Pemain Monopoli</div>
+    <button class="btn-menu g-mario" data-mp-players="3">👥 3 Pemain</button>
+    <button class="btn-menu g-mario" data-mp-players="4">👥 4 Pemain</button>
+    <button class="btn-menu g-mario" data-mp-players="5">👥 5 Pemain</button>
+    <button class="btn-menu g-mario" data-mp-players="6">👥 6 Pemain</button>
+    <button class="btn-menu btn-back" id="btnMpCountBack">‹ Kembali</button>
+  </div>
+
+  <div class="screen" id="monopoliScreen">
+    <div class="g-header">
+      <div class="g-title">🎩 Monopoli Klasik</div>
+      <div class="g-role" id="mpRoleTag">-</div>
+    </div>
+    <div class="g-status" id="mpStatus">-</div>
+
+    <div class="capsa-table" style="background: #111827; padding: 10px;">
+      <div style="width:100%; aspect-ratio:1/1; position:relative; margin:0 auto; max-width:480px;">
+        <canvas id="mpBoardCanvas" style="width:100%; height:100%; border-radius:12px; border:2px solid var(--line); display:block;"></canvas>
+      </div>
+      <div id="mpPlayerListWrap" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px;"></div>
+    </div>
+
+    <div class="capsa-actions" id="mpActions" style="display:none; margin-top:10px;">
+      <button class="capsa-act play" id="mpBtnRoll" style="grid-column: span 2; background:var(--gold); color:#000;">🎲 Lempar Dadu</button>
+      <button class="capsa-act pass" id="mpBtnPayJail" style="display:none; background:var(--blue); color:#fff;">💵 Bayar Denda Penjara ($50)</button>
+      <button class="capsa-act play" id="mpBtnBuy" style="display:none; background:var(--green); color:#fff;">🏠 Beli Properti</button>
+      <button class="capsa-act play" id="mpBtnHouse" style="display:none; background:#8b5cf6; color:#fff;">🏠+ Beli Rumah/Hotel</button>
+      <button class="capsa-act pass" id="mpBtnEndTurn" style="display:none;">⏭️ Selesai Giliran</button>
+    </div>
+
+
+    <div class="capsa-result" id="mpResult" style="display:none; margin-top:10px;"></div>
+    <button class="btn-menu btn-back" id="btnMpBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
   </div>
 
   <div class="screen" id="chessTimeScreen">
@@ -589,5 +625,7 @@ canvas { width: 100%; height: 100%; display: block; }
 <script src="Tttc.js"></script>
 <script src="Poker.js"></script>
 <script src="Uno.js"></script>
+<script src="sys-mp.js"></script>
+<script src="monopoli.js"></script>
 </body>
 </html>
