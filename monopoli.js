@@ -239,6 +239,8 @@ function checkAndStartMpGame() {
   
   const targetMax = (latestMpData && latestMpData.maxPlayers) || window.mpSelectedMaxPlayers || 3;
   const activeRoles = getMpRoles(targetMax);
+  
+  // Mengecek apakah semua role (p1, p2, p3...) sudah aktif online di presence
   const onlineRoles = Object.keys(mpPresence || {}).filter(r => mpPresence[r] && activeRoles.includes(r));
 
   if (onlineRoles.length >= targetMax && latestMpData && latestMpData.phase === 'waiting') {
@@ -250,6 +252,7 @@ function checkAndStartMpGame() {
     });
   }
 }
+
 
 function initMonopoli() {
   mpRef = roomRef.child('monopoli');
@@ -269,19 +272,28 @@ function initMonopoli() {
   pRef.set(true);
   pRef.onDisconnect().remove();
 
+  // DIPERBAIKI: P1 wajib langsung menuliskan state 'waiting' dan maxPlayers secara utuh ke Firebase
   if (myRole === 'p1') {
-    mpRef.transaction(cur => cur || {
-      phase: 'waiting',
-      maxPlayers: window.mpSelectedMaxPlayers || 3
+    const targetMax = window.mpSelectedMaxPlayers || 3;
+    mpRef.transaction(cur => {
+      if (!cur) {
+        return {
+          phase: 'waiting',
+          maxPlayers: targetMax
+        };
+      }
+      return cur;
     });
   }
 
+  // Listener presence untuk mendeteksi ketersediaan pemain online
   roomRef.child('presence').on('value', snap => {
     mpPresence = snap.val() || {};
     if (latestMpData) renderMpUI(latestMpData);
     checkAndStartMpGame();
   });
 
+  // Listener realtime Monopoli
   mpRef.on('value', snap => {
     const data = snap.val();
     if (data) {
@@ -321,6 +333,7 @@ function initMonopoli() {
     }
   }, 3000);
 }
+
 
 function mpDoRollWithAnim() {
   if (!latestMpData || latestMpData.turn !== myRole || latestMpData.hasRolled || animState.isRolling) return;
