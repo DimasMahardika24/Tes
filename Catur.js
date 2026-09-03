@@ -1,22 +1,14 @@
 // ======================================================
-// Catur.js — Game 2: Catur 2P Online
-// Membutuhkan shared.js sudah dimuat lebih dulu (pakai variabel
-// & fungsi bersama seperti dbRoot, roomRef, myRole, currentGame,
-// chessTimeControl, attachPresence, clearSession, dst).
+// Catur.js — Game 2: Catur 2P Online (Fixed & Optimized)
 // ======================================================
 
-  // ======================================================
-  // ================== GAME 2: CATUR ====================
-  // ======================================================
   const pieceUnicode = {k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟',K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙'};
   let chessBoardState, chessTurn, chessSelected = null, chessFlipped = false, myChessColor, chessGameOver = false;
   let chessCastling, chessEP, chessHalfmove = 0;
-  // chessTimeControl sekarang dideklarasikan di shared.js (dipakai juga oleh
-  // proceedCreateRoom() & alur join room di sana, sebelum Catur.js jalan).
-  let chessClocks = null;           // {w: ms, b: ms} sisa waktu, disinkron lewat Firebase
-  let chessTurnStartAt = null;      // timestamp mulai giliran berjalan, buat hitung mundur live
+  let chessClocks = null;          
+  let chessTurnStartAt = null;     
   let chessClockInterval = null;
-  let chessPendingPromotion = null; // move yang lagi nunggu pilihan promosi
+  let chessPendingPromotion = null;
 
   const CHESS_REASON_TEXT = {
     checkmate: 'Skakmat',
@@ -28,7 +20,6 @@
   };
 
   function chessColorOf(p){ if(!p) return null; return p === p.toUpperCase() ? 'w' : 'b'; }
-  function chessRoleOfColor(c){ return c === 'w' ? 'p1' : 'p2'; }
 
   function chessStartingState(){
     return {
@@ -70,10 +61,11 @@
 
     attachPresence('chessStatus', roomIdGlobal);
 
+    // Dapatkan data state real-time
     roomRef.child('state').on('value', (snap) => {
       const data = snap.val();
       if(!data) return;
-      chessBoardState = JSON.parse(data.board);
+      chessBoardState = typeof data.board === 'string' ? JSON.parse(data.board) : data.board;
       chessTurn = data.turn;
       chessCastling = data.castling || { wK:false, wQ:false, bK:false, bQ:false };
       chessEP = data.ep || null;
@@ -100,9 +92,8 @@
           roomRef.child('state').set(chessStateToFirebase(chessStartingState()));
         }
       });
-      roomRef.child('result').once('value').then(snap => {
-        if(!snap.exists()) roomRef.child('posCounts').remove();
-      });
+      roomRef.child('result').remove();
+      roomRef.child('posCounts').remove();
     }
 
     if(chessClockInterval) clearInterval(chessClockInterval);
@@ -111,7 +102,7 @@
     chessDraw();
   }
 
-  // ---------- Deteksi serangan / skak ----------
+  // ---------- Deteksi Serangan & Skak ----------
   function chessFindKing(board, color){
     const K = color === 'w' ? 'K' : 'k';
     for(let y=0;y<8;y++) for(let x=0;x<8;x++) if(board[y][x] === K) return {x,y};
@@ -168,7 +159,7 @@
     return chessSquareAttacked(board, k.x, k.y, color === 'w' ? 'b' : 'w');
   }
 
-  // ---------- Generate langkah ----------
+  // ---------- Generate Langkah Legal ----------
   function chessPieceMoves(board, state, x, y){
     const p = board[y][x];
     if(!p) return [];
@@ -209,16 +200,13 @@
       const homeRow = color === 'w' ? 7 : 0;
       const oppColor = color === 'w' ? 'b' : 'w';
 
-      // PERBAIKAN: Wajib cek hak rights.wK / rights.bK & rights.wQ / rights.bQ dari database!
       if(y===homeRow && x===4 && !chessSquareAttacked(board,x,y,oppColor)){
-        // Rokade Sayap Raja (Kingside)
         const canCastleK = color === 'w' ? rights.wK : rights.bK;
         if(canCastleK && !board[homeRow][5] && !board[homeRow][6] && board[homeRow][7]===(color==='w'?'R':'r')){
           if(!chessSquareAttacked(board,5,homeRow,oppColor) && !chessSquareAttacked(board,6,homeRow,oppColor)){
             moves.push({x1:x,y1:y,x2:6,y2:homeRow,capture:false,flag:'castleK',promotion:false});
           }
         }
-        // Rokade Sayap Menteri (Queenside)
         const canCastleQ = color === 'w' ? rights.wQ : rights.bQ;
         if(canCastleQ && !board[homeRow][1] && !board[homeRow][2] && !board[homeRow][3] && board[homeRow][0]===(color==='w'?'R':'r')){
           if(!chessSquareAttacked(board,3,homeRow,oppColor) && !chessSquareAttacked(board,2,homeRow,oppColor)){
@@ -289,21 +277,19 @@
     return { board: nb, castling: nc, ep: newEp, halfmove: newHalfmove, capturedPiece };
   }
 
-    function chessLegalMovesForSquare(board, state, x, y){
+  function chessLegalMovesForSquare(board, state, x, y){
     const p = board[y][x];
     if(!p) return [];
     const color = chessColorOf(p);
     const pseudo = chessPieceMoves(board, state, x, y);
     const legal = [];
     for(const m of pseudo){
-      // PERBAIKAN: Jika ini langkah promosi, uji pilihan promosi yang valid
       const promoChoice = m.promotion ? 'q' : null;
       const res = chessApplyMove(board, state, m, promoChoice);
-      if(!chessIsInCheck(res.board, color)) legal.push(m); // Cegah self-check
+      if(!chessIsInCheck(res.board, color)) legal.push(m);
     }
     return legal;
   }
-
 
   function chessAllLegalMoves(board, state, color){
     let all = [];
@@ -328,7 +314,7 @@
     if(pieces.length === 2){
       const [a,b] = pieces;
       if(a.p.toLowerCase()==='b' && b.p.toLowerCase()==='b' && chessColorOf(a.p)!==chessColorOf(b.p)){
-        if((a.x+a.y)%2 === (b.x+b.y)%2) return true; // gajah lawan warna tapi di kotak warna sama = tak bisa skakmat
+        if((a.x+a.y)%2 === (b.x+b.y)%2) return true;
       }
       return false;
     }
@@ -343,12 +329,13 @@
     return 'k' + s;
   }
 
-  // ---------- Render & interaksi ----------
+  // ---------- Render & Visual ----------
   function chessDraw(){
     const bd = document.getElementById('chessBoard');
+    if(!bd) return;
     bd.innerHTML = '';
     let validMoves = [];
-    if(chessSelected){
+    if(chessSelected && chessBoardState){
       validMoves = chessLegalMovesForSquare(chessBoardState, {castling:chessCastling, ep:chessEP}, chessSelected.x, chessSelected.y);
     }
     for(let y=0; y<8; y++){
@@ -360,8 +347,11 @@
         if(chessSelected && chessSelected.x === rx && chessSelected.y === ry) cell.classList.add('selected');
         const move = validMoves.find(m => m.x2 === rx && m.y2 === ry);
         if(move) cell.classList.add(move.capture ? 'capture' : 'valid');
-        const p = chessBoardState[ry][rx];
-        if(p) cell.innerHTML = '<span class="piece ' + (chessColorOf(p)==='w' ? 'white' : 'black') + '">' + pieceUnicode[p] + '</span>';
+        
+        if(chessBoardState){
+          const p = chessBoardState[ry][rx];
+          if(p) cell.innerHTML = '<span class="piece ' + (chessColorOf(p)==='w' ? 'white' : 'black') + '">' + pieceUnicode[p] + '</span>';
+        }
         cell.onclick = () => chessHandleClick(rx, ry);
         bd.appendChild(cell);
       }
@@ -374,12 +364,13 @@
       statusTxt = myTurn ? '🟢 Giliranmu (' + (myChessColor==='w'?'Putih':'Hitam') + ')' : '⏳ Giliran lawan...';
       if(chessBoardState && chessIsInCheck(chessBoardState, chessTurn)) statusTxt += (myTurn ? ' — Rajamu SKAK!' : ' — Raja lawan skak');
     }
-    document.getElementById('chessStatus').textContent = statusTxt;
+    const statusEl = document.getElementById('chessStatus');
+    if(statusEl) statusEl.textContent = statusTxt;
   }
 
   function chessHandleClick(x, y){
-    if(chessGameOver || chessPendingPromotion) return;
-    if(chessTurn !== myChessColor) return; // bukan giliran kamu
+    if(chessGameOver || chessPendingPromotion || !chessBoardState) return;
+    if(chessTurn !== myChessColor) return;
     const p = chessBoardState[y][x];
     if(chessSelected){
       const legalMoves = chessLegalMovesForSquare(chessBoardState, {castling:chessCastling, ep:chessEP}, chessSelected.x, chessSelected.y);
@@ -422,9 +413,9 @@
       ep: result.ep, halfmove: result.halfmove, clocks: newClocks, turnStartAt: newTurnStartAt
     });
 
-    // Threefold repetition: hitung posisi lewat transaction biar aman dari race
+    // Pengecekan Threefold Repetition
     const key = chessPositionKey(result.board, nextTurn, result.castling, result.ep);
-    roomRef.child('posCounts').child(key).transaction(c => (c||0) + 1).then(res => {
+    roomRef.child('posCounts/' + key).transaction(c => (c||0) + 1).then(res => {
       if(res.committed && res.snapshot.val() >= 3) chessDeclareResult('draw', 'threefold');
     }).catch(()=>{});
 
@@ -450,8 +441,9 @@
     return (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
   }
 
-    function chessUpdateClockUI(){
+  function chessUpdateClockUI(){
     const wrap = document.getElementById('chessClockWrap');
+    if(!wrap) return;
     if(!chessClocks){ wrap.style.display = 'none'; return; }
     wrap.style.display = 'flex';
     let liveW = chessClocks.w, liveB = chessClocks.b;
@@ -463,22 +455,25 @@
     const myLive = myChessColor === 'w' ? liveW : liveB;
     const oppLive = myChessColor === 'w' ? liveB : liveW;
     const meEl = document.getElementById('chessClockMe'), oppEl = document.getElementById('chessClockOpp');
-    meEl.textContent = chessFormatClock(myLive);
-    oppEl.textContent = chessFormatClock(oppLive);
-    meEl.classList.toggle('low', myLive < 30000);
-    oppEl.classList.toggle('low', oppLive < 30000);
+    if(meEl) {
+      meEl.textContent = chessFormatClock(myLive);
+      meEl.classList.toggle('low', myLive < 30000);
+    }
+    if(oppEl) {
+      oppEl.textContent = chessFormatClock(oppLive);
+      oppEl.classList.toggle('low', oppLive < 30000);
+    }
 
-    // PERBAIKAN: Izinkan klaim timeout dari HP mana saja (mencegah lawan nge-freeze/curang jam)
     if(!chessGameOver){
-      if(liveW <= 0) chessDeclareResult('p2', 'timeout'); // Hitam Menang (p2)
-      else if(liveB <= 0) chessDeclareResult('p1', 'timeout'); // Putih Menang (p1)
+      if(liveW <= 0) chessDeclareResult('p2', 'timeout');
+      else if(liveB <= 0) chessDeclareResult('p1', 'timeout');
     }
   }
-
 
   function showChessResult(r){
     const overlay = document.getElementById('chessWinOverlay');
     const textEl = document.getElementById('chessWinText');
+    if(!overlay || !textEl) return;
     const reasonTxt = CHESS_REASON_TEXT[r.reason] || '';
     if(r.winner === 'draw'){
       textEl.innerHTML = '🤝 REMIS<br><span style="font-size:13px;opacity:.85">' + reasonTxt + '</span>';
@@ -491,6 +486,7 @@
 
   function showChessPromoModal(color){
     const wrap = document.getElementById('chessPromoChoices');
+    if(!wrap) return;
     wrap.innerHTML = '';
     ['q','r','b','n'].forEach(t => {
       const key = color === 'w' ? t.toUpperCase() : t;
@@ -502,7 +498,12 @@
     });
     document.getElementById('chessPromoOverlay').style.display = 'flex';
   }
-  function hideChessPromoModal(){ document.getElementById('chessPromoOverlay').style.display = 'none'; }
+
+  function hideChessPromoModal(){
+    const el = document.getElementById('chessPromoOverlay');
+    if(el) el.style.display = 'none';
+  }
+
   function chessResolvePromotion(choice){
     const mv = chessPendingPromotion;
     chessPendingPromotion = null;
@@ -511,15 +512,19 @@
     chessDraw();
   }
 
-  document.getElementById('btnChessFlip').onclick = () => { chessFlipped = !chessFlipped; chessDraw(); };
-  document.getElementById('btnChessBack').onclick = () => {
-    if(chessClockInterval){ clearInterval(chessClockInterval); chessClockInterval = null; }
-    if(activePresenceRef) activePresenceRef.remove();
-    clearSession(); location.reload();
-  };
-  document.getElementById('btnChessMenu').onclick = () => {
+  const btnFlip = document.getElementById('btnChessFlip');
+  if(btnFlip) btnFlip.onclick = () => { chessFlipped = !chessFlipped; chessDraw(); };
+
+  const btnBack = document.getElementById('btnChessBack');
+  if(btnBack) btnBack.onclick = () => {
     if(chessClockInterval){ clearInterval(chessClockInterval); chessClockInterval = null; }
     if(activePresenceRef) activePresenceRef.remove();
     clearSession(); location.reload();
   };
 
+  const btnMenu = document.getElementById('btnChessMenu');
+  if(btnMenu) btnMenu.onclick = () => {
+    if(chessClockInterval){ clearInterval(chessClockInterval); chessClockInterval = null; }
+    if(activePresenceRef) activePresenceRef.remove();
+    clearSession(); location.reload();
+  };
