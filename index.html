@@ -61,20 +61,27 @@ body {
 @keyframes pulseDot { 0%,100%{ box-shadow: 0 0 0 4px rgba(232,172,31,0.15);} 50%{ box-shadow: 0 0 0 7px rgba(232,172,31,0.05);} }
 .hub-sub { font-size: 13.5px; color: var(--ink-dim); margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 
+/* FIXED ROOM BADGE BUG: Diposisikan rapi di dalam layout tanpa menutupi UI game */
+.room-badge-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
 .room-badge {
-  position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 999;
+  position: relative;
+  top: 0; left: 0; transform: none; z-index: 10;
   background: var(--panel-3);
   border: 1px solid var(--line);
-  color: var(--ink); font-size: 13px; font-weight: 700; letter-spacing: .5px;
-  padding: 10px 16px; border-radius: 30px; cursor: pointer;
-  box-shadow: 0 10px 24px rgba(0,0,0,0.45);
+  color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: .5px;
+  padding: 6px 14px; border-radius: 30px; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   display: none; align-items: center; gap: 8px;
   transition: transform .12s ease;
 }
 .room-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
-.room-badge:active { transform: translateX(-50%) scale(0.95); }
+.room-badge:active { transform: scale(0.95); }
 .room-badge.show { display: inline-flex; animation: badgeDrop .3s cubic-bezier(.2,1.2,.4,1); }
-@keyframes badgeDrop { from { opacity:0; transform: translateX(-50%) translateY(-10px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+@keyframes badgeDrop { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform: translateY(0); } }
 .room-badge .rb-copy { font-size: 11px; color: var(--ink-dim); padding-left: 8px; border-left: 1px solid var(--line); }
 .room-badge.copied { border-color: var(--green); }
 .room-badge.copied .rb-copy { color: var(--green); }
@@ -262,9 +269,11 @@ canvas { width: 100%; height: 100%; display: block; }
 </head>
 <body>
 
-<div class="room-badge" id="roomBadge"><span id="roomBadgeText">Room: ------</span><span class="rb-copy" id="roomBadgeCopy">⧉ salin</span></div>
-
 <div class="card">
+  <!-- Pembungkus Room Badge agar berada di posisi aman -->
+  <div class="room-badge-wrap">
+    <div class="room-badge" id="roomBadge"><span id="roomBadgeText">Room: ------</span><span class="rb-copy" id="roomBadgeCopy">⧉ salin</span></div>
+  </div>
 
   <!-- START SCREEN -->
   <div class="screen active" id="startScreen">

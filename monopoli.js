@@ -1,5 +1,6 @@
 // ======================================================
 // monopoli.js — Full Visual Animation & Board CDN Integrated
+// FIX: Auto Start Multi-Player & Presence Race Condition Fix
 // ======================================================
 
 let mpRef = null;
@@ -40,6 +41,23 @@ let animState = {
   stepCounterAlpha: 0
 };
 
+function checkAndStartMpGame() {
+  if (myRole !== 'p1') return;
+  
+  const targetMax = (latestMpData && latestMpData.maxPlayers) || window.mpSelectedMaxPlayers || 3;
+  const activeRoles = getMpRoles(targetMax);
+  const allIn = activeRoles.every(s => mpPresence[s]);
+
+  if (allIn && latestMpData && latestMpData.phase === 'waiting') {
+    mpRef.transaction(cur => {
+      if (cur && cur.phase === 'waiting') {
+        return buildNewMpGame(cur.maxPlayers || targetMax);
+      }
+      return cur;
+    });
+  }
+}
+
 function initMonopoli() {
   mpRef = roomRef.child('monopoli');
   document.getElementById('mpRoleTag').textContent = myRole.toUpperCase();
@@ -55,7 +73,10 @@ function initMonopoli() {
     location.reload();
   };
 
-  roomRef.child('presence/' + myRole).transaction(cur => cur === null ? true : cur);
+  // Mendaftarkan Presence Player Lokal
+  const pRef = roomRef.child('presence/' + myRole);
+  pRef.set(true);
+  pRef.onDisconnect().remove();
 
   if (myRole === 'p1') {
     mpRef.transaction(cur => cur || {
@@ -64,20 +85,13 @@ function initMonopoli() {
     });
   }
 
-  setupPresence('mpStatus', roomIdGlobal, (presenceData) => {
-    mpPresence = presenceData || {};
-    if (latestMpData) renderMpUI(latestMpData);
-  });
-
+  // Single Presence Listener untuk menghindari bentrok
   roomRef.child('presence').on('value', snap => {
     mpPresence = snap.val() || {};
-    if (myRole === 'p1' && latestMpData && latestMpData.phase === 'waiting') {
-      const activeRoles = getMpRoles(latestMpData.maxPlayers);
-      const allIn = activeRoles.every(s => mpPresence[s]);
-      if (allIn) {
-        mpRef.transaction(cur => (cur && cur.phase === 'waiting') ? buildNewMpGame(cur.maxPlayers) : cur);
-      }
+    if (latestMpData) {
+      renderMpUI(latestMpData);
     }
+    checkAndStartMpGame();
   });
 
   mpRef.on('value', snap => {
@@ -103,6 +117,7 @@ function initMonopoli() {
 
       latestMpData = data;
       renderMpUI(data);
+      checkAndStartMpGame(); // Cek lagi setelah data game terbaru berhasil di-load
     }
   });
 
@@ -402,7 +417,9 @@ function renderMpUI(data) {
   const resultEl = document.getElementById('mpResult');
 
   if (data.phase === 'waiting') {
-    statusEl.textContent = `🟡 Menunggu pemain bergabung...`;
+    const activeRoles = getMpRoles(data.maxPlayers || 3);
+    const count = activeRoles.filter(r => mpPresence[r]).length;
+    statusEl.textContent = `🟡 Menunggu pemain bergabung (${count}/${data.maxPlayers || 3})...`;
     actBox.style.display = 'none';
     return;
   }

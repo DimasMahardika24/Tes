@@ -117,7 +117,7 @@ function buildNewUnoGame(maxPlayers, prev) {
     hasDrawn: false,
     unoChallenge: null,
     finished: [],
-    lastActionText: 'Game Dimulai!',
+    lastActionText: 'Ronde Baru Dimulai!',
     handNumber: ((prev && prev.handNumber) || 0) + 1,
     names: (prev && prev.names) || {}
   };
@@ -516,6 +516,21 @@ function initUno() {
     if (activePresenceRef) activePresenceRef.remove();
     clearSession();
     location.reload();
+  };
+
+  // FIXED TOMBOL "MAIN LAGI" UNO:
+  document.getElementById('unoBtnNext').onclick = () => {
+    if (!unoRef) return;
+    unoRef.transaction(cur => {
+      if (!cur) return cur;
+      return buildNewUnoGame(cur.maxPlayers, cur);
+    }, (error, committed) => {
+      if (committed) {
+        selectedUnoKeys.clear();
+        document.getElementById('unoResult').style.display = 'none';
+        document.getElementById('unoBtnNext').style.display = 'none';
+      }
+    });
   };
 
   roomRef.child('presence/' + myRole).transaction(cur => cur === null ? true : cur);
