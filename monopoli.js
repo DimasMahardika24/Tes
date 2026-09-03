@@ -203,25 +203,42 @@ let mpRef = null;
 let latestMpData = null;
 let mpPresence = {};
 let mpAutoPassInterval = null;
+let isRollProcessing = false;
 
 const boardImage = new Image();
 boardImage.crossOrigin = "anonymous";
 boardImage.src = 'https://c.termai.cc/i125/ypq.jpeg';
 
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let audioCtx = null;
+function getAudioContext() {
+  if (!audioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) audioCtx = new AudioContextClass();
+  }
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
 function playStepSound() {
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(320, audioCtx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.08);
-  gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-  gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.start();
-  osc.stop(audioCtx.currentTime + 0.08);
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(320, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.08);
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 let animState = {
@@ -240,7 +257,6 @@ function checkAndStartMpGame() {
   const targetMax = (latestMpData && latestMpData.maxPlayers) || window.mpSelectedMaxPlayers || 3;
   const activeRoles = getMpRoles(targetMax);
   
-  // DIPERBAIKI: Pastikan p1 selalu terhitung otomatis jika client ini adalah Host (p1)
   const onlineRoles = Object.keys(mpPresence || {}).filter(r => mpPresence[r] && activeRoles.includes(r));
   if (!onlineRoles.includes('p1')) onlineRoles.push('p1');
 
@@ -259,8 +275,6 @@ function checkAndStartMpGame() {
   }
 }
 
-
-
 function initMonopoli() {
   mpRef = roomRef.child('monopoli');
   document.getElementById('mpRoleTag').textContent = myRole.toUpperCase();
@@ -275,7 +289,6 @@ function initMonopoli() {
     location.reload();
   };
 
-  // DIPERBAIKI: Daftarkan presence terlebih dahulu dan pastikan tersimpan sebelum panggil checkAndStart
   const pRef = roomRef.child('presence/' + myRole);
   pRef.set(true);
   pRef.onDisconnect().remove();
@@ -293,7 +306,6 @@ function initMonopoli() {
     });
   }
 
-  // Listener realtime Monopoli (Ditaruh di atas agar UI P1 langsung berubah saat Firebase update)
   mpRef.on('value', snap => {
     const data = snap.val();
     if (data) {
@@ -319,7 +331,6 @@ function initMonopoli() {
     }
   });
 
-  // Listener presence
   roomRef.child('presence').on('value', snap => {
     mpPresence = snap.val() || {};
     if (latestMpData) renderMpUI(latestMpData);
@@ -341,12 +352,19 @@ function initMonopoli() {
   }, 3000);
 }
 
-
 function mpDoRollWithAnim() {
-  if (!latestMpData || latestMpData.turn !== myRole || latestMpData.hasRolled || animState.isRolling) return;
+  getAudioContext();
 
+  if (isRollProcessing || !latestMpData || latestMpData.turn !== myRole || latestMpData.hasRolled || animState.isRolling) {
+    return;
+  }
+
+  isRollProcessing = true;
   animState.isRolling = true;
   animState.rollFrames = 0;
+
+  const rollBtn = document.getElementById('mpBtnRoll');
+  if (rollBtn) rollBtn.disabled = true;
 
   const rollInterval = setInterval(() => {
     animState.tempDice = [
@@ -356,12 +374,15 @@ function mpDoRollWithAnim() {
     animState.rollFrames++;
     drawMpCanvas(latestMpData);
 
-    if (animState.rollFrames > 12) {
+    if (animState.rollFrames > 10) {
       clearInterval(rollInterval);
       animState.isRolling = false;
-      mpDoRoll();
+      mpDoRoll(() => {
+        isRollProcessing = false;
+        if (rollBtn) rollBtn.disabled = false;
+      });
     }
-  }, 60);
+  }, 50);
 }
 
 function triggerPawnMovementAnim(role, startPos, endPos) {
@@ -427,8 +448,11 @@ function mpDoPayJail() {
   });
 }
 
-function mpDoRoll() {
-  if (!latestMpData || latestMpData.turn !== myRole || latestMpData.hasRolled) return;
+function mpDoRoll(onComplete) {
+  if (!latestMpData || latestMpData.turn !== myRole || latestMpData.hasRolled) {
+    if (onComplete) onComplete();
+    return;
+  }
 
   mpRef.transaction(cur => {
     if (!cur || cur.turn !== myRole || cur.hasRolled) return cur;
@@ -543,6 +567,8 @@ function mpDoRoll() {
 
     state.lastActionText = actionLog;
     return state;
+  }, (err, committed) => {
+    if (onComplete) onComplete();
   });
 }
 

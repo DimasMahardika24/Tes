@@ -61,7 +61,6 @@ body {
 @keyframes pulseDot { 0%,100%{ box-shadow: 0 0 0 4px rgba(232,172,31,0.15);} 50%{ box-shadow: 0 0 0 7px rgba(232,172,31,0.05);} }
 .hub-sub { font-size: 13.5px; color: var(--ink-dim); margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 
-/* FIXED ROOM BADGE BUG: Diposisikan rapi di dalam layout tanpa menutupi UI game */
 .room-badge-wrap {
   display: flex;
   justify-content: center;
@@ -106,7 +105,6 @@ body {
 .spinner { width:18px; height:18px; border-radius:50%; border:2px solid var(--line); border-top-color: var(--gold); display:inline-block; animation: spin .7s linear infinite; margin-top: 4px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ONLINE ROOMS ITEM STYLE */
 .room-item-card {
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -367,11 +365,11 @@ canvas { width: 100%; height: 100%; display: block; }
     </div>
     <div class="g-status" id="mpStatus">-</div>
 
-    <div class="capsa-table" style="background: #111827; padding: 10px;">
-      <div style="width:100%; aspect-ratio:1/1; position:relative; margin:0 auto; max-width:480px;">
-        <canvas id="mpBoardCanvas" style="width:100%; height:100%; border-radius:12px; border:2px solid var(--line); display:block;"></canvas>
+    <div class="capsa-table" style="background: #111827; padding: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <div style="width:100%; aspect-ratio:1/1; position:relative; margin:0 auto; max-width:480px; display:flex; justify-content:center; align-items:center;">
+        <canvas id="mpBoardCanvas" style="width:100%; height:100%; border-radius:12px; border:2px solid var(--line); display:block; margin:0 auto;"></canvas>
       </div>
-      <div id="mpPlayerListWrap" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px;"></div>
+      <div id="mpPlayerListWrap" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px; width:100%;"></div>
     </div>
 
     <div class="capsa-actions" id="mpActions" style="display:none; margin-top:10px;">
