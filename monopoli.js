@@ -204,7 +204,6 @@ let latestMpData = null;
 let mpPresence = {};
 let mpAutoPassInterval = null;
 
-// Gambar Papan Baru (CDN Ringan & Cepat)
 const boardImage = new Image();
 boardImage.crossOrigin = "anonymous";
 boardImage.src = 'https://c.termai.cc/i125/ypq.jpeg';
@@ -240,9 +239,9 @@ function checkAndStartMpGame() {
   
   const targetMax = (latestMpData && latestMpData.maxPlayers) || window.mpSelectedMaxPlayers || 3;
   const activeRoles = getMpRoles(targetMax);
-  const onlineCount = activeRoles.filter(s => mpPresence[s]).length;
+  const onlineRoles = Object.keys(mpPresence || {}).filter(r => mpPresence[r] && activeRoles.includes(r));
 
-  if (onlineCount >= targetMax && latestMpData && latestMpData.phase === 'waiting') {
+  if (onlineRoles.length >= targetMax && latestMpData && latestMpData.phase === 'waiting') {
     mpRef.transaction(cur => {
       if (cur && cur.phase === 'waiting') {
         return buildNewMpGame(cur.maxPlayers || targetMax);

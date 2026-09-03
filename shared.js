@@ -375,8 +375,9 @@ function connectToRoomGlobal(targetId) {
     } else if(currentGame === 'monopoli'){
       dbRoot.ref('rooms/' + targetId + '/monopoli').get().then(mpSnap => {
         const mpData = mpSnap.val() || {};
-        const maxP = mpData.maxPlayers || 3;
-        const seats = ['p2', 'p3', 'p4', 'p5', 'p6'].slice(0, maxP - 1);
+        const maxP = mpData.maxPlayers || snap.val().maxPlayers || 3;
+        const roles = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].slice(0, maxP);
+        const seats = roles.filter(r => r !== 'p1');
 
         const tryMpSeat = (seatList, i) => {
           if(i >= seatList.length){
@@ -428,7 +429,6 @@ function enterGame(){
   showScreen(gameMeta[currentGame].screen);
   saveSession();
 
-  // Berikan sedikit jeda per sekian milidetik agar DOM ter-render sempurna
   setTimeout(() => {
     if(currentGame === 'chess') initChess();
     if(currentGame === 'ttt') initTTT();
