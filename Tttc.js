@@ -16,14 +16,32 @@
     return null;
   }
 
+  function updateTTTStatus() {
+    const statusEl = document.getElementById('tttStatus');
+    if (!statusEl) return;
+    
+    if (!tttBoardState) {
+      statusEl.textContent = '⏳ Menyiapkan permainan...';
+      return;
+    }
+
+    const result = tttEval(tttBoardState);
+    if (!result) {
+      const myTurn = tttTurn === mySymbol;
+      statusEl.textContent = myTurn ? '🟢 Giliranmu' : '⏳ Giliran lawan...';
+    } else {
+      statusEl.textContent = result.winner === 'draw' ? '🤝 Seri!' :
+        (result.winner === mySymbol ? '🏆 Kamu menang!' : '😢 Lawan menang!');
+    }
+  }
+
   function initTTT(){
     mySymbol = myRole === 'p1' ? 'X' : 'O';
     document.getElementById('tttRoleTag').textContent = myRole === 'p1' ? 'HOST (X)' : 'JOINER (O)';
     tttRoundBusy = false;
 
-    // Build elemen DOM papan secara tegas di awal
     buildTTTBoard();
-    attachPresence('tttStatus', roomIdGlobal);
+    updateTTTStatus();
 
     roomRef.child('score').on('value', (snap) => {
       const s = snap.val() || {};
@@ -35,10 +53,10 @@
     roomRef.child('state').on('value', (snap) => {
       const data = snap.val();
       if(!data) {
-        // Jika data state di Firebase belum ada, paksakan papan kosong awal
         tttBoardState = tttEmptyBoard();
         tttTurn = 'X';
         renderTTTBoard();
+        updateTTTStatus();
         return;
       }
 
@@ -53,17 +71,14 @@
         tttRoundBusy = false;
         clearTTTWinLine();
         renderTTTBoard();
-        const myTurn = tttTurn === mySymbol;
-        document.getElementById('tttStatus').textContent = myTurn ? '🟢 Giliranmu' : '⏳ Giliran lawan...';
+        updateTTTStatus();
       } 
       // JIKA RONDE SELESAI (ADA WINNER / SERI)
       else if(result && !tttRoundBusy) {
         tttRoundBusy = true;
         renderTTTBoard();
         if(result.line) drawTTTWinLine(result.line);
-        
-        document.getElementById('tttStatus').textContent = result.winner === 'draw' ? 'Seri!' :
-          (result.winner === mySymbol ? '🏆 Kamu menang!' : '😢 Lawan menang!');
+        updateTTTStatus();
 
         roomRef.child('roundLocks/' + tttRound).transaction(
           (current) => (current === null ? true : undefined),
@@ -110,9 +125,7 @@
 
   function renderTTTBoard(){
     const cells = document.querySelectorAll('#tttBoard .ttt-cell');
-    if(!cells || cells.length === 0) {
-      buildTTTBoard(); // Re-build jika elemen belum terbuat
-    }
+    if(!cells || cells.length === 0) buildTTTBoard();
     
     const currentCells = document.querySelectorAll('#tttBoard .ttt-cell');
     const board = tttBoardState || tttEmptyBoard();
