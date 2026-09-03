@@ -1,6 +1,6 @@
 // ======================================================
 // monopoli.js — Standalone Monopoly Engine & Board UI
-// Gambar Board Baru: https://c.termai.cc/i125/ypq.jpeg
+// Gambar Board: https://c.termai.cc/i125/ypq.jpeg
 // ======================================================
 
 const MP_GROUP_COLORS = {
@@ -205,10 +205,6 @@ let mpPresence = {};
 let mpAutoPassInterval = null;
 let isRollProcessing = false;
 
-const boardImage = new Image();
-boardImage.crossOrigin = "anonymous";
-boardImage.src = 'https://c.termai.cc/i125/ypq.jpeg';
-
 let audioCtx = null;
 function getAudioContext() {
   if (!audioCtx) {
@@ -243,7 +239,7 @@ function playStepSound() {
 
 let animState = {
   isRolling: false,
-  rollFrames: 0,
+  rollProgress: 0, // 0 = Besar (Mendekat Kamera), 1 = Normal (Mengecil)
   tempDice: [1, 1],
   movingRole: null,
   pawnAnimPos: {},
@@ -352,6 +348,9 @@ function initMonopoli() {
   }, 3000);
 }
 
+// ======================================================
+// ANIMASI DADU POP-OUT / ZOOM (BESAR KE KECIL)
+// ======================================================
 function mpDoRollWithAnim() {
   getAudioContext();
 
@@ -361,20 +360,26 @@ function mpDoRollWithAnim() {
 
   isRollProcessing = true;
   animState.isRolling = true;
-  animState.rollFrames = 0;
+  animState.rollProgress = 0; // Mulai dari Zoom Paling Besar (Mendekat Kamera)
 
   const rollBtn = document.getElementById('mpBtnRoll');
   if (rollBtn) rollBtn.disabled = true;
 
+  const startTime = Date.now();
+  const duration = 750; // Durasi animasi 0.75 detik
+
   const rollInterval = setInterval(() => {
+    const elapsed = Date.now() - startTime;
+    animState.rollProgress = Math.min(1, elapsed / duration); // Nilai 0.0 -> 1.0
+
     animState.tempDice = [
       Math.floor(Math.random() * 6) + 1,
       Math.floor(Math.random() * 6) + 1
     ];
-    animState.rollFrames++;
+
     drawMpCanvas(latestMpData);
 
-    if (animState.rollFrames > 10) {
+    if (animState.rollProgress >= 1) {
       clearInterval(rollInterval);
       animState.isRolling = false;
       mpDoRoll(() => {
@@ -382,7 +387,7 @@ function mpDoRollWithAnim() {
         if (rollBtn) rollBtn.disabled = false;
       });
     }
-  }, 50);
+  }, 35);
 }
 
 function triggerPawnMovementAnim(role, startPos, endPos) {
@@ -390,23 +395,33 @@ function triggerPawnMovementAnim(role, startPos, endPos) {
   let currentStep = 0;
   animState.movingRole = role;
 
-  const moveInterval = setInterval(() => {
-    currentStep++;
-    const curTilePos = (startPos + currentStep) % 40;
-    animState.pawnAnimPos[role] = curTilePos;
+  let lastTime = performance.now();
 
-    animState.stepCounterText = `+ ${currentStep} Langkah`;
-    animState.stepCounterAlpha = 1.0;
+  function stepAnim(now) {
+    if (now - lastTime >= 150) {
+      currentStep++;
+      const curTilePos = (startPos + currentStep) % 40;
+      animState.pawnAnimPos[role] = curTilePos;
+      animState.stepCounterText = `+ ${currentStep} Langkah`;
+      animState.stepCounterAlpha = 1.0;
 
-    playStepSound();
-    drawMpCanvas(latestMpData);
-
-    if (currentStep >= stepsTotal) {
-      clearInterval(moveInterval);
-      animState.movingRole = null;
-      setTimeout(() => { animState.stepCounterAlpha = 0; drawMpCanvas(latestMpData); }, 600);
+      playStepSound();
+      drawMpCanvas(latestMpData);
+      lastTime = now;
     }
-  }, 180);
+
+    if (currentStep < stepsTotal) {
+      requestAnimationFrame(stepAnim);
+    } else {
+      animState.movingRole = null;
+      setTimeout(() => { 
+        animState.stepCounterAlpha = 0; 
+        drawMpCanvas(latestMpData); 
+      }, 400);
+    }
+  }
+
+  requestAnimationFrame(stepAnim);
 }
 
 function mpDoAutoPass() {
@@ -742,6 +757,9 @@ function renderMpUI(data) {
   drawMpCanvas(data);
 }
 
+// ======================================================
+// RENDER CANVAS UNTUK MONOPOLI
+// ======================================================
 function drawMpCanvas(data) {
   const canvas = document.getElementById('mpBoardCanvas');
   if (!canvas) return;
@@ -750,32 +768,42 @@ function drawMpCanvas(data) {
   canvas.width = 480;
   canvas.height = 480;
 
+  // Hapus isi canvas (transparan), background papan pakai CSS!
   ctx.clearRect(0, 0, 480, 480);
 
-  if (boardImage.complete && boardImage.naturalWidth !== 0) {
-    ctx.drawImage(boardImage, 0, 0, 480, 480);
-  } else {
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(0, 0, 480, 480);
+  // 1. DADU DENGAN ANIMASI MUNCUL BESAR -> MENGEIL KE TENGAH
+  const dVals = animState.isRolling ? animState.tempDice : ((data && data.dice) || [1, 1]);
+  let scale = 1.0;
+  if (animState.isRolling) {
+    // Mulai dari skala 3.5x (Besar mendekat kamera), lalu mengecil menuju 1.0x
+    scale = 3.5 - (animState.rollProgress * 2.5);
   }
 
-  const dVals = animState.isRolling ? animState.tempDice : ((data && data.dice) || [1, 1]);
-  draw3DDice(ctx, 220, 240, dVals[0], animState.isRolling);
-  draw3DDice(ctx, 260, 240, dVals[1], animState.isRolling);
+  draw3DDice(ctx, 220, 240, dVals[0], animState.isRolling, scale);
+  draw3DDice(ctx, 260, 240, dVals[1], animState.isRolling, scale);
 
+  // 2. TEKS KETERANGAN LANGKAH PION
   if (animState.stepCounterAlpha > 0 && animState.stepCounterText) {
     ctx.fillStyle = `rgba(234, 179, 8, ${animState.stepCounterAlpha})`;
     ctx.font = 'bold 16px "Space Grotesk", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(animState.stepCounterText, 240, 205);
+    ctx.fillText(animState.stepCounterText, 240, 190);
   }
 
+  // 3. RENDER RUMAH, GADAI, DAN PION PLAYER
   for (let i = 0; i < 40; i++) {
     let x = 0, y = 0;
-    if (i <= 10) { x = 420 - i * 36; y = 420; }
-    else if (i <= 20) { x = 60; y = 420 - (i - 10) * 36; }
-    else if (i <= 30) { x = 60 + (i - 20) * 36; y = 60; }
-    else { x = 420; y = 60 + (i - 30) * 36; }
+    
+    // FIX KOORDINAT PION: Jalur Kiri (i = 10 s/d 20) digeser lebih ke kiri (x = 18) agar pas di tengah petak
+    if (i <= 10) { 
+      x = 420 - i * 36; y = 420; 
+    } else if (i <= 20) { 
+      x = 18; y = 420 - (i - 10) * 36; // PERBAIKAN: Disesuaikan dari 60 menjadi 18
+    } else if (i <= 30) { 
+      x = 60 + (i - 20) * 36; y = 60; 
+    } else { 
+      x = 420; y = 60 + (i - 30) * 36; 
+    }
 
     const tile = MP_BOARD_DATA[i];
     const owner = data && data.ownership && data.ownership[tile.id];
@@ -830,13 +858,22 @@ function drawMpCanvas(data) {
   }
 }
 
-function draw3DDice(ctx, x, y, val, isSpinning) {
+// FUNGSI UNTUK MENGGAMBAR DADU 3D DENGAN FITUR SCALING (ZOOM)
+function draw3DDice(ctx, x, y, val, isSpinning, scale = 1.0) {
   ctx.save();
   ctx.translate(x, y);
+  ctx.scale(scale, scale); // Menerapkan Skala Dadu
 
   if (isSpinning) {
-    const rot = (Date.now() / 30) % (Math.PI * 2);
+    const rot = (Date.now() / 20) % (Math.PI * 2);
     ctx.rotate(rot);
+  }
+
+  // Efek Bayangan Dadu Saat Besar Mendekati Kamera
+  if (scale > 1.2) {
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 15;
+    ctx.shadowOffsetY = 10;
   }
 
   ctx.fillStyle = '#ffffff';
@@ -845,7 +882,7 @@ function draw3DDice(ctx, x, y, val, isSpinning) {
   ctx.lineWidth = 2;
   ctx.strokeRect(-12, -12, 24, 24);
 
-  if (!isSpinning) {
+  if (!isSpinning || scale < 1.5) {
     ctx.fillStyle = '#0f172a';
     const dots = {
       1: [[0,0]],
@@ -865,7 +902,3 @@ function draw3DDice(ctx, x, y, val, isSpinning) {
 
   ctx.restore();
 }
-
-boardImage.onload = () => {
-  if (latestMpData) drawMpCanvas(latestMpData);
-};
