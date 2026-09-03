@@ -80,26 +80,23 @@
         if(result.line) drawTTTWinLine(result.line);
         updateTTTStatus();
 
-        roomRef.child('roundLocks/' + tttRound).transaction(
-          (current) => (current === null ? true : undefined),
-          (err, committed) => {
-            if(err || !committed) return;
-            
-            const key = result.winner === 'draw' ? 'draw' : result.winner;
-            roomRef.child('score/' + key).transaction(v => (v || 0) + 1);
+        // Hanya HOST (p1) yang bertanggung jawab memperbarui data ke Firebase
+        if (myRole === 'p1') {
+          const key = result.winner === 'draw' ? 'draw' : result.winner;
+          roomRef.child('score/' + key).transaction(v => (v || 0) + 1);
 
-            setTimeout(() => {
-              const nextTurn = result.winner === 'draw' ? 'X' : result.winner;
-              roomRef.child('state').set({ 
-                board: tttEmptyBoard(), 
-                turn: nextTurn, 
-                round: tttRound + 1 
-              });
-            }, 2000);
-          }
-        );
+          setTimeout(() => {
+            const nextTurn = result.winner === 'draw' ? 'X' : result.winner;
+            roomRef.child('state').set({ 
+              board: tttEmptyBoard(), 
+              turn: nextTurn, 
+              round: tttRound + 1 
+            });
+          }, 2000);
+        }
       }
-    });
+
+    }); 
 
     if(myRole === 'p1'){
       roomRef.child('state').once('value').then(snap => {
