@@ -437,31 +437,6 @@
     chessDraw();
   }
 
-  function chessHandleClick(x, y){
-    if(chessGameOver || chessPendingPromotion || !chessBoardState) return;
-    if(chessTurn !== myChessColor) return;
-    const p = chessBoardState[y][x];
-    if(chessSelected){
-      const legalMoves = chessLegalMovesForSquare(chessBoardState, {castling:chessCastling, ep:chessEP}, chessSelected.x, chessSelected.y);
-      const mv = legalMoves.find(m => m.x2===x && m.y2===y);
-      if(mv){
-        chessSelected = null;
-        if(mv.promotion){
-          chessPendingPromotion = mv;
-          showChessPromoModal(myChessColor);
-        } else {
-          chessCommitMove(mv, null);
-        }
-      } else if(p && chessColorOf(p) === myChessColor){
-        chessSelected = {x, y};
-      } else {
-        chessSelected = null;
-      }
-    } else if(p && chessColorOf(p) === myChessColor){
-      chessSelected = {x, y};
-    }
-    chessDraw();
-  }
 
   function chessCommitMove(move, promoteTo){
     const state = { castling: chessCastling, ep: chessEP, halfmove: chessHalfmove };
