@@ -1,5 +1,5 @@
 // ======================================================
-// monopoli.js — Standalone Monopoly Engine & Board UI
+// monopoli.js — Standalone Monopoly Engine & Board UI (BUG-FREE FULL)
 // Gambar Board: https://c.termai.cc/i125/ypq.jpeg
 // ======================================================
 
@@ -77,6 +77,7 @@ function getMpRoles(maxPlayers) {
   return ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].slice(0, maxPlayers);
 }
 
+// FIX BUG 4: LEWATKAN PEMAIN BANGKRUT DAN OFFLINE (GHOST TURN BYPASS)
 function nextMpTurn(game) {
   const roles = getMpRoles(game.maxPlayers);
   let curIdx = roles.indexOf(game.turn);
@@ -84,11 +85,19 @@ function nextMpTurn(game) {
   let count = 0;
 
   const bankruptList = game.bankrupt || [];
-  while (bankruptList.includes(roles[nextIdx]) && count < roles.length) {
+  while (count < roles.length) {
+    const roleCandidate = roles[nextIdx];
+    const isBankrupt = bankruptList.includes(roleCandidate);
+    const isOnline = !!(mpPresence && mpPresence[roleCandidate]);
+
+    if (!isBankrupt && isOnline) {
+      return roleCandidate;
+    }
+
     nextIdx = (nextIdx + 1) % roles.length;
     count++;
   }
-  return roles[nextIdx];
+  return roles[nextIdx]; // Fallback jika semua offline
 }
 
 function buildNewMpGame(maxPlayers) {
@@ -109,6 +118,7 @@ function buildNewMpGame(maxPlayers) {
     dice: [1, 1],
     doubleStreak: 0,
     hasRolled: false,
+    canRollAgain: false,
     money: money,
     pos: pos,
     inJail: inJail,
@@ -120,6 +130,13 @@ function buildNewMpGame(maxPlayers) {
     lastTurnTime: Date.now(),
     lastActionText: 'Game Monopoli Dimulai! P1 silakan lempar dadu.'
   };
+}
+
+// FIX BUG 5: VALIDASI GADAI SEBELUM MEMBERIKAN BONUS SEWA 2X
+function ownsFullGroup(state, owner, group) {
+  if (!group) return false;
+  const groupTiles = MP_BOARD_DATA.filter(t => t.group === group);
+  return groupTiles.every(t => state.ownership[t.id] === owner && (!state.mortgaged || !state.mortgaged[t.id]));
 }
 
 function calculateRent(state, tile, owner, diceTotal = 7) {
@@ -143,22 +160,17 @@ function calculateRent(state, tile, owner, diceTotal = 7) {
 
   if (tile.type === 'property') {
     const houseCount = (state.houses && state.houses[tile.id]) || 0;
-    if (houseCount > 0) return Math.floor(tile.rent * Math.pow(2.5, houseCount));
+    if (houseCount > 0) {
+      if (houseCount === 5) return tile.rent * 15; // Hotel
+      return Math.floor(tile.rent * (houseCount * 2.5)); // 1-4 Rumah
+    }
     
-    if (tile.group) {
-      const groupTiles = MP_BOARD_DATA.filter(t => t.group === tile.group);
-      const ownsAll = groupTiles.every(t => state.ownership[t.id] === owner && (!state.mortgaged || !state.mortgaged[t.id]));
-      return ownsAll ? tile.rent * 2 : tile.rent;
+    if (tile.group && ownsFullGroup(state, owner, tile.group)) {
+      return tile.rent * 2;
     }
   }
 
   return tile.rent || 20;
-}
-
-function ownsFullGroup(state, owner, group) {
-  if (!group) return false;
-  const groupTiles = MP_BOARD_DATA.filter(t => t.group === group);
-  return groupTiles.every(t => state.ownership[t.id] === owner);
 }
 
 function handleBankruptcy(state, role, creditorRole = null) {
@@ -184,14 +196,15 @@ function handleBankruptcy(state, role, creditorRole = null) {
   if (state.turn === role) {
     state.turn = nextMpTurn(state);
     state.hasRolled = false;
+    state.canRollAgain = false;
     state.doubleStreak = 0;
   }
 
   const activeRoles = getMpRoles(state.maxPlayers).filter(r => !state.bankrupt.includes(r));
-  if (activeRoles.length === 1) {
+  if (activeRoles.length <= 1) {
     state.phase = 'gameover';
-    state.winner = activeRoles[0];
-    state.lastActionText = `🏆 GAME OVER! ${activeRoles[0].toUpperCase()} Menang Sebagai Juara Monopoli!`;
+    state.winner = activeRoles[0] || 'Tidak Ada';
+    state.lastActionText = `🏆 GAME OVER! ${(state.winner).toUpperCase()} Menang Sebagai Juara Monopoli!`;
   }
 }
 
@@ -204,6 +217,7 @@ let latestMpData = null;
 let mpPresence = {};
 let mpAutoPassInterval = null;
 let isRollProcessing = false;
+let activeAnimFrame = null;
 
 let audioCtx = null;
 function getAudioContext() {
@@ -232,14 +246,12 @@ function playStepSound() {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.08);
-  } catch (e) {
-    console.error(e);
-  }
+  } catch (e) {}
 }
 
 let animState = {
   isRolling: false,
-  rollProgress: 0, // 0 = Besar (Mendekat Kamera), 1 = Normal (Mengecil)
+  rollProgress: 0,
   tempDice: [1, 1],
   movingRole: null,
   pawnAnimPos: {},
@@ -248,15 +260,12 @@ let animState = {
 };
 
 function checkAndStartMpGame() {
-  if (myRole !== 'p1') return;
-  
   const targetMax = (latestMpData && latestMpData.maxPlayers) || window.mpSelectedMaxPlayers || 3;
   const activeRoles = getMpRoles(targetMax);
-  
   const onlineRoles = Object.keys(mpPresence || {}).filter(r => mpPresence[r] && activeRoles.includes(r));
-  if (!onlineRoles.includes('p1')) onlineRoles.push('p1');
+  const currentLeader = activeRoles.find(r => onlineRoles.includes(r));
 
-  if (onlineRoles.length >= targetMax && latestMpData && latestMpData.phase === 'waiting') {
+  if (myRole === currentLeader && onlineRoles.length >= targetMax && latestMpData && latestMpData.phase === 'waiting') {
     mpRef.transaction(cur => {
       if (cur && cur.phase === 'waiting') {
         return buildNewMpGame(cur.maxPlayers || targetMax);
@@ -341,16 +350,17 @@ function initMonopoli() {
 
   if (mpAutoPassInterval) clearInterval(mpAutoPassInterval);
   mpAutoPassInterval = setInterval(() => {
-    if (myRole === 'p1' && latestMpData && latestMpData.phase === 'playing') {
+    if (!latestMpData || latestMpData.phase !== 'playing') return;
+    const activeRoles = getMpRoles(latestMpData.maxPlayers).filter(r => !(latestMpData.bankrupt || []).includes(r));
+    const currentActiveLeader = activeRoles.find(r => mpPresence[r]);
+
+    if (myRole === currentActiveLeader) {
       const elapsed = (Date.now() - (latestMpData.lastTurnTime || Date.now())) / 1000;
       if (elapsed > 35) mpDoAutoPass();
     }
   }, 3000);
 }
 
-// ======================================================
-// ANIMASI DADU POP-OUT / ZOOM (BESAR KE KECIL)
-// ======================================================
 function mpDoRollWithAnim() {
   getAudioContext();
 
@@ -360,17 +370,17 @@ function mpDoRollWithAnim() {
 
   isRollProcessing = true;
   animState.isRolling = true;
-  animState.rollProgress = 0; // Mulai dari Zoom Paling Besar (Mendekat Kamera)
+  animState.rollProgress = 0;
 
   const rollBtn = document.getElementById('mpBtnRoll');
   if (rollBtn) rollBtn.disabled = true;
 
   const startTime = Date.now();
-  const duration = 750; // Durasi animasi 0.75 detik
+  const duration = 650;
 
   const rollInterval = setInterval(() => {
     const elapsed = Date.now() - startTime;
-    animState.rollProgress = Math.min(1, elapsed / duration); // Nilai 0.0 -> 1.0
+    animState.rollProgress = Math.min(1, elapsed / duration);
 
     animState.tempDice = [
       Math.floor(Math.random() * 6) + 1,
@@ -382,23 +392,23 @@ function mpDoRollWithAnim() {
     if (animState.rollProgress >= 1) {
       clearInterval(rollInterval);
       animState.isRolling = false;
-      mpDoRoll(() => {
-        isRollProcessing = false;
-        if (rollBtn) rollBtn.disabled = false;
-      });
+      mpDoRoll();
     }
   }, 35);
 }
 
 function triggerPawnMovementAnim(role, startPos, endPos) {
   let stepsTotal = (endPos >= startPos) ? (endPos - startPos) : (40 - startPos + endPos);
+  if (stepsTotal === 0) return;
+
+  if (activeAnimFrame) cancelAnimationFrame(activeAnimFrame);
+
   let currentStep = 0;
   animState.movingRole = role;
-
   let lastTime = performance.now();
 
   function stepAnim(now) {
-    if (now - lastTime >= 150) {
+    if (now - lastTime >= 140) {
       currentStep++;
       const curTilePos = (startPos + currentStep) % 40;
       animState.pawnAnimPos[role] = curTilePos;
@@ -411,17 +421,18 @@ function triggerPawnMovementAnim(role, startPos, endPos) {
     }
 
     if (currentStep < stepsTotal) {
-      requestAnimationFrame(stepAnim);
+      activeAnimFrame = requestAnimationFrame(stepAnim);
     } else {
       animState.movingRole = null;
+      delete animState.pawnAnimPos[role];
       setTimeout(() => { 
         animState.stepCounterAlpha = 0; 
         drawMpCanvas(latestMpData); 
-      }, 400);
+      }, 300);
     }
   }
 
-  requestAnimationFrame(stepAnim);
+  activeAnimFrame = requestAnimationFrame(stepAnim);
 }
 
 function mpDoAutoPass() {
@@ -430,6 +441,7 @@ function mpDoAutoPass() {
     const state = JSON.parse(JSON.stringify(cur));
     const oldTurn = state.turn;
     state.hasRolled = false;
+    state.canRollAgain = false;
     state.doubleStreak = 0;
     state.turn = nextMpTurn(state);
     state.lastTurnTime = Date.now();
@@ -463,9 +475,11 @@ function mpDoPayJail() {
   });
 }
 
-function mpDoRoll(onComplete) {
+function mpDoRoll() {
   if (!latestMpData || latestMpData.turn !== myRole || latestMpData.hasRolled) {
-    if (onComplete) onComplete();
+    isRollProcessing = false;
+    const rollBtn = document.getElementById('mpBtnRoll');
+    if (rollBtn) rollBtn.disabled = false;
     return;
   }
 
@@ -479,6 +493,7 @@ function mpDoRoll(onComplete) {
     const isDouble = (d1 === d2);
 
     state.dice = [d1, d2];
+    state.hasRolled = true;
     let actionLog = `🎲 ${myRole.toUpperCase()} lempar dadu (${d1}+${d2}=${total}).`;
     let shouldMovePawn = true;
 
@@ -494,7 +509,6 @@ function mpDoRoll(onComplete) {
           if (state.money[myRole] < 0) handleBankruptcy(state, myRole);
         } else {
           shouldMovePawn = false;
-          state.hasRolled = true;
           actionLog += ` ❌ Tidak dobel. Masih dipenjara (${state.inJail[myRole]} turn).`;
           state.lastActionText = actionLog;
           return state;
@@ -508,15 +522,15 @@ function mpDoRoll(onComplete) {
         state.pos[myRole] = 10;
         state.inJail[myRole] = 3;
         state.doubleStreak = 0;
-        state.hasRolled = true;
+        state.canRollAgain = false;
         state.lastActionText = `🚨 ${myRole.toUpperCase()} Dobel 3x Berturut-turut! Otomatis Masuk Penjara!`;
         return state;
       }
-      state.hasRolled = false;
-      actionLog += ` 🔥 DOBEL! Boleh Lempar Dadu Lagi!`;
+      state.canRollAgain = true;
+      actionLog += ` 🔥 DOBEL! Boleh Lempar Dadu Lagi Setelah Selesai Aksi!`;
     } else {
       state.doubleStreak = 0;
-      state.hasRolled = true;
+      state.canRollAgain = false;
     }
 
     if (shouldMovePawn) {
@@ -536,7 +550,7 @@ function mpDoRoll(onComplete) {
         state.pos[myRole] = 10;
         state.inJail[myRole] = 3;
         state.doubleStreak = 0;
-        state.hasRolled = true;
+        state.canRollAgain = false;
         actionLog += ` 🚨 Masuk Penjara!`;
       } else if (tile.type === 'tax') {
         state.money[myRole] -= tile.price;
@@ -559,7 +573,7 @@ function mpDoRoll(onComplete) {
           state.pos[myRole] = 10;
           state.inJail[myRole] = 3;
           state.doubleStreak = 0;
-          state.hasRolled = true;
+          state.canRollAgain = false;
         } else if (card.goto !== undefined) {
           state.pos[myRole] = card.goto;
           if (card.collectStart) state.money[myRole] += 200;
@@ -583,7 +597,9 @@ function mpDoRoll(onComplete) {
     state.lastActionText = actionLog;
     return state;
   }, (err, committed) => {
-    if (onComplete) onComplete();
+    isRollProcessing = false;
+    const rollBtn = document.getElementById('mpBtnRoll');
+    if (rollBtn) rollBtn.disabled = false;
   });
 }
 
@@ -606,6 +622,7 @@ function mpDoBuy() {
   });
 }
 
+// FIX BUG 1 & 3: KUNCI STRICT DUA LAPIS RUMAH <= 5 DAN CEK STATE GADAI
 function mpDoBuyHouse() {
   if (!latestMpData || latestMpData.turn !== myRole) return;
 
@@ -616,15 +633,16 @@ function mpDoBuyHouse() {
     const tile = MP_BOARD_DATA[pPos];
 
     if (tile.type !== 'property' || state.ownership[tile.id] !== myRole) return cur;
+    if (state.mortgaged && state.mortgaged[tile.id]) return cur; // Batal jika tergadai
 
     if (!ownsFullGroup(state, myRole, tile.group)) {
-      state.lastActionText = `⚠️ Harus menguasai seluruh warna ${tile.group.toUpperCase()} sebelum membangun rumah!`;
+      state.lastActionText = `⚠️ Harus menguasai seluruh warna ${tile.group.toUpperCase()} (dan bebas gadai) sebelum membangun rumah!`;
       return state;
     }
 
     state.houses = state.houses || {};
     const curHouse = state.houses[tile.id] || 0;
-    if (curHouse >= 5) return cur;
+    if (curHouse >= 5) return cur; // Strict Lock Maksimal 5
 
     const cost = tile.housePrice || 100;
     if (state.money[myRole] < cost) return cur;
@@ -638,6 +656,49 @@ function mpDoBuyHouse() {
   });
 }
 
+function mpDoMortgage(tileId) {
+  if (!latestMpData || latestMpData.turn !== myRole) return;
+
+  mpRef.transaction(cur => {
+    if (!cur || cur.turn !== myRole) return cur;
+    const state = JSON.parse(JSON.stringify(cur));
+    const tile = MP_BOARD_DATA[tileId];
+
+    if (state.ownership[tileId] !== myRole) return cur;
+    if (state.houses && state.houses[tileId] > 0) return cur; 
+
+    state.mortgaged = state.mortgaged || {};
+    if (state.mortgaged[tileId]) return cur;
+
+    const val = Math.floor(tile.price / 2);
+    state.mortgaged[tileId] = true;
+    state.money[myRole] += val;
+    state.lastActionText = `🏦 ${myRole.toUpperCase()} Menggadaikan ${tile.name} (+$${val})!`;
+    return state;
+  });
+}
+
+function mpDoUnmortgage(tileId) {
+  if (!latestMpData || latestMpData.turn !== myRole) return;
+
+  mpRef.transaction(cur => {
+    if (!cur || cur.turn !== myRole) return cur;
+    const state = JSON.parse(JSON.stringify(cur));
+    const tile = MP_BOARD_DATA[tileId];
+
+    if (state.ownership[tileId] !== myRole) return cur;
+    if (!state.mortgaged || !state.mortgaged[tileId]) return cur;
+
+    const cost = Math.floor((tile.price / 2) * 1.1);
+    if (state.money[myRole] < cost) return cur;
+
+    state.money[myRole] -= cost;
+    delete state.mortgaged[tileId];
+    state.lastActionText = `🏦 ${myRole.toUpperCase()} Menebus Kembali ${tile.name} (-$${cost})!`;
+    return state;
+  });
+}
+
 function mpDoEndTurn() {
   if (!latestMpData || latestMpData.turn !== myRole) return;
 
@@ -645,15 +706,22 @@ function mpDoEndTurn() {
     if (!cur || cur.turn !== myRole) return cur;
     const state = JSON.parse(JSON.stringify(cur));
 
-    state.hasRolled = false;
-    state.doubleStreak = 0;
-    state.turn = nextMpTurn(state);
-    state.lastTurnTime = Date.now();
-    state.lastActionText = `⏭️ Giliran berpindah ke ${state.turn.toUpperCase()}`;
+    if (state.canRollAgain) {
+      state.hasRolled = false;
+      state.canRollAgain = false;
+      state.lastActionText = `🎲 ${myRole.toUpperCase()} melempar dadu lagi (Bonus Dobel)!`;
+    } else {
+      state.hasRolled = false;
+      state.doubleStreak = 0;
+      state.turn = nextMpTurn(state);
+      state.lastTurnTime = Date.now();
+      state.lastActionText = `⏭️ Giliran berpindah ke ${state.turn.toUpperCase()}`;
+    }
     return state;
   });
 }
 
+// FIX BUG 2: INTEGRASI TOMBOL UI UNTUK GADAI DAN TEBUS PROPERTI
 function renderMpUI(data) {
   const statusEl = document.getElementById('mpStatus');
   const actBox = document.getElementById('mpActions');
@@ -710,6 +778,17 @@ function renderMpUI(data) {
     const btnPayJail = document.getElementById('mpBtnPayJail');
     const btnEnd = document.getElementById('mpBtnEndTurn');
 
+    // Buat elemen tombol gadai dinamis jika belum ada
+    let btnMortgage = document.getElementById('mpBtnMortgage');
+    if (!btnMortgage) {
+      btnMortgage = document.createElement('button');
+      btnMortgage.id = 'mpBtnMortgage';
+      btnMortgage.className = 'capsa-act play';
+      btnMortgage.style.background = '#e67e22';
+      btnMortgage.style.color = '#fff';
+      actBox.appendChild(btnMortgage);
+    }
+
     const inJail = (data.inJail && data.inJail[myRole] > 0);
     const hasJailCard = (data.jailCards && data.jailCards[myRole] > 0);
 
@@ -724,10 +803,12 @@ function renderMpUI(data) {
       btnRoll.style.display = 'block';
       btnBuy.style.display = 'none';
       btnHouse.style.display = 'none';
+      btnMortgage.style.display = 'none';
       btnEnd.style.display = 'none';
     } else {
       btnRoll.style.display = 'none';
       btnEnd.style.display = 'block';
+      btnEnd.textContent = data.canRollAgain ? "🎲 Lempar Dadu Lagi (Bonus Dobel)" : "⏭️ Selesai Giliran";
 
       const tilePos = data.pos ? data.pos[myRole] : 0;
       const tile = MP_BOARD_DATA[tilePos];
@@ -742,14 +823,29 @@ function renderMpUI(data) {
       if (tile && tile.type === 'property' && data.ownership[tile.id] === myRole) {
         const curHouse = (data.houses && data.houses[tile.id]) || 0;
         const houseCost = tile.housePrice || 100;
-        if (curHouse < 5 && data.money[myRole] >= houseCost) {
+        const isMortgaged = data.mortgaged && data.mortgaged[tile.id];
+
+        if (curHouse < 5 && data.money[myRole] >= houseCost && !isMortgaged) {
           btnHouse.style.display = 'block';
           btnHouse.textContent = curHouse === 4 ? `★ Beli Hotel ($${houseCost})` : `🏠+ Beli Rumah (${curHouse + 1}/4) ($${houseCost})`;
         } else {
           btnHouse.style.display = 'none';
         }
+
+        // Tampilkan Opsi Gadai/Tebus
+        btnMortgage.style.display = 'block';
+        if (isMortgaged) {
+          const unmortgageCost = Math.floor((tile.price / 2) * 1.1);
+          btnMortgage.textContent = `💵 Tebus ${tile.name} ($${unmortgageCost})`;
+          btnMortgage.onclick = () => mpDoUnmortgage(tile.id);
+        } else {
+          const mortgageVal = Math.floor(tile.price / 2);
+          btnMortgage.textContent = `🏦 Gadai ${tile.name} (+$${mortgageVal})`;
+          btnMortgage.onclick = () => mpDoMortgage(tile.id);
+        }
       } else {
         btnHouse.style.display = 'none';
+        btnMortgage.style.display = 'none';
       }
     }
   }
@@ -768,14 +864,12 @@ function drawMpCanvas(data) {
   canvas.width = 480;
   canvas.height = 480;
 
-  // Hapus isi canvas (transparan), background papan pakai CSS!
   ctx.clearRect(0, 0, 480, 480);
 
-  // 1. DADU DENGAN ANIMASI MUNCUL BESAR -> MENGEIL KE TENGAH
+  // 1. DADU DENGAN ANIMASI POP-OUT
   const dVals = animState.isRolling ? animState.tempDice : ((data && data.dice) || [1, 1]);
   let scale = 1.0;
   if (animState.isRolling) {
-    // Mulai dari skala 3.5x (Besar mendekat kamera), lalu mengecil menuju 1.0x
     scale = 3.5 - (animState.rollProgress * 2.5);
   }
 
@@ -794,11 +888,10 @@ function drawMpCanvas(data) {
   for (let i = 0; i < 40; i++) {
     let x = 0, y = 0;
     
-    // FIX KOORDINAT PION: Jalur Kiri (i = 10 s/d 20) digeser lebih ke kiri (x = 18) agar pas di tengah petak
     if (i <= 10) { 
       x = 420 - i * 36; y = 420; 
     } else if (i <= 20) { 
-      x = 18; y = 420 - (i - 10) * 36; // PERBAIKAN: Disesuaikan dari 60 menjadi 18
+      x = 18; y = 420 - (i - 10) * 36;
     } else if (i <= 30) { 
       x = 60 + (i - 20) * 36; y = 60; 
     } else { 
@@ -842,8 +935,18 @@ function drawMpCanvas(data) {
         const renderTileIndex = animState.pawnAnimPos[r] !== undefined ? animState.pawnAnimPos[r] : (data && data.pos ? data.pos[r] : 0);
         
         if (Math.floor(renderTileIndex) === i) {
-          const px = x + 10 + (idx % 3) * 9;
-          const py = y + 16 + Math.floor(idx / 3) * 10;
+          let px = x + 10 + (idx % 3) * 9;
+          let py = y + 16 + Math.floor(idx / 3) * 10;
+
+          if (i === 10) {
+            const isPlayerInJail = data && data.inJail && data.inJail[r] > 0;
+            if (isPlayerInJail) {
+              px = x + 10 + (idx % 2) * 10;
+              py = y + 10 + Math.floor(idx / 2) * 10;
+            } else {
+              px = x + 28; py = y + 32;
+            }
+          }
 
           ctx.beginPath();
           ctx.arc(px, py, 5, 0, Math.PI * 2);
@@ -858,18 +961,16 @@ function drawMpCanvas(data) {
   }
 }
 
-// FUNGSI UNTUK MENGGAMBAR DADU 3D DENGAN FITUR SCALING (ZOOM)
 function draw3DDice(ctx, x, y, val, isSpinning, scale = 1.0) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.scale(scale, scale); // Menerapkan Skala Dadu
+  ctx.scale(scale, scale);
 
   if (isSpinning) {
     const rot = (Date.now() / 20) % (Math.PI * 2);
     ctx.rotate(rot);
   }
 
-  // Efek Bayangan Dadu Saat Besar Mendekati Kamera
   if (scale > 1.2) {
     ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
     ctx.shadowBlur = 15;
