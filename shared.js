@@ -517,8 +517,6 @@ window.addEventListener('popstate', () => {
   history.pushState({ghub:true}, '', location.href);
 });
 
-let activePresenceRef = null;
-
 // ======================================================
 // FIX PERMANEN PRESENCE MULTIPLAYER (shared.js)
 // ======================================================
