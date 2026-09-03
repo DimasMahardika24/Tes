@@ -1,5 +1,5 @@
 // ======================================================
-// Catur.js — Game 2: Catur 2P Online (Fixed & Optimized)
+// Catur.js — Game 2: Catur 2P Online (Fixed & Working)
 // ======================================================
 
   const pieceUnicode = {k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟',K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙'};
@@ -49,7 +49,7 @@
     };
   }
 
-    function initChess(){
+  function initChess(){
     myChessColor = myRole === 'p1' ? 'w' : 'b';
     const roleTag = document.getElementById('chessRoleTag');
     if(roleTag) roleTag.textContent = myRole === 'p1' ? 'HOST (Putih)' : 'JOINER (Hitam)';
@@ -63,7 +63,6 @@
     if(winOverlay) winOverlay.style.display = 'none';
     hideChessPromoModal();
 
-    // PAKSA PAKAI BOARD STARTING LANGSUNG
     const starting = chessStartingState();
     chessBoardState = starting.board;
     chessTurn = starting.turn;
@@ -72,12 +71,12 @@
     chessHalfmove = starting.halfmove;
     chessClocks = starting.clocks;
 
-    // GAMBAR PAPAN SEGERA
     chessDraw();
 
-    attachPresence('chessStatus', roomIdGlobal);
+    if(typeof setupPresence === 'function') {
+      setupPresence('chessStatus', roomIdGlobal);
+    }
 
-    // Dapatkan data state real-time dari Firebase
     roomRef.child('state').on('value', (snap) => {
       const data = snap.val();
       if(!data) return;
@@ -116,8 +115,6 @@
     chessClockInterval = setInterval(chessUpdateClockUI, 250);
   }
 
-
-  // ---------- Deteksi Serangan & Skak ----------
   function chessFindKing(board, color){
     const K = color === 'w' ? 'K' : 'k';
     for(let y=0;y<8;y++) for(let x=0;x<8;x++) if(board[y][x] === K) return {x,y};
@@ -174,7 +171,6 @@
     return chessSquareAttacked(board, k.x, k.y, color === 'w' ? 'b' : 'w');
   }
 
-  // ---------- Generate Langkah Legal ----------
   function chessPieceMoves(board, state, x, y){
     const p = board[y][x];
     if(!p) return [];
@@ -349,41 +345,33 @@
     if(!bd) return;
     bd.innerHTML = '';
 
-    const board = chessBoardState || [
-      ['r','n','b','q','k','b','n','r'],
-      ['p','p','p','p','p','p','p','p'],
-      ['','','','','','','',''],
-      ['','','','','','','',''],
-      ['','','','','','','',''],
-      ['','','','','','','',''],
-      ['P','P','P','P','P','P','P','P'],
-      ['R','N','B','Q','K','B','N','R']
-    ];
+    const board = chessBoardState || chessStartingState().board;
 
     let validMoves = [];
-    if(chessSelected && chessBoardState){
-      validMoves = chessLegalMovesForSquare(chessBoardState, {castling:chessCastling, ep:chessEP}, chessSelected.x, chessSelected.y);
+    if(chessSelected && board){
+      validMoves = chessLegalMovesForSquare(board, {castling:chessCastling, ep:chessEP}, chessSelected.x, chessSelected.y);
     }
 
-    for(let y=0; y<8; y++){
-      for(let x=0; x<8; x++){
-        const ry = chessFlipped ? 7 - y : y;
-        const rx = chessFlipped ? 7 - x : x;
+    for(let displayY=0; displayY<8; displayY++){
+      for(let displayX=0; displayX<8; displayX++){
+        const boardY = chessFlipped ? 7 - displayY : displayY;
+        const boardX = chessFlipped ? 7 - displayX : displayX;
+        
         const cell = document.createElement('div');
-        cell.className = 'cell ' + ((rx + ry) % 2 ? 'dark' : 'light');
+        cell.className = 'cell ' + ((boardX + boardY) % 2 ? 'dark' : 'light');
         
-        if(chessSelected && chessSelected.x === rx && chessSelected.y === ry) cell.classList.add('selected');
+        if(chessSelected && chessSelected.x === boardX && chessSelected.y === boardY) cell.classList.add('selected');
         
-        const move = validMoves.find(m => m.x2 === rx && m.y2 === ry);
+        const move = validMoves.find(m => m.x2 === boardX && m.y2 === boardY);
         if(move) cell.classList.add(move.capture ? 'capture' : 'valid');
         
-        const p = board[ry][rx];
+        const p = board[boardY][boardX];
         if(p) cell.innerHTML = '<span class="piece ' + (chessColorOf(p)==='w' ? 'white' : 'black') + '">' + pieceUnicode[p] + '</span>';
         
-        // Gunakan pointerdown agar responsif di HP & Desktop
         cell.onpointerdown = (e) => {
           e.preventDefault();
-          chessHandleClick(rx, ry);
+          e.stopPropagation();
+          chessHandleClick(boardX, boardY);
         };
 
         bd.appendChild(cell);
@@ -417,7 +405,6 @@
       if(mv){
         const activeMove = mv;
         chessSelected = null;
-        chessDraw(); // Hilangkan highlight sejenak
         
         if(activeMove.promotion){
           chessPendingPromotion = activeMove;
@@ -436,7 +423,6 @@
     }
     chessDraw();
   }
-
 
   function chessCommitMove(move, promoteTo){
     const state = { castling: chessCastling, ep: chessEP, halfmove: chessHalfmove };
@@ -457,7 +443,6 @@
       ep: result.ep, halfmove: result.halfmove, clocks: newClocks, turnStartAt: newTurnStartAt
     });
 
-    // Pengecekan Threefold Repetition
     const key = chessPositionKey(result.board, nextTurn, result.castling, result.ep);
     roomRef.child('posCounts/' + key).transaction(c => (c||0) + 1).then(res => {
       if(res.committed && res.snapshot.val() >= 3) chessDeclareResult('draw', 'threefold');
