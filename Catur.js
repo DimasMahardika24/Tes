@@ -49,19 +49,35 @@
     };
   }
 
-  function initChess(){
+    function initChess(){
     myChessColor = myRole === 'p1' ? 'w' : 'b';
-    document.getElementById('chessRoleTag').textContent = myRole === 'p1' ? 'HOST (Putih)' : 'JOINER (Hitam)';
+    const roleTag = document.getElementById('chessRoleTag');
+    if(roleTag) roleTag.textContent = myRole === 'p1' ? 'HOST (Putih)' : 'JOINER (Hitam)';
+    
     chessFlipped = myChessColor === 'b';
     chessSelected = null;
     chessGameOver = false;
     chessPendingPromotion = null;
-    document.getElementById('chessWinOverlay').style.display = 'none';
+    
+    const winOverlay = document.getElementById('chessWinOverlay');
+    if(winOverlay) winOverlay.style.display = 'none';
     hideChessPromoModal();
+
+    // PAKSA PAKAI BOARD STARTING LANGSUNG
+    const starting = chessStartingState();
+    chessBoardState = starting.board;
+    chessTurn = starting.turn;
+    chessCastling = starting.castling;
+    chessEP = starting.ep;
+    chessHalfmove = starting.halfmove;
+    chessClocks = starting.clocks;
+
+    // GAMBAR PAPAN SEGERA
+    chessDraw();
 
     attachPresence('chessStatus', roomIdGlobal);
 
-    // Dapatkan data state real-time
+    // Dapatkan data state real-time dari Firebase
     roomRef.child('state').on('value', (snap) => {
       const data = snap.val();
       if(!data) return;
@@ -98,9 +114,8 @@
 
     if(chessClockInterval) clearInterval(chessClockInterval);
     chessClockInterval = setInterval(chessUpdateClockUI, 250);
-
-    chessDraw();
   }
+
 
   // ---------- Deteksi Serangan & Skak ----------
   function chessFindKing(board, color){

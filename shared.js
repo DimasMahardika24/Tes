@@ -427,12 +427,17 @@ document.getElementById('btnLobbyConnect').onclick = () => {
 function enterGame(){
   showScreen(gameMeta[currentGame].screen);
   saveSession();
-  if(currentGame === 'chess') initChess();
-  if(currentGame === 'ttt') initTTT();
-  if(currentGame === 'poker') initPoker();
-  if(currentGame === 'uno') initUno();
-  if(currentGame === 'monopoli') initMonopoli();
+
+  // Berikan sedikit jeda per sekian milidetik agar DOM ter-render sempurna
+  setTimeout(() => {
+    if(currentGame === 'chess') initChess();
+    if(currentGame === 'ttt') initTTT();
+    if(currentGame === 'poker') initPoker();
+    if(currentGame === 'uno') initUno();
+    if(currentGame === 'monopoli') initMonopoli();
+  }, 50);
 }
+
 
 const SESSION_KEY = 'ghub_session_v1';
 let pendingResumeCoin = 0;
