@@ -1,27 +1,16 @@
 // ======================================================
 // Tttc.js — Game 3: Tic-Tac-Toe 2P
-// Membutuhkan shared.js sudah dimuat lebih dulu (pakai variabel
-// & fungsi bersama seperti dbRoot, roomRef, myRole, currentGame,
-// attachPresence, clearSession, dst).
+// Membutuhkan shared.js sudah dimuat lebih dulu
 // ======================================================
 
-  // ======================================================
-  // =============== GAME 3: TIC TAC TOE =================
-  // ======================================================
   const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
   let tttBoardState, tttTurn, mySymbol, tttWinSvg = null, tttRoundBusy = false, tttRound = 0;
 
-  // CATATAN PENTING: kotak kosong direpresentasikan dengan string kosong '' —
-  // BUKAN null. Firebase Realtime Database otomatis MEMBUANG nilai null saat
-  // disimpan, jadi papan kosong (dulu Array(9).fill(null)) berubah jadi
-  // "undefined" begitu dibaca balik dari server. Itu bikin seluruh fungsi
-  // game meledak diam-diam (error di dalam listener) dan tttBoardState jadi
-  // permanen kosong/falsy — makanya klik di papan tidak pernah bereaksi
-  // setelah lawan join. Pakai '' supaya array tetap array asli dari Firebase.
   function tttEmptyBoard(){ return Array(9).fill(''); }
-  function tttEmptyCells(b){ const r=[]; for(let i=0;i<9;i++) if(!b[i]) r.push(i); return r; }
+  function tttEmptyCells(b){ const r=[]; for(let i=0;i<9;i++) if(!b || !b[i]) r.push(i); return r; }
 
   function tttEval(b){
+    if(!b) return null;
     for(const l of LINES){ if(b[l[0]] && b[l[0]] === b[l[1]] && b[l[0]] === b[l[2]]) return {winner:b[l[0]], line:l}; }
     if(tttEmptyCells(b).length === 0) return {winner:'draw', line:null};
     return null;
@@ -32,8 +21,9 @@
     document.getElementById('tttRoleTag').textContent = myRole === 'p1' ? 'HOST (X)' : 'JOINER (O)';
     tttRoundBusy = false;
 
-    attachPresence('tttStatus', roomIdGlobal);
+    // Build elemen DOM papan secara tegas di awal
     buildTTTBoard();
+    attachPresence('tttStatus', roomIdGlobal);
 
     roomRef.child('score').on('value', (snap) => {
       const s = snap.val() || {};
@@ -44,16 +34,23 @@
 
     roomRef.child('state').on('value', (snap) => {
       const data = snap.val();
-      if(!data) return;
-      tttBoardState = data.board;
-      tttTurn = data.turn;
+      if(!data) {
+        // Jika data state di Firebase belum ada, paksakan papan kosong awal
+        tttBoardState = tttEmptyBoard();
+        tttTurn = 'X';
+        renderTTTBoard();
+        return;
+      }
+
+      tttBoardState = data.board || tttEmptyBoard();
+      tttTurn = data.turn || 'X';
       tttRound = data.round || 0;
 
       const result = tttEval(tttBoardState);
 
       // JIKA RONDE BARU / PAPAN KOSONG
       if(!result) {
-        tttRoundBusy = false; // Buka kunci klik
+        tttRoundBusy = false;
         clearTTTWinLine();
         renderTTTBoard();
         const myTurn = tttTurn === mySymbol;
@@ -61,33 +58,29 @@
       } 
       // JIKA RONDE SELESAI (ADA WINNER / SERI)
       else if(result && !tttRoundBusy) {
-        tttRoundBusy = true; // Kunci sementara pas animasi/teks menang
+        tttRoundBusy = true;
         renderTTTBoard();
         if(result.line) drawTTTWinLine(result.line);
         
         document.getElementById('tttStatus').textContent = result.winner === 'draw' ? 'Seri!' :
           (result.winner === mySymbol ? '🏆 Kamu menang!' : '😢 Lawan menang!');
 
-        // Mencegah bentrok (race condition) antar 2 player
         roomRef.child('roundLocks/' + tttRound).transaction(
           (current) => (current === null ? true : undefined),
           (err, committed) => {
             if(err || !committed) return;
             
-            // Tambah skor
             const key = result.winner === 'draw' ? 'draw' : result.winner;
             roomRef.child('score/' + key).transaction(v => (v || 0) + 1);
 
-            // AUTO RESET DALAM 2 DETIK (INFINITY ROUNDS)
             setTimeout(() => {
-              // Pemenang ronde sebelumnya jalan duluan (atau default ke 'X' kalau seri)
               const nextTurn = result.winner === 'draw' ? 'X' : result.winner;
               roomRef.child('state').set({ 
                 board: tttEmptyBoard(), 
                 turn: nextTurn, 
                 round: tttRound + 1 
               });
-            }, 2000); // 2000 ms = 2 Detik
+            }, 2000);
           }
         );
       }
@@ -102,9 +95,9 @@
     }
   }
 
-
   function buildTTTBoard(){
     const bd = document.getElementById('tttBoard');
+    if(!bd) return;
     bd.innerHTML = '';
     for(let i=0;i<9;i++){
       const btn = document.createElement('button');
@@ -116,10 +109,16 @@
   }
 
   function renderTTTBoard(){
-    if(!tttBoardState) return;
     const cells = document.querySelectorAll('#tttBoard .ttt-cell');
-    cells.forEach((cell, i) => {
-      const v = tttBoardState[i];
+    if(!cells || cells.length === 0) {
+      buildTTTBoard(); // Re-build jika elemen belum terbuat
+    }
+    
+    const currentCells = document.querySelectorAll('#tttBoard .ttt-cell');
+    const board = tttBoardState || tttEmptyBoard();
+
+    currentCells.forEach((cell, i) => {
+      const v = board[i];
       if(v === 'O') cell.innerHTML = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="34" class="o-circle"/></svg>';
       else if(v === 'X') cell.innerHTML = '<svg viewBox="0 0 100 100"><line x1="20" y1="20" x2="80" y2="80" class="x-line"/><line x1="80" y1="20" x2="20" y2="80" class="x-line"/></svg>';
       else cell.innerHTML = '';
@@ -140,7 +139,8 @@
     ln.setAttribute('x2', p2.x); ln.setAttribute('y2', p2.y);
     ln.setAttribute('class', 'winline');
     svg.appendChild(ln);
-    document.getElementById('tttBoardWrap').appendChild(svg);
+    const wrap = document.getElementById('tttBoardWrap');
+    if(wrap) wrap.appendChild(svg);
     tttWinSvg = svg;
   }
 
@@ -159,4 +159,3 @@
     if(activePresenceRef) activePresenceRef.remove();
     clearSession(); location.reload();
   };
-
