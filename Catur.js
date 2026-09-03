@@ -349,7 +349,6 @@
     if(!bd) return;
     bd.innerHTML = '';
 
-    // FALLBACK: Jika Firebase belum kirim data, gunakan papan default sementara
     const board = chessBoardState || [
       ['r','n','b','q','k','b','n','r'],
       ['p','p','p','p','p','p','p','p'],
@@ -378,11 +377,15 @@
         const move = validMoves.find(m => m.x2 === rx && m.y2 === ry);
         if(move) cell.classList.add(move.capture ? 'capture' : 'valid');
         
-        // Aman dari error undefined
         const p = board[ry][rx];
         if(p) cell.innerHTML = '<span class="piece ' + (chessColorOf(p)==='w' ? 'white' : 'black') + '">' + pieceUnicode[p] + '</span>';
         
-        cell.onclick = () => chessHandleClick(rx, ry);
+        // Gunakan pointerdown agar responsif di HP & Desktop
+        cell.onpointerdown = (e) => {
+          e.preventDefault();
+          chessHandleClick(rx, ry);
+        };
+
         bd.appendChild(cell);
       }
     }
@@ -398,6 +401,40 @@
     
     const statusEl = document.getElementById('chessStatus');
     if(statusEl) statusEl.textContent = statusTxt;
+  }
+
+  function chessHandleClick(x, y){
+    if(chessGameOver || chessPendingPromotion) return;
+    if(chessTurn !== myChessColor) return;
+    
+    const board = chessBoardState || chessStartingState().board;
+    const p = board[y][x];
+
+    if(chessSelected){
+      const legalMoves = chessLegalMovesForSquare(board, {castling:chessCastling, ep:chessEP}, chessSelected.x, chessSelected.y);
+      const mv = legalMoves.find(m => m.x2 === x && m.y2 === y);
+
+      if(mv){
+        const activeMove = mv;
+        chessSelected = null;
+        chessDraw(); // Hilangkan highlight sejenak
+        
+        if(activeMove.promotion){
+          chessPendingPromotion = activeMove;
+          showChessPromoModal(myChessColor);
+        } else {
+          chessCommitMove(activeMove, null);
+        }
+        return;
+      } else if(p && chessColorOf(p) === myChessColor){
+        chessSelected = {x, y};
+      } else {
+        chessSelected = null;
+      }
+    } else if(p && chessColorOf(p) === myChessColor){
+      chessSelected = {x, y};
+    }
+    chessDraw();
   }
 
   function chessHandleClick(x, y){
