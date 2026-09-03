@@ -240,8 +240,9 @@ function checkAndStartMpGame() {
   const targetMax = (latestMpData && latestMpData.maxPlayers) || window.mpSelectedMaxPlayers || 3;
   const activeRoles = getMpRoles(targetMax);
   
-  // Mengecek apakah semua role (p1, p2, p3...) sudah aktif online di presence
+  // DIPERBAIKI: Pastikan p1 selalu terhitung otomatis jika client ini adalah Host (p1)
   const onlineRoles = Object.keys(mpPresence || {}).filter(r => mpPresence[r] && activeRoles.includes(r));
+  if (!onlineRoles.includes('p1')) onlineRoles.push('p1');
 
   if (onlineRoles.length >= targetMax && latestMpData && latestMpData.phase === 'waiting') {
     mpRef.transaction(cur => {
@@ -249,9 +250,15 @@ function checkAndStartMpGame() {
         return buildNewMpGame(cur.maxPlayers || targetMax);
       }
       return cur;
+    }, (error, committed, snapshot) => {
+      if (committed && snapshot.exists()) {
+        latestMpData = snapshot.val();
+        renderMpUI(latestMpData);
+      }
     });
   }
 }
+
 
 
 function initMonopoli() {
@@ -268,11 +275,11 @@ function initMonopoli() {
     location.reload();
   };
 
+  // DIPERBAIKI: Daftarkan presence terlebih dahulu dan pastikan tersimpan sebelum panggil checkAndStart
   const pRef = roomRef.child('presence/' + myRole);
   pRef.set(true);
   pRef.onDisconnect().remove();
 
-  // DIPERBAIKI: P1 wajib langsung menuliskan state 'waiting' dan maxPlayers secara utuh ke Firebase
   if (myRole === 'p1') {
     const targetMax = window.mpSelectedMaxPlayers || 3;
     mpRef.transaction(cur => {
@@ -286,14 +293,7 @@ function initMonopoli() {
     });
   }
 
-  // Listener presence untuk mendeteksi ketersediaan pemain online
-  roomRef.child('presence').on('value', snap => {
-    mpPresence = snap.val() || {};
-    if (latestMpData) renderMpUI(latestMpData);
-    checkAndStartMpGame();
-  });
-
-  // Listener realtime Monopoli
+  // Listener realtime Monopoli (Ditaruh di atas agar UI P1 langsung berubah saat Firebase update)
   mpRef.on('value', snap => {
     const data = snap.val();
     if (data) {
@@ -317,6 +317,13 @@ function initMonopoli() {
       renderMpUI(data);
       checkAndStartMpGame();
     }
+  });
+
+  // Listener presence
+  roomRef.child('presence').on('value', snap => {
+    mpPresence = snap.val() || {};
+    if (latestMpData) renderMpUI(latestMpData);
+    checkAndStartMpGame();
   });
 
   document.getElementById('mpBtnRoll').onclick = mpDoRollWithAnim;
