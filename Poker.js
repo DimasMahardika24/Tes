@@ -1,45 +1,5 @@
 // ======================================================
-// Poker.js — Capsa Banting 4 Pemain Realtime
-// Bagian dari Game Hub, nyambung ke shared.js (roomRef, myRole,
-// dbRoot, dst). Nama file & fungsi tetap "poker*" (legacy) supaya
-// ga perlu ubah shared.js/index.html lebih jauh dari yang perlu,
-// tapi ISI-nya sekarang Capsa Banting, bukan Texas Hold'em lagi.
-//
-// Aturan yang diimplementasikan:
-// - 52 kartu dibagi habis ke p1..p4, masing-masing 13 kartu.
-// - Pemegang 3♦ (diamonds 03) WAJIB jalan duluan di kartu pertama,
-//   dan kombo pertama itu WAJIB mengandung kartu 3♦ tsb.
-// - Kombo valid:
-//   - Single(1), Pair(2)
-//   - 3 kartu: Triss (tris/kembar 3) ATAU Seri (3 kartu beda rank
-//     berurutan, mis. 4-5-6). Triss > Seri kalau jumlah kartu sama.
-//   - 5 kartu: Seri/Straight, Flush, Polo Seri (3 kartu berurutan +
-//     1 pair), Polo/Full House, Piting/Four of a Kind ("Poker"),
-//     (Royal) Straight Flush.
-//   - Rank: 3<4<5<6<7<8<9<10<J<Q<K<A<2 (2 paling tinggi).
-//   - Suit: clubs<diamonds<hearts<spades.
-// - ATURAN KHUSUS: As gak bisa dibantai sesama As (single/pair/tris
-//   As gak bisa ditumpuk As lain, mesti pake kartu 2). Begitu juga
-//   Poker (Four of a Kind) gak bisa dibantai sesama Poker — cuma
-//   Straight Flush yang bisa ngelewatinnya.
-// - Jalan searah jarum jam: p1 -> p2 -> p3 -> p4 -> p1 (skip pemain
-//   yang udah habis kartunya / finished).
-// - Pemain berikutnya cuma boleh banting kalau JUMLAH kartu sama
-//   dan levelnya lebih tinggi (kombo 5-kartu dibandingkan lewat
-//   hirarki kategori dulu, baru nilai kartu).
-// - Pass reset: begitu SEMUA lawan aktif (yang masih pegang kartu,
-//   selain yang barusan jalan) sudah pass berturut-turut, meja
-//   direset & giliran balik bebas ke pemain terakhir yang banting.
-// - Menang bertingkat: kartu pertama yang habis = Juara 1, lanjut
-//   sampai Juara 2 & Juara 3 ketentuan, sisa 1 orang terakhir yang
-//   masih pegang kartu = "Buncit" (kalah). Jadi yang kalah cuma 1.
-// - Setiap pemain bisa ganti nama panggilan sendiri (Edit Nama),
-//   dan nama itu keliatan ke semua pemain lain juga.
-//
-// Sama seperti Poker.js versi lama, deck & seluruh tangan (termasuk
-// kartu lawan) ditulis ke Firebase apa adanya dan cuma DISEMBUNYIKAN
-// di tampilan (bukan beneran dirahasiakan dari database) — standar
-// game kasual tanpa server pihak ketiga yang megang deck.
+// Poker.js — Capsa Banting 4 Pemain Realtime (Bom Seri & Bom 4 Kartu)
 // ======================================================
 
 let pokerRef = null;
@@ -48,19 +8,11 @@ let pokerPresence = {};
 let selectedKeys = new Set();
 let pokerNames = {};
 
-// Buat animasi bagi kartu: cuma nge-trigger animasi kalau perubahan
-// handNumber kejadian SAAT kita udah nongkrong di layar (bukan pas
-// baru buka/reload halaman).
 let pokerLastAnimatedHand = null;
 let pokerHasRenderedOnce = false;
 
 const ROLES = ['p1', 'p2', 'p3', 'p4'];
 
-// ---------- Kartu & Deck ----------
-// Gambar kartu dipakai dari Deck of Cards API (deckofcardsapi.com) - gratis,
-// gak perlu hosting sendiri, dan gak akan 404 kayak folder Cards lokal yang
-// kemarin filenya gak cocok. Formatnya: static/img/{RANK}{SUIT}.png, dengan
-// keunikan: kartu "10" kodenya "0" (bukan "10"), bukan bug dari kita.
 const CARD_IMG_BASE = 'https://deckofcardsapi.com/static/img/';
 const CARD_BACK_IMG = CARD_IMG_BASE + 'back.png';
 
@@ -91,7 +43,6 @@ function sortCards(hand){
   return hand.slice().sort((a, b) => RANK_ORDER[a.rank] - RANK_ORDER[b.rank] || SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit]);
 }
 
-// ---------- Giliran (skip pemain yang udah "finished" / habis kartu) ----------
 function nextActiveRole(current, finished){
   finished = finished || [];
   let idx = ROLES.indexOf(current);
@@ -112,13 +63,12 @@ function removeCards(hand, selected){
   });
 }
 
-// ---------- Nama panggilan ----------
 function displayName(role){
   const n = pokerNames && pokerNames[role];
   return (n && n.trim()) ? n.trim() : role.toUpperCase();
 }
 
-// ---------- Deteksi & Perbandingan Kombo ----------
+// ---------- DETEKSI KOMBO KARTU ----------
 function detectCombo(cards){
   const n = cards.length;
   if(n === 1){
@@ -132,12 +82,26 @@ function detectCombo(cards){
     if(cards.every(c => c.rank === cards[0].rank)){
       return { valid: true, type: 'triple', count: 3, level: 1, tiebreak: [Math.max(...cards.map(cardValue))] };
     }
-    // Seri: 3 kartu beda rank yang berurutan (mis. 4-5-6), suit bebas.
+    // Bom Seri 3 Kartu (berurutan)
     const sorted = cards.slice().sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
     const idxs = sorted.map(c => RANK_ORDER[c.rank]);
     const uniq = [...new Set(idxs)];
     if(uniq.length === 3 && (uniq[0] - uniq[2] === 2)){
       return { valid: true, type: 'run3', count: 3, level: 0, tiebreak: [idxs[0], SUIT_ORDER[sorted[0].suit]] };
+    }
+    return { valid: false };
+  }
+  if(n === 4){
+    // Bom 4 Kartu Angka Sama (Four of a Kind - 4 Kartu Saja)
+    if(cards.every(c => c.rank === cards[0].rank)){
+      return { valid: true, type: 'four_pure', count: 4, level: 2, tiebreak: [RANK_ORDER[cards[0].rank]] };
+    }
+    // Bom Seri 4 Kartu (berurutan)
+    const sorted = cards.slice().sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
+    const idxs = sorted.map(c => RANK_ORDER[c.rank]);
+    const uniq = [...new Set(idxs)];
+    if(uniq.length === 4 && (uniq[0] - uniq[3] === 3)){
+      return { valid: true, type: 'run4', count: 4, level: 1, tiebreak: [idxs[0], SUIT_ORDER[sorted[0].suit]] };
     }
     return { valid: false };
   }
@@ -158,9 +122,6 @@ function detectFiveCombo(cards){
     .map(([i, c]) => ({ i: +i, c }))
     .sort((a, b) => b.c - a.c || b.i - a.i);
 
-  // Urutan level (dari terlemah ke terkuat):
-  // 1 Seri/Straight < 2 Polo Seri < 3 Flush < 4 Polo/Full House
-  // < 5 Piting/Four of a Kind (Poker) < 6 Straight Flush
   if(isStraight && isFlush){
     return { valid: true, type: 'straightflush', count: 5, level: 6, tiebreak: [idxs[0], SUIT_ORDER[sorted[0].suit]] };
   }
@@ -173,8 +134,6 @@ function detectFiveCombo(cards){
   if(groups[0].c === 3 && groups[1] && groups[1].c === 2){
     return { valid: true, type: 'fullhouse', count: 5, level: 4, tiebreak: [groups[0].i] };
   }
-  // Polo Seri: 1 pair + 3 kartu tunggal beda rank yang berurutan
-  // (mis. pair 9-9 + 4-5-6). Bentuknya = groups [2,1,1,1].
   if(groups.length === 4 && groups[0].c === 2 && groups.slice(1).every(g => g.c === 1)){
     const singleRanks = groups.slice(1).map(g => g.i).sort((a, b) => a - b);
     if(singleRanks[2] - singleRanks[0] === 2){
@@ -203,18 +162,19 @@ function comboDisplayName(combo){
     case 'single': return 'Single';
     case 'pair': return 'Pair';
     case 'triple': return 'Triss';
-    case 'run3': return 'Seri (3 Kartu Berurutan)';
-    case 'straight': return 'Seri (Straight)';
+    case 'run3': return 'Bom Seri (3 Kartu)';
+    case 'run4': return 'Bom Seri (4 Kartu)';
+    case 'four_pure': return 'Bom 4 Angka Sama';
+    case 'straight': return 'Seri 5 Kartu (Straight)';
     case 'flush': return 'Flush';
     case 'seripolo': return 'Polo Seri (Seri + Pair)';
     case 'fullhouse': return 'Polo (Full House)';
-    case 'four': return 'Poker (Four of a Kind)';
+    case 'four': return 'Poker (Four of a Kind + Kicker)';
     case 'straightflush': return combo.tiebreak[0] === RANK_ORDER['02'] ? 'Royal Flush' : 'Straight Flush';
     default: return '-';
   }
 }
 
-// ---------- Aturan khusus: As vs As & Poker vs Poker gak boleh saling banting ----------
 function isPureAceCombo(cards){
   return cards.length > 0 && cards.every(c => c.rank === 'A');
 }
@@ -223,16 +183,16 @@ function isBlockedBeat(lastPlay, newCombo, newCards){
   if(lastPlay.combo.count <= 3 && newCombo.count === lastPlay.combo.count){
     if(isPureAceCombo(lastPlay.cards) && isPureAceCombo(newCards)) return 'ace';
   }
-  if(lastPlay.combo.type === 'four' && newCombo.type === 'four') return 'poker';
+  if((lastPlay.combo.type === 'four' || lastPlay.combo.type === 'four_pure') && 
+     (newCombo.type === 'four' || newCombo.type === 'four_pure')) return 'poker';
   return false;
 }
 function blockedBeatMessage(reason){
-  if(reason === 'ace') return 'As gak bisa dibantai dengan As lagi! (cuma kartu 2 yang bisa ngelewatin As)';
-  if(reason === 'poker') return 'Poker (Four of a Kind) gak bisa dibantai dengan Poker lagi! (cuma Straight Flush yang bisa ngelewatin)';
+  if(reason === 'ace') return 'As gak bisa dibantai dengan As lagi! (Cuma kartu 2 yang bisa ngelewatin As)';
+  if(reason === 'poker') return 'Bom 4 Angka Sama gak bisa dibantai sesama Bom 4 Angka Sama!';
   return 'Kombinasi tidak diperbolehkan.';
 }
 
-// ---------- Setup Ronde Baru (cuma dijalankan HOST/p1) ----------
 function pokerBuildNewGame(prev){
   const deck = shuffleDeck(makeDeck());
   const hands = {
@@ -262,30 +222,29 @@ function pokerBuildNewGame(prev){
   };
 }
 
-// ---------- Aksi Pemain ----------
 function pokerDoPlay(){
   const data = latestPokerData;
   if(!data || data.phase !== 'playing' || data.turn !== myRole) return;
   const hand = sortCards((data.hands && data.hands[myRole]) || []);
   const selected = hand.filter(c => selectedKeys.has(cardKey(c)));
-  if(selected.length === 0){ alert('Pilih kartu dulu.'); return; }
+  if(selected.length === 0){ showCustomAlert('Pilih kartu dulu.'); return; }
 
   const combo = detectCombo(selected);
-  if(!combo.valid){ alert('Kombinasi kartu tidak valid.'); return; }
+  if(!combo.valid){ showCustomAlert('Kombinasi kartu tidak valid.'); return; }
   if(data.isFirstPlay){
     if(!selected.some(c => c.rank === '03' && c.suit === 'd')){
-      alert('Wajib jalan dengan kartu 3♦ (3 Wajik) di kartu pertama!');
+      showCustomAlert('Wajib jalan dengan kartu 3♦ (3 Wajik) di kartu pertama!');
       return;
     }
   } else if(data.lastPlay){
     if(combo.count !== data.lastPlay.combo.count){
-      alert('Jumlah kartu harus sama dengan yang di meja (' + data.lastPlay.combo.count + ' kartu).');
+      showCustomAlert('Jumlah kartu harus sama dengan yang di meja (' + data.lastPlay.combo.count + ' kartu).');
       return;
     }
     const blocked = isBlockedBeat(data.lastPlay, combo, selected);
-    if(blocked){ alert(blockedBeatMessage(blocked)); return; }
+    if(blocked){ showCustomAlert(blockedBeatMessage(blocked)); return; }
     if(compareCombo(combo, data.lastPlay.combo) <= 0){
-      alert('Kombinasi kamu harus lebih tinggi dari kartu terakhir di meja.');
+      showCustomAlert('Kombinasi kamu harus lebih tinggi dari kartu terakhir di meja.');
       return;
     }
   }
@@ -296,7 +255,7 @@ function pokerDoPlay(){
     const state = JSON.parse(JSON.stringify(cur));
     const curHand = state.hands[myRole] || [];
     const remain = removeCards(curHand, selected);
-    if(remain.length !== curHand.length - selected.length) return cur; // kartu udah gak sesuai (race), batalkan
+    if(remain.length !== curHand.length - selected.length) return cur;
 
     const c2 = detectCombo(selected);
     if(!c2.valid) return cur;
@@ -320,7 +279,6 @@ function pokerDoPlay(){
       finished.push(myRole);
       state.finished = finished;
       if(finished.length >= 3){
-        // Cuma 1 org yang kalah: sisa 1 pemain yang masih pegang kartu.
         state.phase = 'roundover';
         state.loser = ROLES.find(r => !finished.includes(r)) || null;
         state.winner = finished[0];
@@ -336,7 +294,7 @@ function pokerDoPass(){
   pokerRef.transaction(cur => {
     if(!cur || cur.phase !== 'playing') return cur;
     if(cur.turn !== myRole) return cur;
-    if(!cur.lastPlay) return cur; // meja kosong / wajib jalan, gak boleh pass
+    if(!cur.lastPlay) return cur;
     const state = JSON.parse(JSON.stringify(cur));
     const finished = state.finished || [];
     state.passCount = (state.passCount || 0) + 1;
@@ -358,7 +316,6 @@ function pokerDoPass(){
   }, () => { selectedKeys.clear(); });
 }
 
-// ---------- Render ----------
 function seatPosFor(role){
   const my = ROLES.indexOf(myRole);
   const r = ROLES.indexOf(role);
@@ -524,8 +481,6 @@ function pokerRenderCore(data){
   }
 }
 
-/// Animasi bagi kartu: dikasih PER ORANG sampai selesai baru pindah ke pemain berikutnya, delay 0.5s per kartu
-// Animasi Capsa: Disesuaikan dengan 4 pemain aktif di meja
 function pokerAnimateDeal(done){
   const table = document.querySelector('#pokerScreen .capsa-table');
   if(!table){ done(); return; }
@@ -534,10 +489,9 @@ function pokerAnimateDeal(done){
   overlay.className = 'capsa-deal-overlay';
   table.appendChild(overlay);
 
-  // Urutan pemain aktif di meja Capsa 4P
   const dealTargets = ['bottom', 'right', 'top', 'left']; 
-  const cardsPerPlayer = 5; // Kartu animasi meluncur per pemain
-  const perCardDelay = 300; // 0.3 detik per kartu
+  const cardsPerPlayer = 5; 
+  const perCardDelay = 300; 
   const animDuration = 550;
 
   let cardIndex = 0;
@@ -560,8 +514,6 @@ function pokerAnimateDeal(done){
   }, totalDuration);
 }
 
-
-
 function pokerRender(data){
   const freshHand = data.phase === 'playing' && !!data.handNumber && data.handNumber !== pokerLastAnimatedHand;
   const shouldAnimate = freshHand && pokerHasRenderedOnce;
@@ -575,7 +527,6 @@ function pokerRender(data){
   }
 }
 
-// ---------- Presence (4 kursi) ----------
 function pokerAttachPresence(){
   const presenceRef = roomRef.child('presence/' + myRole);
   activePresenceRef = presenceRef;
@@ -605,7 +556,6 @@ function pokerAttachPresence(){
   });
 }
 
-// ---------- Nama Panggilan ----------
 function pokerAttachNames(){
   pokerRef.child('names').on('value', snap => {
     pokerNames = snap.val() || {};
@@ -633,13 +583,10 @@ function pokerSaveName(){
   pokerCloseNameEditor();
 }
 
-// ---------- Init ----------
 function initPoker(){
   pokerRef = roomRef.child('poker');
   document.getElementById('pokerRoleTag').textContent = myRole.toUpperCase();
 
-  // Auto-landscape: paksa tampilan Capsa jadi mode landscape via CSS
-  // transform, TANPA perlu pemain fisik muterin HP-nya.
   document.documentElement.classList.add('force-landscape');
 
   document.getElementById('btnPokerBack').onclick = () => {
@@ -649,10 +596,8 @@ function initPoker(){
     location.reload();
   };
 
-  // Pastiin slot presence kita sendiri ke-set, termasuk pas resume sesi lama.
   roomRef.child('presence/' + myRole).transaction(cur => cur === null ? true : cur);
 
-  // Host bikin state awal kalau belum ada.
   if(myRole === 'p1'){
     pokerRef.transaction(cur => cur || {
       phase: 'waiting', hands: null, turn: null, starter: null,

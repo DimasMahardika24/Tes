@@ -1,6 +1,6 @@
 // ======================================================
 // Uno.js — Uno Battle Arena (2-6 Pemain Realtime)
-// Bagian dari Game Hub, terintegrasi dengan shared.js
+// Update: Teriak UNO (1 Kartu), UNO GAME (0 Kartu), & Waktu Timer
 // ======================================================
 
 let unoRef = null;
@@ -10,37 +10,31 @@ let selectedUnoKeys = new Set();
 let unoNames = {};
 let unoTimerCheck = null;
 
-// Pemicu animasi bagi kartu
 let unoLastAnimatedHand = null;
 let unoHasRenderedOnce = false;
 
 const UNO_BASE_URL = "https://unocardinfo.victorhomedia.com/graphics/uno_card-";
 const UNO_CARD_URLS = {
-  // MERAH
   "merah_0": UNO_BASE_URL + "red0.png", "merah_1": UNO_BASE_URL + "red1.png", "merah_2": UNO_BASE_URL + "red2.png",
   "merah_3": UNO_BASE_URL + "red3.png", "merah_4": UNO_BASE_URL + "red4.png", "merah_5": UNO_BASE_URL + "red5.png",
   "merah_6": UNO_BASE_URL + "red6.png", "merah_7": UNO_BASE_URL + "red7.png", "merah_8": UNO_BASE_URL + "red8.png",
   "merah_9": UNO_BASE_URL + "red9.png", "merah_draw2": UNO_BASE_URL + "reddraw2.png",
   "merah_reverse": UNO_BASE_URL + "redreverse.png", "merah_skip": UNO_BASE_URL + "redskip.png",
-  // KUNING
   "kuning_0": UNO_BASE_URL + "yellow0.png", "kuning_1": UNO_BASE_URL + "yellow1.png", "kuning_2": UNO_BASE_URL + "yellow2.png",
   "kuning_3": UNO_BASE_URL + "yellow3.png", "kuning_4": UNO_BASE_URL + "yellow4.png", "kuning_5": UNO_BASE_URL + "yellow5.png",
   "kuning_6": UNO_BASE_URL + "yellow6.png", "kuning_7": UNO_BASE_URL + "yellow7.png", "kuning_8": UNO_BASE_URL + "yellow8.png",
   "kuning_9": UNO_BASE_URL + "yellow9.png", "kuning_draw2": UNO_BASE_URL + "yellowdraw2.png",
   "kuning_reverse": UNO_BASE_URL + "yellowreverse.png", "kuning_skip": UNO_BASE_URL + "yellowskip.png",
-  // HIJAU
   "hijau_0": UNO_BASE_URL + "green0.png", "hijau_1": UNO_BASE_URL + "green1.png", "hijau_2": UNO_BASE_URL + "green2.png",
   "hijau_3": UNO_BASE_URL + "green3.png", "hijau_4": UNO_BASE_URL + "green4.png", "hijau_5": UNO_BASE_URL + "green5.png",
   "hijau_6": UNO_BASE_URL + "green6.png", "hijau_7": UNO_BASE_URL + "green7.png", "hijau_8": UNO_BASE_URL + "green8.png",
   "hijau_9": UNO_BASE_URL + "green9.png", "hijau_draw2": UNO_BASE_URL + "greendraw2.png",
   "hijau_reverse": UNO_BASE_URL + "greenreverse.png", "hijau_skip": UNO_BASE_URL + "greenskip.png",
-  // BIRU
   "biru_0": UNO_BASE_URL + "blue0.png", "biru_1": UNO_BASE_URL + "blue1.png", "biru_2": UNO_BASE_URL + "blue2.png",
   "biru_3": UNO_BASE_URL + "blue3.png", "biru_4": UNO_BASE_URL + "blue4.png", "biru_5": UNO_BASE_URL + "blue5.png",
   "biru_6": UNO_BASE_URL + "blue6.png", "biru_7": UNO_BASE_URL + "blue7.png", "biru_8": UNO_BASE_URL + "blue8.png",
   "biru_9": UNO_BASE_URL + "blue9.png", "biru_draw2": UNO_BASE_URL + "bluedraw2.png",
   "biru_reverse": UNO_BASE_URL + "bluereverse.png", "biru_skip": UNO_BASE_URL + "blueskip.png",
-  // WILD
   "wild_wild": UNO_BASE_URL + "wildchange.png", "wild_draw4": UNO_BASE_URL + "wilddraw4.png",
   "back": UNO_BASE_URL + "back.png"
 };
@@ -129,28 +123,28 @@ function buildNewUnoGame(maxPlayers, prev) {
   };
 }
 
-// ---------- Aksi Pemain ----------
+// ---------- AKSI PEMAIN ----------
 function unoDoPlay(chosenColor = null) {
   const data = latestUnoData;
   if (!data || data.phase !== 'playing' || data.turn !== myRole) return;
   const hand = data.hands[myRole] || [];
   const selected = hand.filter(c => selectedUnoKeys.has(c.id));
 
-  if (selected.length === 0) return alert('Pilih kartu yang ingin dibuang!');
+  if (selected.length === 0) return showCustomAlert('Pilih kartu yang ingin dibuang!');
 
   if (selected.length > 1 && !selected.every(c => c.value === selected[0].value)) {
-    return alert('Multi-run harus kartu dengan nilai/fitur yang sama!');
+    return showCustomAlert('Multi-run harus kartu dengan nilai/fitur yang sama!');
   }
 
   const first = selected[0];
   const curCol = data.currentCard.chosenColor || data.currentCard.color;
 
   if (data.drawStack > 0 && first.value !== data.currentCard.value && first.value !== 'draw4') {
-    return alert(`Sedang ada Stacking +${data.drawStack}! Kamu harus membalas kartu penalti atau ambil kartu.`);
+    return showCustomAlert(`Sedang ada Stacking +${data.drawStack}! Kamu harus membalas kartu penalti atau ambil kartu.`);
   }
 
   if (first.color !== 'wild' && first.color !== curCol && String(first.value) !== String(data.currentCard.value)) {
-    return alert('Kartu tidak cocok dengan kartu meja!');
+    return showCustomAlert('Kartu tidak cocok dengan kartu meja!');
   }
 
   if (first.color === 'wild' && !chosenColor) {
@@ -187,13 +181,16 @@ function unoDoPlay(chosenColor = null) {
     state.hands[myRole] = curHand;
     state.hasDrawn = false;
 
-    if (curHand.length === 1) {
+    // DETEKSI TERIAK: SISA 1 = UNO, SISA 0 = UNO GAME
+    if (curHand.length === 1 || curHand.length === 0) {
+      const mode = curHand.length === 1 ? 'UNO' : 'UNO GAME';
       state.unoChallenge = {
         target: myRole,
+        type: mode,
         startTime: Date.now(),
         shouted: false
       };
-      state.lastActionText = `📢 ${unoNames[myRole] || myRole.toUpperCase()} sisa 1 kartu! Pemicu UNO aktif!`;
+      state.lastActionText = `📢 ${(unoNames && unoNames[myRole]) || myRole.toUpperCase()} sisa ${curHand.length} kartu! Pemicu TERIAK ${mode} aktif!`;
     } else {
       state.unoChallenge = null;
     }
@@ -202,7 +199,6 @@ function unoDoPlay(chosenColor = null) {
     if (curHand.length === 0 && !finished.includes(myRole)) {
       finished.push(myRole);
       state.finished = finished;
-      state.unoChallenge = null;
       if (finished.length >= getUnoRoles(state.maxPlayers).length - 1) {
         state.phase = 'roundover';
         return state;
@@ -228,7 +224,7 @@ function unoDoDraw() {
       state.drawStack = 0;
       state.hasDrawn = false;
       state.turn = nextUnoTurn(state, 1);
-      state.lastActionText = `📥 ${unoNames[myRole] || myRole.toUpperCase()} mengambil penalti +${drawn.length} kartu.`;
+      state.lastActionText = `📥 ${(unoNames && unoNames[myRole]) || myRole.toUpperCase()} mengambil penalti +${drawn.length} kartu.`;
       return state;
     }
 
@@ -236,7 +232,7 @@ function unoDoDraw() {
       const drawn = drawUnoCards(state, 1);
       state.hands[myRole] = [...(state.hands[myRole] || []), ...drawn];
       state.hasDrawn = true;
-      state.lastActionText = `📥 ${unoNames[myRole] || myRole.toUpperCase()} mengambil 1 kartu. Boleh pasang kartu atau Pass.`;
+      state.lastActionText = `📥 ${(unoNames && unoNames[myRole]) || myRole.toUpperCase()} mengambil 1 kartu. Boleh pasang kartu atau Pass.`;
     }
     return state;
   });
@@ -248,7 +244,7 @@ function unoDoPass() {
     const state = JSON.parse(JSON.stringify(cur));
     state.hasDrawn = false;
     state.turn = nextUnoTurn(state, 1);
-    state.lastActionText = `⏭️ ${unoNames[myRole] || myRole.toUpperCase()} memilih Pass.`;
+    state.lastActionText = `⏭️ ${(unoNames && unoNames[myRole]) || myRole.toUpperCase()} memilih Pass.`;
     return state;
   }, () => {
     selectedUnoKeys.clear();
@@ -260,7 +256,8 @@ function unoShout() {
     if (!cur || !cur.unoChallenge || cur.unoChallenge.target !== myRole) return cur;
     const state = JSON.parse(JSON.stringify(cur));
     state.unoChallenge.shouted = true;
-    state.lastActionText = `🎉 Broadcast: ${unoNames[myRole] || myRole.toUpperCase()} berhasil Teriak "UNO!"`;
+    const txt = state.unoChallenge.type === 'UNO GAME' ? 'UNO GAME!' : 'UNO!';
+    state.lastActionText = `🎉 ${(unoNames && unoNames[myRole]) || myRole.toUpperCase()} berhasil Teriak "${txt}"`;
     return state;
   });
 }
@@ -271,18 +268,25 @@ function unoCatch() {
     const state = JSON.parse(JSON.stringify(cur));
     const target = state.unoChallenge.target;
     
+    // Penalti +2 kartu jika kena DOR
     const drawn = drawUnoCards(state, 2);
     state.hands[target] = [...(state.hands[target] || []), ...drawn];
     
-    const catcherName = unoNames[myRole] || myRole.toUpperCase();
-    const targetName = unoNames[target] || target.toUpperCase();
-    state.lastActionText = `💥 Broadcast: ${catcherName} teriak "DOR!" Teriak UNO ${targetName} DIBATALKAN! (Kena penalti +2 kartu)`;
+    // Jika awalnya sudah mau menang (sisa 0), batalkan status menang
+    if (state.finished && state.finished.includes(target)) {
+      state.finished = state.finished.filter(r => r !== target);
+      if (state.phase === 'roundover') state.phase = 'playing';
+    }
+
+    const catcherName = (unoNames && unoNames[myRole]) || myRole.toUpperCase();
+    const targetName = (unoNames && unoNames[target]) || target.toUpperCase();
+    const typeTxt = state.unoChallenge.type || 'UNO';
+    state.lastActionText = `💥 ${catcherName} teriak "DOR!" ${targetName} Lupa Teriak ${typeTxt}! (Kena penalti +2 kartu)`;
     state.unoChallenge = null;
     return state;
   });
 }
 
-// Animasi Uno Dinamis 2 - 6 Pemain
 function unoAnimateDeal(done) {
   const table = document.querySelector('#unoScreen .capsa-table');
   if (!table || !latestUnoData) { done(); return; }
@@ -291,15 +295,11 @@ function unoAnimateDeal(done) {
   overlay.className = 'capsa-deal-overlay';
   table.appendChild(overlay);
 
-  // Ambil daftar role pemain aktif dari data game (misal: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'])
   const activeRoles = getUnoRoles(latestUnoData.maxPlayers || 4);
-  
-  // Pemain utama (kamu) selalu di posisi bottom
   let dealTargets = ['bottom']; 
 
-  // Tentukan arah meluncur untuk lawan-lawan sesuai jumlah total pemain
   activeRoles.forEach(role => {
-    if (role === myRole) return; // Lewati diri sendiri karena sudah 'bottom'
+    if (role === myRole) return;
 
     if (activeRoles.length === 2) {
       dealTargets.push('top');
@@ -308,19 +308,17 @@ function unoAnimateDeal(done) {
     } else if (activeRoles.length === 4) {
       dealTargets.push('right', 'top', 'left');
     } else {
-      // Untuk 5 dan 6 pemain (meluncur melingkar ke kanan, atas, dan kiri)
       const dirs = ['right', 'right', 'top', 'left', 'left'];
       dealTargets.push(dirs[dealTargets.length - 1] || 'top');
     }
   });
 
-  const cardsPerPlayer = 7; // Uno 7 kartu di awal
-  const perCardDelay = 300; // 0.3 detik per kartu
+  const cardsPerPlayer = 7;
+  const perCardDelay = 300;
   const animDuration = 550;
 
   let cardIndex = 0;
 
-  // Bagikan kartu per pemain aktif (Selesaikan 1 orang dulu baru pindah)
   dealTargets.forEach(dir => {
     for (let c = 0; c < cardsPerPlayer; c++) {
       const img = document.createElement('img');
@@ -339,7 +337,6 @@ function unoAnimateDeal(done) {
   }, totalDuration);
 }
 
-// ---------- Render Core ----------
 function renderUnoUICore(data) {
   latestUnoData = data;
   if (data.turn !== myRole || data.phase !== 'playing') selectedUnoKeys.clear();
@@ -365,7 +362,6 @@ function renderUnoUICore(data) {
     statusEl.textContent = '🏁 Permainan Selesai!';
   }
 
-  // Render Kartu Meja & Hand
   document.getElementById('unoTopCardImg').src = getUnoCardImgUrl(data.currentCard);
   const myHandContainer = document.getElementById('unoHandMe');
   myHandContainer.innerHTML = '';
@@ -386,7 +382,6 @@ function renderUnoUICore(data) {
     myHandContainer.appendChild(img);
   });
 
-  // Render Opponents
   const opponentsContainer = document.getElementById('unoOpponentsWrap');
   opponentsContainer.innerHTML = '';
   activeRoles.forEach(role => {
@@ -407,7 +402,6 @@ function renderUnoUICore(data) {
     opponentsContainer.appendChild(div);
   });
 
-  // Tombol Aksi (Play / Draw / Pass)
   const actBox = document.getElementById('unoActions');
   actBox.style.display = canPlay ? 'grid' : 'none';
   if (canPlay) {
@@ -429,7 +423,6 @@ function renderUnoUICore(data) {
 
   handleUnoDorButtons(data);
 
-  // Result Overlay
   const resultEl = document.getElementById('unoResult');
   const nextBtn = document.getElementById('unoBtnNext');
   if (data.phase === 'roundover') {
@@ -444,7 +437,6 @@ function renderUnoUICore(data) {
   }
 }
 
-// Handler Pembungkus Render + Animasi
 function renderUnoUI(data) {
   const freshHand = data.phase === 'playing' && !!data.handNumber && data.handNumber !== unoLastAnimatedHand;
   const shouldAnimate = freshHand && unoHasRenderedOnce;
@@ -458,14 +450,17 @@ function renderUnoUI(data) {
   }
 }
 
-// Mekanisme Waktu & Pemunculan Tombol UNO / DOR
+// LOGIKA TIMER 3 DETIK (UNO / UNO GAME) DAN 2 DETIK DELAY (DOR!)
 function handleUnoDorButtons(data) {
   let unoContainer = document.getElementById('unoChallengeBox');
   if (!unoContainer) {
     unoContainer = document.createElement('div');
     unoContainer.id = 'unoChallengeBox';
     unoContainer.style.cssText = "margin-top:10px; display:flex; justify-content:center; gap:10px;";
-    document.getElementById('unoActions').parentNode.insertBefore(unoContainer, document.getElementById('unoActions'));
+    const actEl = document.getElementById('unoActions');
+    if (actEl && actEl.parentNode) {
+      actEl.parentNode.insertBefore(unoContainer, actEl);
+    }
   }
   unoContainer.innerHTML = '';
 
@@ -473,41 +468,46 @@ function handleUnoDorButtons(data) {
 
   const elapsed = (Date.now() - data.unoChallenge.startTime) / 1000;
 
-  if (elapsed > 5) {
+  // Batas waktu tantangan: 3 Detik Total
+  if (elapsed > 3) {
     if (myRole === 'p1') unoRef.child('unoChallenge').remove();
     return;
   }
 
+  // 1. Tombol Teriak UNO / UNO GAME (Durasi 3 detik penuh di layar pemain)
   if (data.unoChallenge.target === myRole && !data.unoChallenge.shouted) {
     const btnShout = document.createElement('button');
     btnShout.className = 'capsa-act play';
     btnShout.style.background = '#e4574f';
     btnShout.style.color = '#fff';
-    btnShout.textContent = `🔥 TERIAK UNO! (${Math.ceil(5 - elapsed)}s)`;
+    btnShout.style.width = '100%';
+    const typeLabel = data.unoChallenge.type === 'UNO GAME' ? 'UNO GAME' : 'UNO';
+    btnShout.textContent = `🔥 TERIAK ${typeLabel}! (${(3 - elapsed).toFixed(1)}s)`;
     btnShout.onclick = () => unoShout();
     unoContainer.appendChild(btnShout);
   }
 
-  if (data.unoChallenge.target !== myRole && !data.unoChallenge.shouted && elapsed >= 3) {
+  // 2. Tombol DOR! untuk Lawan (Baru Muncul di detik ke-2 / setelah 2.0s)
+  if (data.unoChallenge.target !== myRole && !data.unoChallenge.shouted && elapsed >= 2.0) {
     const btnCatch = document.createElement('button');
     btnCatch.className = 'capsa-act play';
     btnCatch.style.background = '#e8ac1f';
     btnCatch.style.color = '#000';
-    btnCatch.textContent = `💥 DOR! (Batalkan UNO)`;
+    btnCatch.style.width = '100%';
+    const typeLabel = data.unoChallenge.type === 'UNO GAME' ? 'UNO GAME' : 'UNO';
+    btnCatch.textContent = `💥 DOR! (Lupa Teriak ${typeLabel})`;
     btnCatch.onclick = () => unoCatch();
     unoContainer.appendChild(btnCatch);
   }
 }
 
-// Loop Timer
 if (unoTimerCheck) clearInterval(unoTimerCheck);
 unoTimerCheck = setInterval(() => {
   if (latestUnoData && latestUnoData.unoChallenge) {
     renderUnoUICore(latestUnoData);
   }
-}, 500);
+}, 200);
 
-// ---------- Init ----------
 function initUno() {
   unoRef = roomRef.child('uno');
   document.getElementById('unoRoleTag').textContent = myRole.toUpperCase();
