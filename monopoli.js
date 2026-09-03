@@ -1,6 +1,202 @@
 // ======================================================
-// monopoli.js — Full Visual Animation & Board CDN Integrated
-// FIX: Auto Start Multi-Player & Presence Race Condition Fix
+// monopoli.js — Standalone Monopoly Engine & Board UI
+// Gambar Board Baru: https://c.termai.cc/i125/ypq.jpeg
+// ======================================================
+
+const MP_GROUP_COLORS = {
+  brown: "#8b4513", lightblue: "#87ceeb", pink: "#ff69b4",
+  orange: "#ffa500", red: "#ff0000", yellow: "#ffd700",
+  green: "#008000", darkblue: "#00008b"
+};
+
+const MP_BOARD_DATA = [
+  { id: 0, name: "START", short: "GO", type: "start", price: 0 },
+  { id: 1, name: "Jakarta", short: "JKT", type: "property", price: 60, rent: 10, group: "brown", housePrice: 50 },
+  { id: 2, name: "Dana Umum", short: "CHEST", type: "chest", price: 0 },
+  { id: 3, name: "Bandung", short: "BDG", type: "property", price: 60, rent: 12, group: "brown", housePrice: 50 },
+  { id: 4, name: "Pajak Penghasilan", short: "PAJAK", type: "tax", price: 200 },
+  { id: 5, name: "Stasiun Gambir", short: "GMBR", type: "station", price: 200, rent: 25 },
+  { id: 6, name: "Surabaya", short: "SBY", type: "property", price: 100, rent: 14, group: "lightblue", housePrice: 50 },
+  { id: 7, name: "Kesempatan", short: "CHNC", type: "chance", price: 0 },
+  { id: 8, name: "Semarang", short: "SMG", type: "property", price: 100, rent: 16, group: "lightblue", housePrice: 50 },
+  { id: 9, name: "Yogyakarta", short: "JOG", type: "property", price: 120, rent: 18, group: "lightblue", housePrice: 50 },
+  { id: 10, name: "PENJARA", short: "JAIL", type: "jail", price: 0 },
+  { id: 11, name: "Denpasar", short: "DPS", type: "property", price: 140, rent: 20, group: "pink", housePrice: 100 },
+  { id: 12, name: "Perusahaan Listrik", short: "PLN", type: "utility", price: 150 },
+  { id: 13, name: "Kuta", short: "KTA", type: "property", price: 140, rent: 22, group: "pink", housePrice: 100 },
+  { id: 14, name: "Ubud", short: "UBD", type: "property", price: 160, rent: 24, group: "pink", housePrice: 100 },
+  { id: 15, name: "Stasiun Pasar Senen", short: "SNEN", type: "station", price: 200, rent: 25 },
+  { id: 16, name: "Medan", short: "MDN", type: "property", price: 180, rent: 26, group: "orange", housePrice: 100 },
+  { id: 17, name: "Dana Umum", short: "CHEST", type: "chest", price: 0 },
+  { id: 18, name: "Palembang", short: "PLB", type: "property", price: 180, rent: 28, group: "orange", housePrice: 100 },
+  { id: 19, name: "Padang", short: "PDG", type: "property", price: 200, rent: 30, group: "orange", housePrice: 100 },
+  { id: 20, name: "PARKIR GRATIS", short: "FREE", type: "parking", price: 0 },
+  { id: 21, name: "Makassar", short: "MKS", type: "property", price: 220, rent: 32, group: "red", housePrice: 150 },
+  { id: 22, name: "Kesempatan", short: "CHNC", type: "chance", price: 0 },
+  { id: 23, name: "Manado", short: "MND", type: "property", price: 220, rent: 34, group: "red", housePrice: 150 },
+  { id: 24, name: "Balikpapan", short: "BKP", type: "property", price: 240, rent: 36, group: "red", housePrice: 150 },
+  { id: 25, name: "Stasiun Tugu", short: "TUGU", type: "station", price: 200, rent: 25 },
+  { id: 26, name: "Pontianak", short: "PTK", type: "property", price: 260, rent: 38, group: "yellow", housePrice: 150 },
+  { id: 27, name: "Banjarmasin", short: "BJM", type: "property", price: 260, rent: 40, group: "yellow", housePrice: 150 },
+  { id: 28, name: "Perusahaan Air", short: "PAM", type: "utility", price: 150 },
+  { id: 29, name: "Samarinda", short: "SMD", type: "property", price: 280, rent: 42, group: "yellow", housePrice: 150 },
+  { id: 30, name: "MASUK PENJARA", short: "GOTO", type: "goto_jail", price: 0 },
+  { id: 31, name: "Malang", short: "MLG", type: "property", price: 300, rent: 44, group: "green", housePrice: 200 },
+  { id: 32, name: "Solo", short: "SLO", type: "property", price: 300, rent: 46, group: "green", housePrice: 200 },
+  { id: 33, name: "Dana Umum", short: "CHEST", type: "chest", price: 0 },
+  { id: 34, name: "Bogor", short: "BGR", type: "property", price: 320, rent: 48, group: "green", housePrice: 200 },
+  { id: 35, name: "Stasiun Hall", short: "HALL", type: "station", price: 200, rent: 25 },
+  { id: 36, name: "Kesempatan", short: "CHNC", type: "chance", price: 0 },
+  { id: 37, name: "Ibu Kota Nusantara", short: "IKN", type: "property", price: 350, rent: 60, group: "darkblue", housePrice: 200 },
+  { id: 38, name: "Pajak Mewah", short: "PAJAK", type: "tax", price: 100 },
+  { id: 39, name: "Raja Ampat", short: "R4", type: "property", price: 400, rent: 80, group: "darkblue", housePrice: 200 }
+];
+
+const MP_PLAYER_COLORS = {
+  p1: "#e4574f", p2: "#3d6bf0", p3: "#2bb673",
+  p4: "#e8ac1f", p5: "#9b59b6", p6: "#e67e22"
+};
+
+const CHANCE_CARDS = [
+  { text: "Mendapat hadiah festival! +$100", amount: 100 },
+  { text: "Kena tilang lalu lintas! -$50", amount: -50 },
+  { text: "Maju ke START! +$200", goto: 0, collectStart: true },
+  { text: "Kartu Bebas Penjara Gratis!", getOutJail: true },
+  { text: "Masuk Penjara!", gotoJail: true }
+];
+
+const CHEST_CARDS = [
+  { text: "Klaim dividen investasi! +$150", amount: 150 },
+  { text: "Bayar asuransi kesehatan! -$100", amount: -100 },
+  { text: "Hadiah Ulang Tahun! +$50", amount: 50 },
+  { text: "Kartu Bebas Penjara Gratis!", getOutJail: true },
+  { text: "Pengeluaran tak terduga! -$75", amount: -75 }
+];
+
+function getMpRoles(maxPlayers) {
+  return ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].slice(0, maxPlayers);
+}
+
+function nextMpTurn(game) {
+  const roles = getMpRoles(game.maxPlayers);
+  let curIdx = roles.indexOf(game.turn);
+  let nextIdx = (curIdx + 1) % roles.length;
+  let count = 0;
+
+  const bankruptList = game.bankrupt || [];
+  while (bankruptList.includes(roles[nextIdx]) && count < roles.length) {
+    nextIdx = (nextIdx + 1) % roles.length;
+    count++;
+  }
+  return roles[nextIdx];
+}
+
+function buildNewMpGame(maxPlayers) {
+  const roles = getMpRoles(maxPlayers);
+  let money = {}, pos = {}, inJail = {}, jailCards = {};
+
+  roles.forEach(r => {
+    money[r] = 1500;
+    pos[r] = 0;
+    inJail[r] = 0;
+    jailCards[r] = 0;
+  });
+
+  return {
+    phase: 'playing',
+    maxPlayers: maxPlayers,
+    turn: 'p1',
+    dice: [1, 1],
+    doubleStreak: 0,
+    hasRolled: false,
+    money: money,
+    pos: pos,
+    inJail: inJail,
+    jailCards: jailCards,
+    ownership: {},
+    mortgaged: {},
+    houses: {},
+    bankrupt: [],
+    lastTurnTime: Date.now(),
+    lastActionText: 'Game Monopoli Dimulai! P1 silakan lempar dadu.'
+  };
+}
+
+function calculateRent(state, tile, owner, diceTotal = 7) {
+  if (state.mortgaged && state.mortgaged[tile.id]) return 0;
+
+  if (tile.type === 'utility') {
+    let utilCount = 0;
+    MP_BOARD_DATA.forEach(t => {
+      if (t.type === 'utility' && state.ownership[t.id] === owner && (!state.mortgaged || !state.mortgaged[t.id])) utilCount++;
+    });
+    return utilCount >= 2 ? diceTotal * 10 : diceTotal * 4;
+  }
+
+  if (tile.type === 'station') {
+    let stationCount = 0;
+    MP_BOARD_DATA.forEach(t => {
+      if (t.type === 'station' && state.ownership[t.id] === owner && (!state.mortgaged || !state.mortgaged[t.id])) stationCount++;
+    });
+    return (tile.rent || 25) * Math.pow(2, stationCount - 1);
+  }
+
+  if (tile.type === 'property') {
+    const houseCount = (state.houses && state.houses[tile.id]) || 0;
+    if (houseCount > 0) return Math.floor(tile.rent * Math.pow(2.5, houseCount));
+    
+    if (tile.group) {
+      const groupTiles = MP_BOARD_DATA.filter(t => t.group === tile.group);
+      const ownsAll = groupTiles.every(t => state.ownership[t.id] === owner && (!state.mortgaged || !state.mortgaged[t.id]));
+      return ownsAll ? tile.rent * 2 : tile.rent;
+    }
+  }
+
+  return tile.rent || 20;
+}
+
+function ownsFullGroup(state, owner, group) {
+  if (!group) return false;
+  const groupTiles = MP_BOARD_DATA.filter(t => t.group === group);
+  return groupTiles.every(t => state.ownership[t.id] === owner);
+}
+
+function handleBankruptcy(state, role, creditorRole = null) {
+  state.bankrupt = state.bankrupt || [];
+  if (!state.bankrupt.includes(role)) state.bankrupt.push(role);
+
+  const remainingCash = Math.max(0, state.money[role] || 0);
+  state.money[role] = 0;
+
+  if (state.ownership) {
+    Object.keys(state.ownership).forEach(tileId => {
+      if (state.ownership[tileId] === role) {
+        if (creditorRole) state.ownership[tileId] = creditorRole;
+        else delete state.ownership[tileId];
+        if (state.houses) delete state.houses[tileId];
+        if (state.mortgaged) delete state.mortgaged[tileId];
+      }
+    });
+  }
+
+  if (creditorRole) state.money[creditorRole] = (state.money[creditorRole] || 0) + remainingCash;
+
+  if (state.turn === role) {
+    state.turn = nextMpTurn(state);
+    state.hasRolled = false;
+    state.doubleStreak = 0;
+  }
+
+  const activeRoles = getMpRoles(state.maxPlayers).filter(r => !state.bankrupt.includes(r));
+  if (activeRoles.length === 1) {
+    state.phase = 'gameover';
+    state.winner = activeRoles[0];
+    state.lastActionText = `🏆 GAME OVER! ${activeRoles[0].toUpperCase()} Menang Sebagai Juara Monopoli!`;
+  }
+}
+
+// ======================================================
+// MONOPOLI CLIENT UI & RENDER ENGINE
 // ======================================================
 
 let mpRef = null;
@@ -8,12 +204,11 @@ let latestMpData = null;
 let mpPresence = {};
 let mpAutoPassInterval = null;
 
-// Pre-load Gambar Board dari CDN URL
+// Gambar Papan Baru (CDN Ringan & Cepat)
 const boardImage = new Image();
 boardImage.crossOrigin = "anonymous";
-boardImage.src = 'https://cdn.jsdelivr.net/gh/dikzzgans424-star/CDN-Miwa-botz@main/uploads/1788437852494.jpg';
+boardImage.src = 'https://c.termai.cc/i125/ypq.jpeg';
 
-// Web Audio API untuk Efek Suara Step Pion Melangkah
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 function playStepSound() {
   if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -30,7 +225,6 @@ function playStepSound() {
   osc.stop(audioCtx.currentTime + 0.08);
 }
 
-// State Animasi Lokal
 let animState = {
   isRolling: false,
   rollFrames: 0,
@@ -46,9 +240,9 @@ function checkAndStartMpGame() {
   
   const targetMax = (latestMpData && latestMpData.maxPlayers) || window.mpSelectedMaxPlayers || 3;
   const activeRoles = getMpRoles(targetMax);
-  const allIn = activeRoles.every(s => mpPresence[s]);
+  const onlineCount = activeRoles.filter(s => mpPresence[s]).length;
 
-  if (allIn && latestMpData && latestMpData.phase === 'waiting') {
+  if (onlineCount >= targetMax && latestMpData && latestMpData.phase === 'waiting') {
     mpRef.transaction(cur => {
       if (cur && cur.phase === 'waiting') {
         return buildNewMpGame(cur.maxPlayers || targetMax);
@@ -65,7 +259,6 @@ function initMonopoli() {
   document.getElementById('btnMpBack').onclick = () => {
     if (activePresenceRef) activePresenceRef.remove();
     clearSession();
-    
     if (roomRef && myRole === 'p1') {
       mpRef.remove().catch(()=>{});
       if (roomIdGlobal) dbRoot.ref('publicRooms/' + roomIdGlobal).remove().catch(()=>{});
@@ -73,7 +266,6 @@ function initMonopoli() {
     location.reload();
   };
 
-  // Mendaftarkan Presence Player Lokal
   const pRef = roomRef.child('presence/' + myRole);
   pRef.set(true);
   pRef.onDisconnect().remove();
@@ -85,19 +277,15 @@ function initMonopoli() {
     });
   }
 
-  // Single Presence Listener untuk menghindari bentrok
   roomRef.child('presence').on('value', snap => {
     mpPresence = snap.val() || {};
-    if (latestMpData) {
-      renderMpUI(latestMpData);
-    }
+    if (latestMpData) renderMpUI(latestMpData);
     checkAndStartMpGame();
   });
 
   mpRef.on('value', snap => {
     const data = snap.val();
     if (data) {
-      // Deteksi Pergerakan Pion untuk Animasi Melangkah
       if (latestMpData && data.pos) {
         Object.keys(data.pos).forEach(r => {
           const oldP = latestMpData.pos[r] || 0;
@@ -108,7 +296,6 @@ function initMonopoli() {
         });
       }
 
-      // Sync Posisi Awal
       if (!latestMpData && data.pos) {
         Object.keys(data.pos).forEach(r => {
           animState.pawnAnimPos[r] = data.pos[r];
@@ -117,7 +304,7 @@ function initMonopoli() {
 
       latestMpData = data;
       renderMpUI(data);
-      checkAndStartMpGame(); // Cek lagi setelah data game terbaru berhasil di-load
+      checkAndStartMpGame();
     }
   });
 
@@ -131,14 +318,11 @@ function initMonopoli() {
   mpAutoPassInterval = setInterval(() => {
     if (myRole === 'p1' && latestMpData && latestMpData.phase === 'playing') {
       const elapsed = (Date.now() - (latestMpData.lastTurnTime || Date.now())) / 1000;
-      if (elapsed > 35) {
-        mpDoAutoPass();
-      }
+      if (elapsed > 35) mpDoAutoPass();
     }
   }, 3000);
 }
 
-// Trigger Lempar Dadu Visual Berputar
 function mpDoRollWithAnim() {
   if (!latestMpData || latestMpData.turn !== myRole || latestMpData.hasRolled || animState.isRolling) return;
 
@@ -156,12 +340,11 @@ function mpDoRollWithAnim() {
     if (animState.rollFrames > 12) {
       clearInterval(rollInterval);
       animState.isRolling = false;
-      mpDoRoll(); // Eksekusi Transaksi Firebase
+      mpDoRoll();
     }
   }, 60);
 }
 
-// Trigger Animasi Melangkah Step-by-Step
 function triggerPawnMovementAnim(role, startPos, endPos) {
   let stepsTotal = (endPos >= startPos) ? (endPos - startPos) : (40 - startPos + endPos);
   let currentStep = 0;
@@ -421,6 +604,7 @@ function renderMpUI(data) {
     const count = activeRoles.filter(r => mpPresence[r]).length;
     statusEl.textContent = `🟡 Menunggu pemain bergabung (${count}/${data.maxPlayers || 3})...`;
     actBox.style.display = 'none';
+    drawMpCanvas(data);
     return;
   }
 
@@ -429,6 +613,7 @@ function renderMpUI(data) {
     actBox.style.display = 'none';
     resultEl.style.display = 'block';
     resultEl.innerHTML = `🥇 PEMENANG: ${(data.winner || 'P1').toUpperCase()}!`;
+    drawMpCanvas(data);
     return;
   }
 
@@ -449,7 +634,7 @@ function renderMpUI(data) {
         ${r.toUpperCase()} ${mpPresence[r] ? '🟢' : '🔴'} ${isTurn ? '⭐' : ''} ${inJailCount > 0 ? '🚨' : ''} ${jailCardCount > 0 ? '🎟️' : ''}
       </div>
       <div style="color:var(--ink); font-weight:700;">
-        ${isBankrupt ? '💀 BANGKRUT' : '💰 $' + (data.money[r] || 0)}
+        ${isBankrupt ? '💀 BANGKRUT' : '💰 $' + ((data.money && data.money[r]) || 0)}
       </div>
     `;
     listWrap.appendChild(div);
@@ -484,16 +669,17 @@ function renderMpUI(data) {
       btnRoll.style.display = 'none';
       btnEnd.style.display = 'block';
 
-      const tile = MP_BOARD_DATA[data.pos[myRole]];
+      const tilePos = data.pos ? data.pos[myRole] : 0;
+      const tile = MP_BOARD_DATA[tilePos];
       
-      if ((tile.type === 'property' || tile.type === 'station' || tile.type === 'utility') && !data.ownership[tile.id] && data.money[myRole] >= tile.price) {
+      if (tile && (tile.type === 'property' || tile.type === 'station' || tile.type === 'utility') && !data.ownership[tile.id] && data.money[myRole] >= tile.price) {
         btnBuy.style.display = 'block';
         btnBuy.textContent = `🏠 Beli ${tile.name} ($${tile.price})`;
       } else {
         btnBuy.style.display = 'none';
       }
 
-      if (tile.type === 'property' && data.ownership[tile.id] === myRole) {
+      if (tile && tile.type === 'property' && data.ownership[tile.id] === myRole) {
         const curHouse = (data.houses && data.houses[tile.id]) || 0;
         const houseCost = tile.housePrice || 100;
         if (curHouse < 5 && data.money[myRole] >= houseCost) {
@@ -511,7 +697,6 @@ function renderMpUI(data) {
   drawMpCanvas(data);
 }
 
-// RENDER CANVAS UTAMA BERBANTUAN GAMBAR BOARD CDN & ANIMASI
 function drawMpCanvas(data) {
   const canvas = document.getElementById('mpBoardCanvas');
   if (!canvas) return;
@@ -520,7 +705,8 @@ function drawMpCanvas(data) {
   canvas.width = 480;
   canvas.height = 480;
 
-  // 1. Gambar Background Board CDN
+  ctx.clearRect(0, 0, 480, 480);
+
   if (boardImage.complete && boardImage.naturalWidth !== 0) {
     ctx.drawImage(boardImage, 0, 0, 480, 480);
   } else {
@@ -528,12 +714,10 @@ function drawMpCanvas(data) {
     ctx.fillRect(0, 0, 480, 480);
   }
 
-  // 2. Render Dadu Berputar / Static
-  const dVals = animState.isRolling ? animState.tempDice : (data.dice || [1, 1]);
+  const dVals = animState.isRolling ? animState.tempDice : ((data && data.dice) || [1, 1]);
   draw3DDice(ctx, 220, 240, dVals[0], animState.isRolling);
   draw3DDice(ctx, 260, 240, dVals[1], animState.isRolling);
 
-  // 3. Render Floating Counter (+X Langkah)
   if (animState.stepCounterAlpha > 0 && animState.stepCounterText) {
     ctx.fillStyle = `rgba(234, 179, 8, ${animState.stepCounterAlpha})`;
     ctx.font = 'bold 16px "Space Grotesk", sans-serif';
@@ -541,7 +725,6 @@ function drawMpCanvas(data) {
     ctx.fillText(animState.stepCounterText, 240, 205);
   }
 
-  // 4. Render Overlay Pemilik, Rumah, & Pion Pemain
   for (let i = 0; i < 40; i++) {
     let x = 0, y = 0;
     if (i <= 10) { x = 420 - i * 36; y = 420; }
@@ -550,11 +733,10 @@ function drawMpCanvas(data) {
     else { x = 420; y = 60 + (i - 30) * 36; }
 
     const tile = MP_BOARD_DATA[i];
-    const owner = data.ownership && data.ownership[tile.id];
-    const isMortgaged = data.mortgaged && data.mortgaged[tile.id];
-    const houseCount = (data.houses && data.houses[tile.id]) || 0;
+    const owner = data && data.ownership && data.ownership[tile.id];
+    const isMortgaged = data && data.mortgaged && data.mortgaged[tile.id];
+    const houseCount = (data && data.houses && data.houses[tile.id]) || 0;
 
-    // Overlay Status Gadai
     if (isMortgaged) {
       ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
       ctx.fillRect(x + 1, y + 1, 34, 34);
@@ -564,13 +746,11 @@ function drawMpCanvas(data) {
       ctx.fillText('GADAI', x + 18, y + 20);
     }
 
-    // Indikator Warna Pemilik Properti
     if (owner && !isMortgaged) {
-      ctx.fillStyle = MP_PLAYER_COLORS[owner];
+      ctx.fillStyle = MP_PLAYER_COLORS[owner] || '#fff';
       ctx.fillRect(x + 2, y + 30, 32, 4);
     }
 
-    // Render Rumah / Hotel
     if (houseCount > 0 && !isMortgaged) {
       if (houseCount === 5) {
         ctx.fillStyle = '#ef4444';
@@ -583,10 +763,10 @@ function drawMpCanvas(data) {
       }
     }
 
-    // Render Pion Pemain dengan Animasi Smooth
-    getMpRoles(data.maxPlayers).forEach((r, idx) => {
-      if (!(data.bankrupt || []).includes(r)) {
-        const renderTileIndex = animState.pawnAnimPos[r] !== undefined ? animState.pawnAnimPos[r] : (data.pos ? data.pos[r] : 0);
+    const maxP = (data && data.maxPlayers) || 3;
+    getMpRoles(maxP).forEach((r, idx) => {
+      if (!data || !(data.bankrupt || []).includes(r)) {
+        const renderTileIndex = animState.pawnAnimPos[r] !== undefined ? animState.pawnAnimPos[r] : (data && data.pos ? data.pos[r] : 0);
         
         if (Math.floor(renderTileIndex) === i) {
           const px = x + 10 + (idx % 3) * 9;
@@ -594,7 +774,7 @@ function drawMpCanvas(data) {
 
           ctx.beginPath();
           ctx.arc(px, py, 5, 0, Math.PI * 2);
-          ctx.fillStyle = MP_PLAYER_COLORS[r];
+          ctx.fillStyle = MP_PLAYER_COLORS[r] || '#fff';
           ctx.fill();
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 2;
@@ -605,7 +785,6 @@ function drawMpCanvas(data) {
   }
 }
 
-// Helper Dadu 3D Berputar
 function draw3DDice(ctx, x, y, val, isSpinning) {
   ctx.save();
   ctx.translate(x, y);
