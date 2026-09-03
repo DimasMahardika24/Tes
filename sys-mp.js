@@ -113,10 +113,9 @@ function buildNewMpGame(maxPlayers) {
     inJail: inJail,
     jailCards: jailCards,
     ownership: {},
-    mortgaged: {}, // { tileId: true }
+    mortgaged: {},
     houses: {},
-    auction: null, // Sub-state lelang { tileId, currentBid, highestBidder, passedRoles: [] }
-    tradeOffer: null, // Sub-state trading
+    auction: null,
     bankrupt: [],
     lastTurnTime: Date.now(),
     lastActionText: 'Game Monopoli Dimulai! p1 silakan lempar dadu.'
@@ -124,12 +123,10 @@ function buildNewMpGame(maxPlayers) {
 }
 
 function calculateRent(state, tile, owner, diceTotal = 7) {
-  // Jika tanah dalam status ter-Gadai (Mortgaged), Sewa = $0
   if (state.mortgaged && state.mortgaged[tile.id]) {
     return 0;
   }
 
-  // 1. Utility (Listrik & Air) -> Dadu x 4 atau Dadu x 10
   if (tile.type === 'utility') {
     let utilCount = 0;
     MP_BOARD_DATA.forEach(t => {
@@ -138,7 +135,6 @@ function calculateRent(state, tile, owner, diceTotal = 7) {
     return utilCount >= 2 ? diceTotal * 10 : diceTotal * 4;
   }
 
-  // 2. Stasiun -> $25, $50, $100, $200
   if (tile.type === 'station') {
     let stationCount = 0;
     MP_BOARD_DATA.forEach(t => {
@@ -147,7 +143,6 @@ function calculateRent(state, tile, owner, diceTotal = 7) {
     return (tile.rent || 25) * Math.pow(2, stationCount - 1);
   }
 
-  // 3. Properti Rumah / Hotel / Full Monopoly
   if (tile.type === 'property') {
     const houseCount = (state.houses && state.houses[tile.id]) || 0;
     if (houseCount > 0) {
@@ -163,14 +158,12 @@ function calculateRent(state, tile, owner, diceTotal = 7) {
   return tile.rent || 20;
 }
 
-// FUNGSI CEK SYARAT MONOPOLI KOMPLEKS
 function ownsFullGroup(state, owner, group) {
   if (!group) return false;
   const groupTiles = MP_BOARD_DATA.filter(t => t.group === group);
   return groupTiles.every(t => state.ownership[t.id] === owner);
 }
 
-// EKSKUSI KEBANGKRUTAN LENGKAP & TRANSFER ASET
 function handleBankruptcy(state, role, creditorRole = null) {
   state.bankrupt = state.bankrupt || [];
   if (!state.bankrupt.includes(role)) {
@@ -180,14 +173,13 @@ function handleBankruptcy(state, role, creditorRole = null) {
   const remainingCash = Math.max(0, state.money[role] || 0);
   state.money[role] = 0;
 
-  // Transfer Aset ke Kreditor (Pemain lain) atau Reset jika bangkrut ke Bank
   if (state.ownership) {
     Object.keys(state.ownership).forEach(tileId => {
       if (state.ownership[tileId] === role) {
         if (creditorRole) {
-          state.ownership[tileId] = creditorRole; // Transfer aset ke penagih utang
+          state.ownership[tileId] = creditorRole;
         } else {
-          delete state.ownership[tileId]; // Disita Bank
+          delete state.ownership[tileId];
         }
         if (state.houses) delete state.houses[tileId];
         if (state.mortgaged) delete state.mortgaged[tileId];

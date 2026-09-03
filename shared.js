@@ -94,7 +94,6 @@ document.getElementById('btnCopyCreated').onclick = () => {
 };
 
 const gameMeta = {
-  mario:    { title: '🍄 Mario Coin Rush', screen: 'marioScreen' },
   chess:    { title: '♟ Catur 2P Online', screen: 'chessScreen' },
   ttt:      { title: '⭕ Tic-Tac-Toe 2P', screen: 'tttScreen' },
   poker:    { title: '🃏 Poker Capsa', screen: 'pokerScreen' },
@@ -141,7 +140,6 @@ document.getElementById('btnCreatedBack').onclick = () => {
   location.reload();
 };
 
-// ---------- ALUR BUAT ROOM DENGAN MODAL CUSTOM PASSWORD ----------
 function proceedCreateRoom(){
   document.getElementById('createPassInput').value = '';
   document.getElementById('createPassOverlay').style.display = 'flex';
@@ -166,7 +164,6 @@ function executeCreateRoom(){
     if(currentGame === 'poker') maxP = 4;
     if(currentGame === 'uno') maxP = window.unoSelectedMaxPlayers || 4;
     if(currentGame === 'monopoli') maxP = window.mpSelectedMaxPlayers || 3;
-    if(currentGame === 'mario') maxP = 8;
 
     candidateRef.transaction(
       (current) => (current === null
@@ -335,11 +332,7 @@ function connectToRoomGlobal(targetId) {
     roomIdGlobal = targetId;
     roomRef = dbRoot.ref('rooms/' + targetId);
 
-    if(currentGame === 'mario'){
-      myRole = 'joiner';
-      showRoomBadge(targetId);
-      enterGame();
-    } else if(currentGame === 'poker'){
+    if(currentGame === 'poker'){
       const trySeat = (seats, i) => {
         if(i >= seats.length){
           showCustomAlert('Room Capsa Banting ini sudah penuh (4 pemain).');
@@ -434,7 +427,6 @@ document.getElementById('btnLobbyConnect').onclick = () => {
 function enterGame(){
   showScreen(gameMeta[currentGame].screen);
   saveSession();
-  if(currentGame === 'mario') initMario();
   if(currentGame === 'chess') initChess();
   if(currentGame === 'ttt') initTTT();
   if(currentGame === 'poker') initPoker();
@@ -447,7 +439,7 @@ let pendingResumeCoin = 0;
 function saveSession(){
   try{
     localStorage.setItem(SESSION_KEY, JSON.stringify({
-      roomId: roomIdGlobal, game: currentGame, role: myRole, coin: myCoinCount || 0
+      roomId: roomIdGlobal, game: currentGame, role: myRole, coin: 0
     }));
   }catch(e){}
 }
@@ -496,7 +488,6 @@ document.getElementById('btnResumeContinue').onclick = () => {
     myRole = pendingSession.role;
     roomIdGlobal = pendingSession.roomId;
     roomRef = dbRoot.ref('rooms/' + pendingSession.roomId);
-    pendingResumeCoin = pendingSession.coin || 0;
     showRoomBadge(pendingSession.roomId);
     enterGame();
   }).catch(() => {
@@ -517,9 +508,7 @@ window.addEventListener('popstate', () => {
   history.pushState({ghub:true}, '', location.href);
 });
 
-// ======================================================
-// FIX PERMANEN PRESENCE MULTIPLAYER (shared.js)
-// ======================================================
+// PRESENCE MULTIPLAYER
 let activePresenceRef = null;
 
 function setupPresence(statusElId, roomLabel, onPresenceChange) {
@@ -528,17 +517,14 @@ function setupPresence(statusElId, roomLabel, onPresenceChange) {
   const presenceRef = roomRef.child('presence/' + myRole);
   activePresenceRef = presenceRef;
 
-  // 1. Set status online saat terhubung ke server Firebase
-  dbRoot.ref('.info/connected').off('value'); // Hapus listener lama biar gak numpuk
+  dbRoot.ref('.info/connected').off('value');
   dbRoot.ref('.info/connected').on('value', (snap) => {
     if (snap.val() === true) {
-      // Pastikan saat terputus otomatis terhapus dari Firebase
       presenceRef.onDisconnect().remove();
       presenceRef.set(true);
     }
   });
 
-  // 2. Bersihkan presence jika tab/browser ditutup
   if (!setupPresence._pagehideBound) {
     setupPresence._pagehideBound = true;
     window.addEventListener('pagehide', () => {
@@ -549,8 +535,7 @@ function setupPresence(statusElId, roomLabel, onPresenceChange) {
     });
   }
 
-  // 3. Listen SEMUA pemain di room, bukan cuma 1 lawan
-  roomRef.child('presence').off('value'); // Clear listener ganda
+  roomRef.child('presence').off('value');
   roomRef.child('presence').on('value', (snap) => {
     const presenceData = snap.val() || {};
     const statusEl = document.getElementById(statusElId);
@@ -566,7 +551,6 @@ function setupPresence(statusElId, roomLabel, onPresenceChange) {
       }
     }
 
-    // Callback untuk re-render UI game lokal
     if (onPresenceChange) onPresenceChange(presenceData);
   });
 }

@@ -30,7 +30,6 @@ body {
   align-items: flex-start; min-height: 100vh; padding: 10px; overflow-x: hidden;
 }
 
-
 .card {
   width: 100%; max-width: 680px;
   background: var(--panel);
@@ -54,8 +53,6 @@ body {
 }
 .btn-menu:active { transform: translateY(2px); border-bottom-width: 1px; filter: brightness(0.96); }
 .btn-menu span.ic { font-size: 22px; }
-.g-mario { background: var(--gold); color: var(--gold-ink); }
-.g-mario span.ic { filter: none; }
 .g-chess { background: var(--blue); color: #fff; }
 .g-ttt { background: var(--green); color: #06251a; }
 .g-poker { background: linear-gradient(135deg, #7a1f2b, #a8283a); color: #fff; }
@@ -151,19 +148,6 @@ body {
 
 .game-wrapper { width: 100%; aspect-ratio: 16/9; background: #5c94fc; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); position: relative; box-shadow: 0 10px 26px rgba(0,0,0,0.4); }
 canvas { width: 100%; height: 100%; display: block; }
-.touch-controls { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
-.dpad, .actions { display: flex; gap: 12px; }
-.btn-game { width: 58px; height: 58px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); border-radius: 14px; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; touch-action: manipulation; border-bottom: 3px solid rgba(0,0,0,0.35); transition: transform .08s ease, border-bottom-width .08s ease; }
-.btn-game:active { transform: translateY(2px); border-bottom-width: 1px; background: var(--panel-3); }
-.btn-jump { width: 96px; background: var(--red); color: #fff; border-bottom: 3px solid #96201b; }
-.btn-jump:active { background: #c8443d; border-bottom-width: 1px; }
-.coin-counter { position: absolute; top: 8px; right: 8px; background: rgba(10,12,17,0.82); color: var(--gold); font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 20px; z-index: 5; border: 1px solid rgba(255,255,255,0.08); }
-.players-counter { position: absolute; top: 8px; left: 8px; background: rgba(10,12,17,0.82); color: var(--green); font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 20px; z-index: 5; border: 1px solid rgba(255,255,255,0.08); }
-.mario-toggle { font-size: 12px; font-weight: 700; color: var(--gold-ink); background: var(--gold); border: none; padding: 6px 12px; border-radius: 20px; cursor: pointer; transition: transform .1s ease, background .15s ease, color .15s ease; }
-.mario-toggle:active { transform: scale(0.94); }
-.mario-toggle.off { background: var(--panel-3); color: var(--ink-dim); }
-.mario-off-banner { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10,12,17,0.78); backdrop-filter: blur(2px); z-index: 6; color: var(--ink); font-size: 13px; font-weight: 600; text-align: center; align-items: center; justify-content: center; padding: 0 20px; }
-.mario-off-banner.show { display: flex; }
 .win-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10,12,17,0.92); backdrop-filter: blur(3px); z-index: 20; flex-direction: column; justify-content: center; align-items: center; gap: 14px; animation: fadeSlide .22s ease; }
 .win-text { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 26px; font-weight: 700; text-align: center; color: var(--gold); padding: 0 16px; animation: popIn .3s cubic-bezier(.2,1.3,.4,1); }
 @keyframes popIn { from{ transform: scale(.7); opacity:0; } to{ transform:scale(1); opacity:1; } }
@@ -288,7 +272,7 @@ canvas { width: 100%; height: 100%; display: block; }
     <div class="hub-sub">Main bareng temen secara online, tinggal share kode room</div>
     <button class="btn-menu g-chess" id="btnGoCreate" style="justify-content:center;text-align:center">🎮 BUAT ROOM</button>
     <button class="btn-menu g-ttt" id="btnGoJoin" style="justify-content:center;text-align:center">🔗 GABUNG ROOM</button>
-    <button class="btn-menu g-mario" id="btnGoOnlineRooms" style="justify-content:center;text-align:center; background:#3d6bf0; color:#fff;">🌐 ONLINE ROOMS (PUBLIC)</button>
+    <button class="btn-menu g-chess" id="btnGoOnlineRooms" style="justify-content:center;text-align:center; background:#3d6bf0; color:#fff;">🌐 ONLINE ROOMS (PUBLIC)</button>
   </div>
 
   <!-- ONLINE ROOMS SCREEN -->
@@ -350,21 +334,20 @@ canvas { width: 100%; height: 100%; display: block; }
 
   <div class="screen" id="gamePickScreen">
     <div class="lobby-title">Pilih Game</div>
-    <button class="btn-menu g-mario" data-game="mario"><span class="ic">🍄</span> Mario Coin Rush (Multiplayer)</button>
     <button class="btn-menu g-chess" data-game="chess"><span class="ic">♟</span> Catur 2P Online</button>
     <button class="btn-menu g-ttt" data-game="ttt"><span class="ic">⭕</span> Tic-Tac-Toe 2P</button>
     <button class="btn-menu g-poker" data-game="poker"><span class="ic">🃏</span> Poker Capsa (4 Pemain)</button>
-    <button class="btn-menu g-mario" data-game="uno" style="background: #e4574f; color:#fff;"><span class="ic">🎴</span> Uno Battle Arena (2-6 Player)</button>
+    <button class="btn-menu g-poker" data-game="uno" style="background: #e4574f; color:#fff;"><span class="ic">🎴</span> Uno Battle Arena (2-6 Player)</button>
     <button class="btn-menu g-poker" data-game="monopoli" style="background: linear-gradient(135deg, #2b6cb0, #2c5282); color:#fff;"><span class="ic">🎩</span> Monopoli Klasik (3-6 Player)</button>
     <button class="btn-menu btn-back" id="btnGamePickBack">‹ Kembali</button>
   </div>
 
   <div class="screen" id="monopoliPlayerCountScreen">
     <div class="lobby-title">Pilih Jumlah Pemain Monopoli</div>
-    <button class="btn-menu g-mario" data-mp-players="3">👥 3 Pemain</button>
-    <button class="btn-menu g-mario" data-mp-players="4">👥 4 Pemain</button>
-    <button class="btn-menu g-mario" data-mp-players="5">👥 5 Pemain</button>
-    <button class="btn-menu g-mario" data-mp-players="6">👥 6 Pemain</button>
+    <button class="btn-menu g-chess" data-mp-players="3">👥 3 Pemain</button>
+    <button class="btn-menu g-chess" data-mp-players="4">👥 4 Pemain</button>
+    <button class="btn-menu g-chess" data-mp-players="5">👥 5 Pemain</button>
+    <button class="btn-menu g-chess" data-mp-players="6">👥 6 Pemain</button>
     <button class="btn-menu btn-back" id="btnMpCountBack">‹ Kembali</button>
   </div>
 
@@ -389,7 +372,6 @@ canvas { width: 100%; height: 100%; display: block; }
       <button class="capsa-act play" id="mpBtnHouse" style="display:none; background:#8b5cf6; color:#fff;">🏠+ Beli Rumah/Hotel</button>
       <button class="capsa-act pass" id="mpBtnEndTurn" style="display:none;">⏭️ Selesai Giliran</button>
     </div>
-
 
     <div class="capsa-result" id="mpResult" style="display:none; margin-top:10px;"></div>
     <button class="btn-menu btn-back" id="btnMpBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
@@ -433,33 +415,6 @@ canvas { width: 100%; height: 100%; display: block; }
     </div>
     <button class="btn-menu btn-copy-code" id="btnResumeContinue" style="justify-content:center;text-align:center">▶ Lanjutkan</button>
     <button class="btn-menu btn-back" id="btnResumeNew">✕ Room Baru / Menu Utama</button>
-  </div>
-
-  <div class="screen" id="marioScreen">
-    <div class="g-header">
-      <div class="g-title">🍄 Mario Coin Rush</div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <button class="mario-toggle" id="btnMarioToggle">🟢 ON</button>
-        <div class="g-role" id="marioRoleTag">-</div>
-      </div>
-    </div>
-    <div class="g-status" id="marioStatus">-</div>
-    <div class="game-wrapper">
-      <canvas id="canvas"></canvas>
-      <div class="coin-counter" id="coinCounter">🪙 0</div>
-      <div class="players-counter" id="playersCounter">👥 1</div>
-      <div class="mario-off-banner" id="marioOffBanner">🔌 Mario OFF — karaktermu disembunyikan</div>
-    </div>
-    <div class="touch-controls">
-      <div class="dpad">
-        <div class="btn-game" id="btnLeft">◀</div>
-        <div class="btn-game" id="btnRight">▶</div>
-      </div>
-      <div class="actions">
-        <div class="btn-game btn-jump" id="btnJump">LOMPAT</div>
-      </div>
-    </div>
-    <button class="btn-menu btn-back" id="btnMarioBack" style="margin-top:12px;text-align:center;justify-content:center">‹ Menu Utama</button>
   </div>
 
   <div class="screen" id="chessScreen">
@@ -567,11 +522,11 @@ canvas { width: 100%; height: 100%; display: block; }
 
   <div class="screen" id="unoPlayerCountScreen">
     <div class="lobby-title">Pilih Jumlah Pemain Uno</div>
-    <button class="btn-menu g-mario" data-uno-players="2">👥 2 Pemain</button>
-    <button class="btn-menu g-mario" data-uno-players="3">👥 3 Pemain</button>
-    <button class="btn-menu g-mario" data-uno-players="4">👥 4 Pemain</button>
-    <button class="btn-menu g-mario" data-uno-players="5">👥 5 Pemain</button>
-    <button class="btn-menu g-mario" data-uno-players="6">👥 6 Pemain</button>
+    <button class="btn-menu g-chess" data-uno-players="2">👥 2 Pemain</button>
+    <button class="btn-menu g-chess" data-uno-players="3">👥 3 Pemain</button>
+    <button class="btn-menu g-chess" data-uno-players="4">👥 4 Pemain</button>
+    <button class="btn-menu g-chess" data-uno-players="5">👥 5 Pemain</button>
+    <button class="btn-menu g-chess" data-uno-players="6">👥 6 Pemain</button>
     <button class="btn-menu btn-back" id="btnUnoCountBack">‹ Kembali</button>
   </div>
 
@@ -620,7 +575,6 @@ canvas { width: 100%; height: 100%; display: block; }
 </div> 
 
 <script src="shared.js"></script>
-<script src="Mario.js"></script>
 <script src="Catur.js"></script>
 <script src="Tttc.js"></script>
 <script src="Poker.js"></script>
