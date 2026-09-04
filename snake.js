@@ -1,5 +1,6 @@
 // ======================================================
 // snake.js — Hybrid Board (Image Background + Canvas Pawn)
+// Animasi Dadu Monopoli Modern + Suara Step Pion
 // ======================================================
 
 const SNAKES_AND_LADDERS = [
@@ -24,6 +25,37 @@ let snakeUnsub = null;
 let isAnimatingLocal = false;
 let currentGameState = null;
 let localVisualPositions = {};
+
+// SIFAT SOUND ENGINE (Menggunakan Web Audio API dari Monopoli Engine)
+let audioCtxSnake = null;
+function getSnakeAudioContext() {
+  if (!audioCtxSnake) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) audioCtxSnake = new AudioContextClass();
+  }
+  if (audioCtxSnake && audioCtxSnake.state === 'suspended') {
+    audioCtxSnake.resume();
+  }
+  return audioCtxSnake;
+}
+
+function playSnakeStepSound() {
+  try {
+    const ctx = getSnakeAudioContext();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(340, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(140, ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.08);
+  } catch (e) {}
+}
 
 function getCanvasContext() {
   const canvas = document.getElementById('snakeCanvas');
@@ -53,7 +85,7 @@ function getBoardCoordinates(pos, playerIndex) {
   return { x: baseX + offset.x, y: baseY + offset.y };
 }
 
-// Render Pion Menggunakan Vektor Canvas di atas gambar papan
+// Render Canvas Layer (Pion + Efek Canvas)
 function drawCanvasState() {
   const ctx = getCanvasContext();
   if (!ctx) return;
@@ -188,12 +220,14 @@ function updateSnakeControls(data) {
       padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
       color: var(--ink); display: flex; align-items: center; gap: 8px;
     `;
-    chip.innerHTML = `<span style="width:12px; height:12px; border-radius:50%; background:${color.main}; border:1.5px solid #fff;"></span> ${pKey.toUpperCase()} (Kotak ${pData.pos})`;
+    
+    let rankText = pData.rank ? ` 🏆 Juara ${pData.rank}` : '';
+    chip.innerHTML = `<span style="width:12px; height:12px; border-radius:50%; background:${color.main}; border:1.5px solid #fff;"></span> ${pKey.toUpperCase()} (Kotak ${pData.pos})${rankText}`;
     listWrap.appendChild(chip);
   });
 }
 
-// Animasi Langkah demi Langkah Pion
+// Animasi Langkah demi Langkah Pion di Canvas
 async function animatePionMovement(pKey, startPos, diceVal) {
   let currentPos = startPos;
   
@@ -203,6 +237,7 @@ async function animatePionMovement(pKey, startPos, diceVal) {
     
     localVisualPositions[pKey] = currentPos;
     drawCanvasState();
+    playSnakeStepSound(); // Efek suara per langkah
     
     await new Promise(r => setTimeout(r, 260));
   }
@@ -221,6 +256,7 @@ async function animatePionMovement(pKey, startPos, diceVal) {
 
     localVisualPositions[pKey] = eventPoint.end;
     drawCanvasState();
+    playSnakeStepSound();
     await new Promise(r => setTimeout(r, 600));
     currentPos = eventPoint.end;
   }
@@ -230,6 +266,7 @@ async function animatePionMovement(pKey, startPos, diceVal) {
 
 document.getElementById('snakeBtnRoll').onclick = () => {
   if(!roomRef || isAnimatingLocal) return;
+  getSnakeAudioContext();
   const snakeRef = roomRef.child('snake');
 
   snakeRef.get().then(async snap => {
@@ -244,25 +281,50 @@ document.getElementById('snakeBtnRoll').onclick = () => {
     isAnimatingLocal = true;
     document.getElementById('snakeBtnRoll').disabled = true;
 
-    // 1. Animasi Kocok Dadu
+    // ==========================================
+    // 1. ANIMASI DADU MONOPOLI (POP-OUT & SPIN)
+    // ==========================================
     const diceBox = document.getElementById('snakeDiceBox');
-    diceBox.classList.add('rolling');
-    
-    let rollInterval = setInterval(() => {
-      diceBox.textContent = Math.floor(Math.random() * 6) + 1;
-    }, 70);
+    diceBox.style.transition = 'transform 0.1s ease, box-shadow 0.1s ease';
+    diceBox.style.transform = 'scale(1.4) rotate(15deg)';
+    diceBox.style.boxShadow = '0 10px 25px rgba(232, 172, 31, 0.6)';
 
-    await new Promise(r => setTimeout(r, 1000));
-    clearInterval(rollInterval);
-    diceBox.classList.remove('rolling');
+    let startTime = Date.now();
+    let duration = 900;
 
-    // 2. Angka Dadu Final
+    const rollInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      
+      // Rotasi acak dadu
+      const rot = Math.floor(Math.random() * 360);
+      const randomDice = Math.floor(Math.random() * 6) + 1;
+      
+      diceBox.style.transform = `scale(${1.4 - progress * 0.4}) rotate(${rot}deg)`;
+      diceBox.textContent = randomDice;
+
+      if (elapsed >= duration) {
+        clearInterval(rollInterval);
+      }
+    }, 60);
+
+    await new Promise(r => setTimeout(r, duration));
+
+    // Reset style dadu ke kondisi normal
+    diceBox.style.transform = 'scale(1) rotate(0deg)';
+    diceBox.style.boxShadow = '0 6px 14px rgba(0,0,0,0.4)';
+
+    // ==========================================
+    // 2. DAPATKAN HASIL DADU FINAL
+    // ==========================================
     const dice = Math.floor(Math.random() * 6) + 1;
     diceBox.textContent = dice;
 
     await new Promise(r => setTimeout(r, 350));
 
-    // 3. Jalankan Pergerakan Pion
+    // ==========================================
+    // 3. JALANKAN PERGERAKAN PION
+    // ==========================================
     let oldPos = data.players[myRole].pos || 1;
     let finalPos = await animatePionMovement(myRole, oldPos, dice);
 
@@ -282,34 +344,37 @@ document.getElementById('snakeBtnRoll').onclick = () => {
 
     data.players[myRole].pos = finalPos;
 
-    // Hitung berapa pemain yang sudah selesai/menang
+    // Hitung pemain yang sudah selesai
     const finishedPlayers = playerKeys.filter(k => data.players[k].rank > 0);
 
-    // Jika player baru saja sampai di FINISH (kotak >= 100)
+    // Jika player baru saja sampai di FINISH
     if (finalPos >= 100 && !data.players[myRole].rank) {
       const nextRank = finishedPlayers.length + 1;
       data.players[myRole].rank = nextRank;
       showCustomAlert(`🏆 Selamat! ${myRole.toUpperCase()} berhasil Finis sebagai Juara ${nextRank}!`);
     }
 
-    // Cari pemain berikutnya yang BELUM menang
-    let nextTurnIndex = data.turnIndex;
-    const totalPlayers = playerKeys.length;
     const currentFinishedCount = playerKeys.filter(k => data.players[k].rank > 0).length;
+    let nextTurnIndex = data.turnIndex;
 
-    // Game benar-benar selesai jika tersisa 1 orang saja yang belum finis
-    if (currentFinishedCount >= totalPlayers - 1) {
+    // Game selesai jika tersisa 1 orang saja yang belum finis
+    if (currentFinishedCount >= playerKeys.length - 1) {
       data.status = 'ended';
     } else {
-      // Jika dapet angka 6 dan BELUM menang, dapat giliran lagi. Jika tidak, oper ke pemain aktif berikutnya
-      if (dice !== 6 || finalPos >= 100) {
+      // LOGIKA DADU 6: Boleh lempar dadu lagi jika dapet 6 dan belum finis
+      if (dice === 6 && finalPos < 100) {
+        nextTurnIndex = data.turnIndex;
+        showCustomAlert(`🎲 HOKI! Dapat Dadu 6, ${myRole.toUpperCase()} Lempar Lagi!`);
+      } else {
         do {
-          nextTurnIndex = (nextTurnIndex + 1) % totalPlayers;
-        } while (data.players[playerKeys[nextTurnIndex]].rank > 0); // Skip pemain yang sudah finis
+          nextTurnIndex = (nextTurnIndex + 1) % playerKeys.length;
+        } while (data.players[playerKeys[nextTurnIndex]].rank > 0);
       }
     }
 
-    // 4. Update Database Realtime
+    // ==========================================
+    // 4. UPDATE DATABASE REALTIME
+    // ==========================================
     await snakeRef.update({
       players: data.players,
       lastDice: dice,
@@ -320,15 +385,39 @@ document.getElementById('snakeBtnRoll').onclick = () => {
 
     isAnimatingLocal = false;
     drawCanvasState();
+    updateSnakeControls(data);
   });
 };
-;
 
-// HANDLER TOMBOL KEMBALI KEMBALI DIBETULKAN
 document.getElementById('btnSnakeBack').onclick = () => {
-  if(snakeUnsub) {
+  // 1. Unsubscribe listener Firebase Snake
+  if (snakeUnsub) {
     snakeUnsub();
     snakeUnsub = null;
   }
+
+  // 2. Lepaskan Presence Multiplayer di Firebase
+  if (activePresenceRef) {
+    activePresenceRef.remove();
+    activePresenceRef = null;
+  }
+
+  // 3. Jika P1 yang keluar saat di lobby/room, hapus data room publik
+  if (roomRef && myRole === 'p1') {
+    roomRef.child('snake').remove().catch(() => {});
+    if (roomIdGlobal) {
+      dbRoot.ref('publicRooms/' + roomIdGlobal).remove().catch(() => {});
+    }
+  }
+
+  // 4. Bersihkan Session Storage & Variable Global Game Hub
+  clearSession();
+  hideRoomBadge();
+  currentGame = null;
+  myRole = null;
+  roomIdGlobal = null;
+  roomRef = null;
+
+  // 5. Kembali ke Layar Utama
   showScreen('startScreen');
 };
