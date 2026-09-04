@@ -53,9 +53,17 @@ body {
 }
 .btn-menu:active { transform: translateY(2px); border-bottom-width: 1px; filter: brightness(0.96); }
 .btn-menu span.ic { font-size: 22px; }
+.btn-menu.disabled {
+  opacity: 0.55;
+  filter: grayscale(0.8);
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .g-chess { background: var(--blue); color: #fff; }
 .g-ttt { background: var(--green); color: #06251a; }
 .g-poker { background: linear-gradient(135deg, #7a1f2b, #a8283a); color: #fff; }
+.g-snake { background: linear-gradient(135deg, #d97706, #b45309); color: #fff; }
+
 .hub-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 24px; font-weight: 700; color: var(--ink); margin-bottom: 3px; display: flex; align-items: center; gap: 9px; }
 .hub-title .badge-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 4px rgba(232,172,31,0.15); flex-shrink: 0; animation: pulseDot 2.4s ease-in-out infinite; }
 @keyframes pulseDot { 0%,100%{ box-shadow: 0 0 0 4px rgba(232,172,31,0.15);} 50%{ box-shadow: 0 0 0 7px rgba(232,172,31,0.05);} }
@@ -150,6 +158,72 @@ body {
 .g-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 18px; font-weight: 700; color: var(--ink); }
 .g-role { font-size: 12px; color: var(--ink); font-weight: 700; background: var(--panel-3); padding: 6px 12px; border-radius: 20px; border: 1px solid var(--line); }
 .g-status { font-size: 13px; color: var(--green); margin-bottom: 12px; font-weight: 600; text-align: center; background: var(--void); padding: 10px; border-radius: 10px; border: 1px solid var(--line); transition: color .2s ease; }
+
+/* STYLE ULAR TANGGA BOARD & PION */
+.snake-board-container {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 1/1;
+  margin: 0 auto;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.6);
+  border: 2px solid var(--line);
+}
+#snakeBoardBg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.snake-pion {
+  position: absolute;
+  width: 7.5%;
+  height: 7.5%;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.6);
+  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  z-index: 5;
+}
+.snake-pion-0 { background: #3d6bf0; }
+.snake-pion-1 { background: #1e3a8a; }
+.snake-pion-2 { background: #e8ac1f; }
+.snake-pion-3 { background: #e4574f; }
+.snake-pion-4 { background: #8b5cf6; }
+.snake-pion-5 { background: #2bb673; }
+.snake-pion-6 { background: #f97316; }
+
+/* ANIMASI DADU 3D */
+.dice-animation-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 15px 0;
+  height: 60px;
+}
+.dice-box {
+  width: 50px;
+  height: 50px;
+  background: #ffffff;
+  border-radius: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 28px;
+  font-weight: 800;
+  color: #1a1f2a;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.4);
+}
+.dice-box.rolling {
+  animation: diceRoll 0.5s ease-in-out infinite;
+}
+@keyframes diceRoll {
+  0% { transform: rotate(0deg) scale(0.9); }
+  50% { transform: rotate(180deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(0.9); }
+}
 
 .game-wrapper { width: 100%; aspect-ratio: 16/9; background: #5c94fc; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); position: relative; box-shadow: 0 10px 26px rgba(0,0,0,0.4); }
 canvas { width: 100%; height: 100%; display: block; }
@@ -268,7 +342,7 @@ canvas { width: 100%; height: 100%; display: block; }
 <body>
 
 <div class="card">
-  <!-- Pembungkus Room Badge agar berada di posisi aman -->
+  <!-- Room Badge -->
   <div class="room-badge-wrap">
     <div class="room-badge" id="roomBadge"><span id="roomBadgeText">Room: ------</span><span class="rb-copy" id="roomBadgeCopy">⧉ salin</span></div>
   </div>
@@ -339,16 +413,24 @@ canvas { width: 100%; height: 100%; display: block; }
     </div>
   </div>
 
+  <!-- GAME PICK SCREEN -->
   <div class="screen" id="gamePickScreen">
     <div class="lobby-title">Pilih Game</div>
     <button class="btn-menu g-chess" data-game="chess"><span class="ic">♟</span> Catur 2P Online</button>
     <button class="btn-menu g-ttt" data-game="ttt"><span class="ic">⭕</span> Tic-Tac-Toe 2P</button>
     <button class="btn-menu g-poker" data-game="poker"><span class="ic">🃏</span> Poker Capsa (4 Pemain)</button>
     <button class="btn-menu g-poker" data-game="uno" style="background: #e4574f; color:#fff;"><span class="ic">🎴</span> Uno Battle Arena (2-6 Player)</button>
-    <button class="btn-menu g-poker" data-game="monopoli" style="background: linear-gradient(135deg, #2b6cb0, #2c5282); color:#fff;"><span class="ic">🎩</span> Monopoli Klasik (3-6 Player)</button>
+    <button class="btn-menu g-snake" data-game="snake"><span class="ic">🐍</span> Ular Tangga Board (2-7 Player)</button>
+
+    <!-- TOMBOL MONOPOLI TERKUNCI / MAINTENANCE -->
+    <button class="btn-menu disabled" style="background: #334155; color: #94a3b8; border-bottom-color: #1e293b;" title="Game sedang dalam pemeliharaan">
+      <span class="ic">🔒</span> Monopoli Klasik <span style="margin-left: auto; font-size: 11px; background: #0f172a; padding: 3px 8px; border-radius: 6px; color: #ef4444;">MAINTENANCE</span>
+    </button>
+
     <button class="btn-menu btn-back" id="btnGamePickBack">‹ Kembali</button>
   </div>
 
+  <!-- MONOPOLI PLAYER COUNT SCREEN -->
   <div class="screen" id="monopoliPlayerCountScreen">
     <div class="lobby-title">Pilih Jumlah Pemain Monopoli</div>
     <button class="btn-menu g-chess" data-mp-players="3">👥 3 Pemain</button>
@@ -358,6 +440,7 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnMpCountBack">‹ Kembali</button>
   </div>
 
+  <!-- MONOPOLI SCREEN -->
   <div class="screen" id="monopoliScreen">
     <div class="g-header">
       <div class="g-title">🎩 Monopoli Klasik</div>
@@ -367,8 +450,7 @@ canvas { width: 100%; height: 100%; display: block; }
 
     <div class="capsa-table" style="background: #111827; padding: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
       <div style="width:100%; aspect-ratio:1/1; position:relative; margin:0 auto; max-width:480px; display:flex; justify-content:center; align-items:center;">
-<canvas id="mpBoardCanvas" style="width:100%; height:100%; border-radius:12px; border:2px solid var(--line); display:block; margin:0 auto; background: url('https://c.termai.cc/i125/ypq.jpeg') no-repeat center/cover;"></canvas>
-
+        <canvas id="mpBoardCanvas" style="width:100%; height:100%; border-radius:12px; border:2px solid var(--line); display:block; margin:0 auto; background: url('https://c.termai.cc/i125/ypq.jpeg') no-repeat center/cover;"></canvas>
       </div>
       <div id="mpPlayerListWrap" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px; width:100%;"></div>
     </div>
@@ -385,6 +467,46 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnMpBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
   </div>
 
+  <!-- SNAKE PLAYER COUNT SCREEN -->
+  <div class="screen" id="snakePlayerCountScreen">
+    <div class="lobby-title">Pilih Max Pemain Ular Tangga</div>
+    <button class="btn-menu g-snake" data-snake-players="2">👥 2 Pemain</button>
+    <button class="btn-menu g-snake" data-snake-players="3">👥 3 Pemain</button>
+    <button class="btn-menu g-snake" data-snake-players="4">👥 4 Pemain</button>
+    <button class="btn-menu g-snake" data-snake-players="5">👥 5 Pemain</button>
+    <button class="btn-menu g-snake" data-snake-players="6">👥 6 Pemain</button>
+    <button class="btn-menu g-snake" data-snake-players="7">👥 7 Pemain</button>
+    <button class="btn-menu btn-back" id="btnSnakeCountBack">‹ Kembali</button>
+  </div>
+
+  <!-- SNAKE SCREEN -->
+  <div class="screen" id="snakeScreen">
+    <div class="g-header">
+      <div class="g-title">🐍 Ular Tangga Board</div>
+      <div class="g-role" id="snakeRoleTag">-</div>
+    </div>
+    <div class="g-status" id="snakeStatus">-</div>
+
+    <div class="snake-board-container" id="snakeBoardArea">
+      <img id="snakeBoardBg" src="https://i.pinimg.com/originals/2f/68/a7/2f68a7e1eee18556b055418f7305b3c0.jpg" alt="Board Ular Tangga">
+      <div id="snakePionsWrap"></div>
+    </div>
+
+    <div class="dice-animation-wrap">
+      <div class="dice-box" id="snakeDiceBox">🎲</div>
+    </div>
+
+    <div id="snakePlayersList" style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:12px;"></div>
+
+    <div class="capsa-actions" id="snakeActions">
+      <button class="capsa-act play" id="snakeBtnRoll" style="grid-column: span 2; background: var(--gold); color: #000;">🎲 Kocok Dadu!</button>
+    </div>
+
+    <div class="capsa-result" id="snakeResult" style="display:none;"></div>
+    <button class="btn-menu btn-back" id="btnSnakeBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
+  </div>
+
+  <!-- CHESS TIME SCREEN -->
   <div class="screen" id="chessTimeScreen">
     <div class="lobby-title">Pilih Waktu Jalan</div>
     <button class="btn-menu g-chess" data-time="180" style="justify-content:center;text-align:center">⏱ 3 Menit</button>
@@ -394,6 +516,7 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnChessTimeBack">‹ Kembali</button>
   </div>
 
+  <!-- CREATED SCREEN -->
   <div class="screen" id="createdScreen">
     <div class="lobby-title">Room Dibuat!</div>
     <div class="created-icon">🎉</div>
@@ -403,6 +526,7 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnCreatedBack">‹ Batal</button>
   </div>
 
+  <!-- JOIN SCREEN -->
   <div class="screen" id="joinScreen">
     <div class="lobby-title">Gabung Room</div>
     <div class="join-box" style="display:flex">
@@ -413,6 +537,7 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnJoinBack">‹ Kembali</button>
   </div>
 
+  <!-- RESUME SCREEN -->
   <div class="screen" id="resumeScreen">
     <div class="lobby-title">Lanjutkan Room?</div>
     <div class="created-icon">🔌</div>
@@ -425,6 +550,7 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnResumeNew">✕ Room Baru / Menu Utama</button>
   </div>
 
+  <!-- CHESS SCREEN -->
   <div class="screen" id="chessScreen">
     <div class="g-header">
       <div class="g-title">♟ Catur 2P Online</div>
@@ -452,6 +578,7 @@ canvas { width: 100%; height: 100%; display: block; }
     </div>
   </div>
 
+  <!-- TTT SCREEN -->
   <div class="screen" id="tttScreen">
     <div class="g-header">
       <div class="g-title">⭕ Tic-Tac-Toe 2P</div>
@@ -465,6 +592,7 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnTttBack" style="margin-top:12px;text-align:center;justify-content:center">‹ Menu Utama</button>
   </div>
 
+  <!-- POKER SCREEN -->
   <div class="screen" id="pokerScreen">
     <div class="g-header">
       <div class="g-title">🃏 Capsa Banting 4P</div>
@@ -528,6 +656,7 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnPokerBack" style="margin-top:12px;text-align:center;justify-content:center">‹ Menu Utama</button>
   </div>
 
+  <!-- UNO SCREEN -->
   <div class="screen" id="unoPlayerCountScreen">
     <div class="lobby-title">Pilih Jumlah Pemain Uno</div>
     <button class="btn-menu g-chess" data-uno-players="2">👥 2 Pemain</button>
@@ -588,5 +717,6 @@ canvas { width: 100%; height: 100%; display: block; }
 <script src="Poker.js"></script>
 <script src="Uno.js"></script>
 <script src="monopoli.js"></script>
+<script src="snake.js"></script>
 </body>
 </html>

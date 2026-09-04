@@ -98,7 +98,8 @@ const gameMeta = {
   ttt:      { title: '⭕ Tic-Tac-Toe 2P', screen: 'tttScreen' },
   poker:    { title: '🃏 Poker Capsa', screen: 'pokerScreen' },
   uno:      { title: '🎴 Uno Battle Arena', screen: 'unoScreen' },
-  monopoli: { title: '🎩 Monopoli Klasik', screen: 'monopoliScreen' }
+  monopoli: { title: '🎩 Monopoli Klasik', screen: 'monopoliScreen' },
+  snake:    { title: '🐍 Ular Tangga Board', screen: 'snakeScreen' }
 };
 
 document.querySelectorAll('#gamePickScreen .btn-menu[data-game]').forEach(btn => {
@@ -111,6 +112,8 @@ document.querySelectorAll('#gamePickScreen .btn-menu[data-game]').forEach(btn =>
       showScreen('unoPlayerCountScreen');
     } else if(currentGame === 'monopoli'){
       showScreen('monopoliPlayerCountScreen');
+    } else if(currentGame === 'snake'){
+      showScreen('snakePlayerCountScreen');
     } else {
       chessTimeControl = 0;
       proceedCreateRoom();
@@ -125,6 +128,14 @@ document.querySelectorAll('#monopoliPlayerCountScreen .btn-menu[data-mp-players]
   };
 });
 document.getElementById('btnMpCountBack').onclick = () => showScreen('gamePickScreen');
+
+document.querySelectorAll('#snakePlayerCountScreen .btn-menu[data-snake-players]').forEach(btn => {
+  btn.onclick = () => {
+    window.snakeSelectedMaxPlayers = parseInt(btn.dataset.snakePlayers, 10) || 2;
+    proceedCreateRoom();
+  };
+});
+document.getElementById('btnSnakeCountBack').onclick = () => showScreen('gamePickScreen');
 
 document.getElementById('btnGoCreate').onclick = () => showScreen('gamePickScreen');
 document.getElementById('btnGoJoin').onclick = () => showScreen('joinScreen');
@@ -164,6 +175,7 @@ function executeCreateRoom(){
     if(currentGame === 'poker') maxP = 4;
     if(currentGame === 'uno') maxP = window.unoSelectedMaxPlayers || 4;
     if(currentGame === 'monopoli') maxP = window.mpSelectedMaxPlayers || 3;
+    if(currentGame === 'snake') maxP = window.snakeSelectedMaxPlayers || 2;
 
     candidateRef.transaction(
       (current) => (current === null
@@ -396,6 +408,30 @@ function connectToRoomGlobal(targetId) {
         };
         tryMpSeat(seats, 0);
       });
+    } else if(currentGame === 'snake'){
+      dbRoot.ref('rooms/' + targetId + '/snake').get().then(snakeSnap => {
+        const snakeData = snakeSnap.val() || {};
+        const maxP = snakeData.maxPlayers || snap.val().maxPlayers || 2;
+        const roles = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7'].slice(0, maxP);
+        const seats = roles.filter(r => r !== 'p1');
+
+        const trySnakeSeat = (seatList, i) => {
+          if(i >= seatList.length){
+            showCustomAlert('Room Ular Tangga ini sudah penuh.');
+            return;
+          }
+          roomRef.child('presence/' + seatList[i]).transaction(
+            (current) => (current === null ? true : undefined),
+            (err, committed) => {
+              if(err || !committed){ trySnakeSeat(seatList, i + 1); return; }
+              myRole = seatList[i];
+              showRoomBadge(targetId);
+              enterGame();
+            }
+          );
+        };
+        trySnakeSeat(seats, 0);
+      });
     } else {
       roomRef.child('presence/p2').transaction(
         (current) => (current === null ? true : undefined),
@@ -435,6 +471,7 @@ function enterGame(){
     if(currentGame === 'poker') initPoker();
     if(currentGame === 'uno') initUno();
     if(currentGame === 'monopoli') initMonopoli();
+    if(currentGame === 'snake') initSnake();
   }, 50);
 }
 
