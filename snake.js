@@ -1,5 +1,5 @@
 // ======================================================
-// snake.js — Logic & Interactive Image Rendering Ular Tangga
+// snake.js — Hybrid Board (Image Background + Canvas Pawn)
 // ======================================================
 
 const SNAKES_AND_LADDERS = [
@@ -9,29 +9,104 @@ const SNAKES_AND_LADDERS = [
   { start: 91, end: 72 },  { start: 97, end: 78 }
 ];
 
-// Aset Pion Gambar Persis Dari Bot WA
-const PION_IMAGES = [
-  'https://cdn.jsdelivr.net/gh/dikzzgans424-star/CDN-Miwa-botz@main/uploads/1780236206544.jpg',
-  'https://cdn.jsdelivr.net/gh/dikzzgans424-star/CDN-Miwa-botz@main/uploads/178023601621.jpg',
-  'https://cdn.jsdelivr.net/gh/dikzzgans424-star/CDN-Miwa-botz@main/uploads/1780236187804.jpg',
-  'https://cdn.jsdelivr.net/gh/dikzzgans424-star/CDN-Miwa-botz@main/uploads/1780236196281.jpg',
-  'https://cdn.jsdelivr.net/gh/dikzzgans424-star/CDN-Miwa-botz@main/uploads/1780237879139.jpg',
-  'https://cdn.jsdelivr.net/gh/dikzzgans424-star/CDN-Miwa-botz@main/uploads/1780237885067.jpg',
-  'https://cdn.jsdelivr.net/gh/dikzzgans424-star/CDN-Miwa-botz@main/uploads/1780237888413.jpg'
+// Warna Pion Vektor 3D
+const PLAYER_COLORS = [
+  { main: '#ef4444', dark: '#991b1b', light: '#fca5a5' }, // Merah
+  { main: '#3b82f6', dark: '#1e40af', light: '#93c5fd' }, // Biru
+  { main: '#eab308', dark: '#854d0e', light: '#fef08a' }, // Kuning
+  { main: '#10b981', dark: '#065f46', light: '#6ee7b7' }, // Hijau
+  { main: '#a855f7', dark: '#6b21a8', light: '#d8b4fe' }, // Ungu
+  { main: '#f97316', dark: '#9a3412', light: '#fdba74' }, // Orange
+  { main: '#ec4899', dark: '#9d174d', light: '#fbcfe8' }  // Pink
 ];
 
 let snakeUnsub = null;
+let isAnimatingLocal = false;
+let currentGameState = null;
+let localVisualPositions = {};
 
-// Mengkalkulasi Koordinat Posisi Papan (1 - 100)
-function calculateCoords(pos, index) {
-  let x = ((pos - 1) % 10) * 10;
-  let y = (9 - Math.floor((pos - 1) / 10)) * 10;
+function getCanvasContext() {
+  const canvas = document.getElementById('snakeCanvas');
+  return canvas ? canvas.getContext('2d') : null;
+}
+
+// Menghitung Posisi Koordinat Pixel Pion pada Canvas (800x800)
+function getBoardCoordinates(pos, playerIndex) {
+  const row = Math.floor((pos - 1) / 10);
+  const col = (pos - 1) % 10;
   
-  // Offset mikro agar pion bertumpuk tidak saling menutupi
-  let offsetX = (index % 3) * 1.8;
-  let offsetY = Math.floor(index / 3) * 1.8;
-  
-  return { left: `${x + offsetX + 0.8}%`, top: `${y + offsetY + 0.8}%` };
+  // Posisi Papan Zig-Zag
+  const actualCol = (row % 2 === 0) ? col : (9 - col);
+  const actualRow = 9 - row;
+
+  const tileSize = 80;
+  const baseX = actualCol * tileSize + tileSize / 2;
+  const baseY = actualRow * tileSize + tileSize / 2;
+
+  // Offset mikro jika bertumpuk di kotak yang sama
+  const offsets = [
+    { x: -12, y: -12 }, { x: 12, y: 12 }, { x: -12, y: 12 },
+    { x: 12, y: -12 }, { x: 0, y: -16 }, { x: 0, y: 16 }, { x: 0, y: 0 }
+  ];
+  const offset = offsets[playerIndex % offsets.length];
+
+  return { x: baseX + offset.x, y: baseY + offset.y };
+}
+
+// Render Pion Menggunakan Vektor Canvas di atas gambar papan
+function drawCanvasState() {
+  const ctx = getCanvasContext();
+  if (!ctx) return;
+
+  // Clear layar transparan canvas
+  ctx.clearRect(0, 0, 800, 800);
+
+  if (!currentGameState || !currentGameState.players) return;
+
+  const playerKeys = Object.keys(currentGameState.players);
+
+  playerKeys.forEach((pKey, index) => {
+    const pos = localVisualPositions[pKey] || currentGameState.players[pKey].pos || 1;
+    const coords = getBoardCoordinates(pos, index);
+    const color = PLAYER_COLORS[index % PLAYER_COLORS.length];
+
+    ctx.save();
+
+    // Bayangan Pion
+    ctx.beginPath();
+    ctx.ellipse(coords.x, coords.y + 14, 18, 8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.fill();
+
+    // Gradien Bola 3D Glossy
+    const gradient = ctx.createRadialGradient(
+      coords.x - 6, coords.y - 8, 2,
+      coords.x, coords.y, 22
+    );
+    gradient.addColorStop(0, color.light);
+    gradient.addColorStop(0.4, color.main);
+    gradient.addColorStop(1, color.dark);
+
+    // Bodi Pion Token
+    ctx.beginPath();
+    ctx.arc(coords.x, coords.y, 22, 0, Math.PI * 2);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
+
+    // Teks ID Pemain (P1, P2)
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 14px "Space Grotesk", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.9)';
+    ctx.shadowBlur = 4;
+    ctx.fillText(pKey.toUpperCase(), coords.x, coords.y + 1);
+
+    ctx.restore();
+  });
 }
 
 function initSnake() {
@@ -66,48 +141,15 @@ function initSnake() {
     const data = snap.val();
     if(!data) return;
 
-    renderSnakeBoard(data);
-    updateSnakeControls(data);
-  });
-}
+    currentGameState = data;
 
-function renderSnakeBoard(data) {
-  const pionsWrap = document.getElementById('snakePionsWrap');
-  pionsWrap.innerHTML = '';
-
-  const playerKeys = Object.keys(data.players || {});
-  
-  playerKeys.forEach((pKey, i) => {
-    const pData = data.players[pKey];
-    
-    // Element Pion Berupa Gambar Image CDN
-    const pionImg = document.createElement('img');
-    pionImg.className = `snake-pion`;
-    pionImg.id = `pion-${pKey}`;
-    pionImg.src = PION_IMAGES[i % PION_IMAGES.length];
-    pionImg.style.objectFit = 'cover';
-    
-    const coords = calculateCoords(pData.pos || 1, i);
-    pionImg.style.left = coords.left;
-    pionImg.style.top = coords.top;
-    
-    pionsWrap.appendChild(pionImg);
-  });
-
-  // UI Daftar Pemain Terhubung
-  const listWrap = document.getElementById('snakePlayersList');
-  listWrap.innerHTML = '';
-  
-  playerKeys.forEach((pKey, i) => {
-    const pData = data.players[pKey];
-    const chip = document.createElement('div');
-    chip.style.cssText = `
-      background: var(--panel-2); border: 1px solid var(--line);
-      padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;
-      color: var(--ink); display: flex; align-items: center; gap: 8px;
-    `;
-    chip.innerHTML = `<img src="${PION_IMAGES[i % PION_IMAGES.length]}" style="width:16px; height:16px; border-radius:50%; object-fit:cover;"> ${pKey.toUpperCase()} (Kotak ${pData.pos})`;
-    listWrap.appendChild(chip);
+    if (!isAnimatingLocal) {
+      Object.keys(data.players || {}).forEach(pKey => {
+        localVisualPositions[pKey] = data.players[pKey].pos || 1;
+      });
+      drawCanvasState();
+      updateSnakeControls(data);
+    }
   });
 }
 
@@ -128,64 +170,66 @@ function updateSnakeControls(data) {
   if (data.status === 'ended') {
     btnRoll.disabled = true;
     document.getElementById('snakeResult').style.display = 'block';
-    document.getElementById('snakeResult').innerHTML = `🎉 Pertandingan Selesai! Selamat untuk para Pemenang!`;
+    document.getElementById('snakeResult').innerHTML = `🎉 Pertandingan Selesai! Selamat untuk Pemenang!`;
     return;
   }
 
-  btnRoll.disabled = !(myRole === currentTurnKey && !data.isRolling);
+  btnRoll.disabled = !(myRole === currentTurnKey && !data.isRolling && !isAnimatingLocal);
+
+  // List Pemain
+  const listWrap = document.getElementById('snakePlayersList');
+  listWrap.innerHTML = '';
+  playerKeys.forEach((pKey, i) => {
+    const pData = data.players[pKey];
+    const color = PLAYER_COLORS[i % PLAYER_COLORS.length];
+    const chip = document.createElement('div');
+    chip.style.cssText = `
+      background: var(--panel-2); border: 1px solid var(--line);
+      padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+      color: var(--ink); display: flex; align-items: center; gap: 8px;
+    `;
+    chip.innerHTML = `<span style="width:12px; height:12px; border-radius:50%; background:${color.main}; border:1.5px solid #fff;"></span> ${pKey.toUpperCase()} (Kotak ${pData.pos})`;
+    listWrap.appendChild(chip);
+  });
 }
 
-// ANIMASI KELUARAN DADU & PERGERAKAN PION
-async function animatePionMovement(pKey, pIndex, startPos, diceVal) {
-  const pionEl = document.getElementById(`pion-${pKey}`);
-  if(!pionEl) return Math.min(startPos + diceVal, 100);
-
+// Animasi Langkah demi Langkah Pion
+async function animatePionMovement(pKey, startPos, diceVal) {
   let currentPos = startPos;
   
-  // 1. Bergerak Langkah Demi Langkah
   for(let i = 0; i < diceVal; i++) {
     currentPos++;
     if(currentPos > 100) { currentPos = 100; break; }
     
-    const coords = calculateCoords(currentPos, pIndex);
-    pionEl.style.left = coords.left;
-    pionEl.style.top = coords.top;
+    localVisualPositions[pKey] = currentPos;
+    drawCanvasState();
     
-    await new Promise(r => setTimeout(r, 220));
+    await new Promise(r => setTimeout(r, 260));
   }
 
-  // 2. Cek Logika Ular Tangga
+  // Cek Tangga / Ular
   const eventPoint = SNAKES_AND_LADDERS.find(s => s.start === currentPos);
   if(eventPoint) {
     await new Promise(r => setTimeout(r, 250));
     
     const isLadder = eventPoint.end > eventPoint.start;
-    
     if(isLadder) {
-      pionEl.style.transition = 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)';
-      showCustomAlert(`🚀 WAH NAIK TANGGA! Meluncur dari Kotak ${eventPoint.start} ➔ ${eventPoint.end}`);
+      showCustomAlert(`🚀 NAIK TANGGA! Meluncur ke Kotak ${eventPoint.end}`);
     } else {
-      pionEl.style.animation = 'diceRoll 0.3s ease-in-out infinite';
-      showCustomAlert(`😱 SSSTT... DIMAKAN ULAR! Jatuh dari Kotak ${eventPoint.start} ➔ ${eventPoint.end}`);
-      await new Promise(r => setTimeout(r, 400));
-      pionEl.style.animation = 'none';
-      pionEl.style.transition = 'all 0.8s ease-in-out';
+      showCustomAlert(`😱 TERMAKAN ULAR! Jatuh ke Kotak ${eventPoint.end}`);
     }
 
+    localVisualPositions[pKey] = eventPoint.end;
+    drawCanvasState();
+    await new Promise(r => setTimeout(r, 600));
     currentPos = eventPoint.end;
-    const finalCoords = calculateCoords(currentPos, pIndex);
-    pionEl.style.left = finalCoords.left;
-    pionEl.style.top = finalCoords.top;
-
-    await new Promise(r => setTimeout(r, 850));
-    pionEl.style.transition = 'all 0.4s cubic-bezier(0.25, 1, 0.5, 1)';
   }
 
   return currentPos;
 }
 
 document.getElementById('snakeBtnRoll').onclick = () => {
-  if(!roomRef) return;
+  if(!roomRef || isAnimatingLocal) return;
   const snakeRef = roomRef.child('snake');
 
   snakeRef.get().then(async snap => {
@@ -197,43 +241,94 @@ document.getElementById('snakeBtnRoll').onclick = () => {
 
     if(myRole !== currentTurnKey || data.isRolling) return;
 
-    snakeRef.update({ isRolling: true });
+    isAnimatingLocal = true;
+    document.getElementById('snakeBtnRoll').disabled = true;
 
-    await new Promise(r => setTimeout(r, 600));
+    // 1. Animasi Kocok Dadu
+    const diceBox = document.getElementById('snakeDiceBox');
+    diceBox.classList.add('rolling');
+    
+    let rollInterval = setInterval(() => {
+      diceBox.textContent = Math.floor(Math.random() * 6) + 1;
+    }, 70);
+
+    await new Promise(r => setTimeout(r, 1000));
+    clearInterval(rollInterval);
+    diceBox.classList.remove('rolling');
+
+    // 2. Angka Dadu Final
     const dice = Math.floor(Math.random() * 6) + 1;
+    diceBox.textContent = dice;
+
+    await new Promise(r => setTimeout(r, 350));
+
+    // 3. Jalankan Pergerakan Pion
     let oldPos = data.players[myRole].pos || 1;
-    const pIndex = playerKeys.indexOf(myRole);
+    let finalPos = await animatePionMovement(myRole, oldPos, dice);
 
-    let finalPos = await animatePionMovement(myRole, pIndex, oldPos, dice);
-
-    // Tabrakan Jalur Antar Pion
+    // Tabrakan Pion (Hanya menginjak pion pemain yang BELUM menang)
     playerKeys.forEach(otherKey => {
-      if(otherKey !== myRole && data.players[otherKey].pos === finalPos && finalPos < 100) {
+      if(
+        otherKey !== myRole && 
+        data.players[otherKey].pos === finalPos && 
+        finalPos < 100 && 
+        !data.players[otherKey].rank
+      ) {
         data.players[otherKey].pos = 1;
-        showCustomAlert(`💥 CRITICAL! Pion ${myRole.toUpperCase()} menginjak ${otherKey.toUpperCase()}! Target kembali ke START.`);
+        localVisualPositions[otherKey] = 1;
+        showCustomAlert(`💥 Pion ${myRole.toUpperCase()} menginjak ${otherKey.toUpperCase()}! Target kembali ke START.`);
       }
     });
 
     data.players[myRole].pos = finalPos;
 
-    let nextTurnIndex = data.turnIndex;
-    if (finalPos >= 100) {
-      data.status = 'ended';
-    } else if (dice !== 6) {
-      nextTurnIndex = (data.turnIndex + 1) % playerKeys.length;
+    // Hitung berapa pemain yang sudah selesai/menang
+    const finishedPlayers = playerKeys.filter(k => data.players[k].rank > 0);
+
+    // Jika player baru saja sampai di FINISH (kotak >= 100)
+    if (finalPos >= 100 && !data.players[myRole].rank) {
+      const nextRank = finishedPlayers.length + 1;
+      data.players[myRole].rank = nextRank;
+      showCustomAlert(`🏆 Selamat! ${myRole.toUpperCase()} berhasil Finis sebagai Juara ${nextRank}!`);
     }
 
-    snakeRef.update({
+    // Cari pemain berikutnya yang BELUM menang
+    let nextTurnIndex = data.turnIndex;
+    const totalPlayers = playerKeys.length;
+    const currentFinishedCount = playerKeys.filter(k => data.players[k].rank > 0).length;
+
+    // Game benar-benar selesai jika tersisa 1 orang saja yang belum finis
+    if (currentFinishedCount >= totalPlayers - 1) {
+      data.status = 'ended';
+    } else {
+      // Jika dapet angka 6 dan BELUM menang, dapat giliran lagi. Jika tidak, oper ke pemain aktif berikutnya
+      if (dice !== 6 || finalPos >= 100) {
+        do {
+          nextTurnIndex = (nextTurnIndex + 1) % totalPlayers;
+        } while (data.players[playerKeys[nextTurnIndex]].rank > 0); // Skip pemain yang sudah finis
+      }
+    }
+
+    // 4. Update Database Realtime
+    await snakeRef.update({
       players: data.players,
       lastDice: dice,
       isRolling: false,
       turnIndex: nextTurnIndex,
       status: data.status || 'playing'
     });
+
+    isAnimatingLocal = false;
+    drawCanvasState();
   });
 };
+;
 
+// HANDLER TOMBOL KEMBALI KEMBALI DIBETULKAN
 document.getElementById('btnSnakeBack').onclick = () => {
-  if(snakeUnsub) snakeUnsub();
+  if(snakeUnsub) {
+    snakeUnsub();
+    snakeUnsub = null;
+  }
   showScreen('startScreen');
 };

@@ -487,9 +487,13 @@ canvas { width: 100%; height: 100%; display: block; }
     </div>
     <div class="g-status" id="snakeStatus">-</div>
 
-    <div class="snake-board-container" id="snakeBoardArea">
-      <img id="snakeBoardBg" src="https://i.pinimg.com/originals/2f/68/a7/2f68a7e1eee18556b055418f7305b3c0.jpg" alt="Board Ular Tangga">
-      <div id="snakePionsWrap"></div>
+    <!-- KONTAINER PAPAN GAMBAR & CANVAS PION -->
+    <div class="snake-board-container" id="snakeBoardArea" style="position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; border-radius: 14px; overflow: hidden; border: 2px solid var(--line);">
+      <!-- Background Gambar Asli Papan Ular Tangga -->
+      <img id="snakeBoardBg" src="https://i.pinimg.com/originals/2f/68/a7/2f68a7e1eee18556b055418f7305b3c0.jpg" alt="Board Ular Tangga" style="position: absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:1;">
+      
+      <!-- Canvas Layer Khusus Pion -->
+      <canvas id="snakeCanvas" width="800" height="800" style="position: absolute; top:0; left:0; width: 100%; height: 100%; display: block; z-index:2;"></canvas>
     </div>
 
     <div class="dice-animation-wrap">
@@ -503,6 +507,8 @@ canvas { width: 100%; height: 100%; display: block; }
     </div>
 
     <div class="capsa-result" id="snakeResult" style="display:none;"></div>
+    
+    <!-- TOMBOL KEMBALI KEMBALI AKTIF -->
     <button class="btn-menu btn-back" id="btnSnakeBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
   </div>
 
