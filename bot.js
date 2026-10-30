@@ -1,14 +1,12 @@
 // ======================================================
 // bot.js — Single-player mode: bot menggantikan pemain lain
-// Game: Catur, TTT, Poker, Uno, Ular Tangga
-// (Monopoli tetap maintenance)
+// FIXED: Uno stacking penalty draw & Capsa anti-stuck
 // ======================================================
 
 let botActiveRoles = [];
 const botTimers = {};
 const botPresenceRefs = {};
 
-// Handlers disimpan agar bisa di-off saat re-enter
 let chessBotHandler = null;
 let tttBotHandler = null;
 let snakeBotHandler = null;
@@ -17,27 +15,19 @@ let pokerBotHandler = null;
 
 function cleanupBotListeners() {
   try {
-    if (chessBotHandler && roomRef) {
-      roomRef.child('state').off('value', chessBotHandler);
-      chessBotHandler = null;
-    }
-    if (tttBotHandler && roomRef) {
-      roomRef.child('state').off('value', tttBotHandler);
-      tttBotHandler = null;
-    }
-    if (snakeBotHandler && roomRef) {
-      roomRef.child('snake').off('value', snakeBotHandler);
-      snakeBotHandler = null;
-    }
-    if (unoBotHandler && roomRef) {
-      roomRef.child('uno').off('value', unoBotHandler);
-      unoBotHandler = null;
-    }
-    if (pokerBotHandler && roomRef) {
-      roomRef.child('poker').off('value', pokerBotHandler);
-      pokerBotHandler = null;
-    }
+    if (chessBotHandler && roomRef) roomRef.child('state').off('value', chessBotHandler);
+    if (tttBotHandler && roomRef) roomRef.child('state').off('value', tttBotHandler);
+    if (snakeBotHandler && roomRef) roomRef.child('snake').off('value', snakeBotHandler);
+    if (unoBotHandler && roomRef) roomRef.child('uno').off('value', unoBotHandler);
+    if (pokerBotHandler && roomRef) roomRef.child('poker').off('value', pokerBotHandler);
   } catch(e) {}
+  
+  chessBotHandler = null;
+  tttBotHandler = null;
+  snakeBotHandler = null;
+  unoBotHandler = null;
+  pokerBotHandler = null;
+
   Object.keys(botTimers).forEach(k => {
     if (botTimers[k]) { clearTimeout(botTimers[k]); botTimers[k] = null; }
   });
@@ -60,14 +50,12 @@ function startBotForCurrentGame() {
     const maxP = window.snakeSelectedMaxPlayers || 2;
     botRoles = ['p2','p3','p4','p5','p6','p7'].slice(0, maxP - 1);
   } else {
-    console.warn('[bot] game tidak didukung mode bot:', game);
     return;
   }
 
   botActiveRoles = botRoles;
   cleanupBotListeners();
 
-  // Daftarkan presence semua bot
   botRoles.forEach(r => {
     const ref = roomRef.child('presence/' + r);
     ref.set(true);
@@ -85,7 +73,7 @@ function startBotForCurrentGame() {
 }
 
 // ============================================================
-// ♟ CATUR BOT — Minimax depth 2 (total) + alpha-beta
+// ♟ CATUR BOT
 // ============================================================
 const CHESS_VAL = { p:100, n:320, b:330, r:500, q:900, k:20000 };
 
@@ -160,7 +148,7 @@ function makeChessBotMove(data) {
   };
 
   const moves = chessAllLegalMoves(board, state, 'b');
-  if (moves.length === 0) return; // sudah dikirim sebagai checkmate/stalemate oleh player
+  if (moves.length === 0) return;
 
   let bestScore = Infinity;
   let bestMove = null;
@@ -168,15 +156,10 @@ function makeChessBotMove(data) {
 
   for (const m of moves) {
     const res = chessApplyMove(board, state, m, m.promotion ? 'q' : null);
-    // depth tambahan 1 → total 2 ply (bot→opponent)
     const score = chessBotMinimax(
       res.board,
       { castling: res.castling, ep: res.ep, halfmove: res.halfmove },
-      1,
-      'w',
-      'b',
-      -Infinity,
-      Infinity
+      1, 'w', 'b', -Infinity, Infinity
     );
     if (score < bestScore) { bestScore = score; bestMove = m; }
   }
@@ -195,12 +178,10 @@ function makeChessBotMove(data) {
     turnStartAt: null
   });
 
-  // ✅ FIX: cek game over setelah bot move
   chessBotPostMoveCheck(res.board, res);
 }
 
 function chessBotPostMoveCheck(board, res) {
-  // Cek player putih masih punya legal move?
   const legalWhite = chessAllLegalMoves(board, { castling: res.castling, ep: res.ep }, 'w');
   if (legalWhite.length === 0) {
     if (chessIsInCheck(board, 'w')) {
@@ -220,7 +201,7 @@ function chessBotPostMoveCheck(board, res) {
 }
 
 // ============================================================
-// ⭕ TTT BOT — Minimax sempurna
+// ⭕ TTT BOT
 // ============================================================
 function tttBotMinimax(board, isMax) {
   const result = tttEval(board);
@@ -277,7 +258,7 @@ function startTTTBot() {
 }
 
 // ============================================================
-// 🐍 SNAKE BOT — auto-roll
+// 🐍 SNAKE BOT
 // ============================================================
 function startSnakeBot() {
   const snakeRef = roomRef.child('snake');
@@ -347,7 +328,7 @@ function snakeBotRoll(snakeRef, botKey) {
 }
 
 // ============================================================
-// 🎴 UNO BOT
+// 🎴 UNO BOT (FIXED: Wajib ambil penalti stack)
 // ============================================================
 function startUnoBot() {
   const unoRef = roomRef.child('uno');
@@ -405,6 +386,18 @@ function unoBotMove(unoRef, botKey) {
     });
 
     if (valid.length === 0) {
+      // 🛠️ FIX BUG UNO: Jika ada Stacking dan tidak punya penawar, WAJIB ambil semuanya!
+      if (s.drawStack > 0) {
+        const drawn = drawUnoCards(s, s.drawStack);
+        s.hands[botKey] = [...hand, ...drawn];
+        s.drawStack = 0;
+        s.hasDrawn = false;
+        s.turn = nextUnoTurn(s, 1);
+        s.lastActionText = `📥 ${botKey.toUpperCase()} terpaksa mengambil penalti +${drawn.length} kartu.`;
+        return s;
+      }
+
+      // Logika draw normal (tanpa stack)
       if (s.hasDrawn) {
         s.hasDrawn = false;
         s.turn = nextUnoTurn(s, 1);
@@ -413,11 +406,12 @@ function unoBotMove(unoRef, botKey) {
         const drawn = drawUnoCards(s, 1);
         s.hands[botKey] = [...hand, ...drawn];
         s.hasDrawn = true;
-        s.lastActionText = `📥 ${botKey.toUpperCase()} ambil kartu.`;
+        s.lastActionText = `📥 ${botKey.toUpperCase()} ambil 1 kartu.`;
       }
       return s;
     }
 
+    // Bot memilih kartu untuk dibuang (Prioritas: Draw4 > Draw2 > Skip > Reverse > Wild > Angka)
     const prio = c => c.value === 'draw4' ? 5 : c.value === 'draw2' ? 4
                    : c.value === 'skip' ? 3 : c.value === 'reverse' ? 2
                    : c.color === 'wild' ? 0 : 1;
@@ -473,7 +467,7 @@ function unoBotMove(unoRef, botKey) {
 }
 
 // ============================================================
-// 🃏 POKER BOT
+// 🃏 POKER (CAPSA) BOT
 // ============================================================
 function pokerCombinations(arr, k) {
   const out = [];
@@ -521,7 +515,24 @@ function pokerBotMove(pokerRef, botKey) {
 
     if (s.isFirstPlay) {
       const threeD = hand.find(c => c.rank === '03' && c.suit === 'd');
-      if (!threeD) return cur;
+      if (!threeD) {
+        // FALLBACK: Kalau nggak punya 3♦ (bug), buang kartu terkecil biar gak stuck
+        if (hand.length > 0) {
+          const sorted = sortCards(hand);
+          const chosenCard = sorted[0];
+          const combo = detectCombo([chosenCard]);
+          s.hands[botKey] = removeCards(hand, [chosenCard]);
+          s.lastPlay = { by: botKey, cards: [chosenCard], combo };
+          s.lastPlayer = botKey;
+          s.passCount = 0;
+          s.isFirstPlay = false;
+          s.lastActionText = comboDisplayName(combo);
+          s.turn = nextActiveRole(botKey, s.finished || []);
+          return s;
+        }
+        return cur;
+      }
+      
       const combo = detectCombo([threeD]);
       s.hands[botKey] = removeCards(hand, [threeD]);
       s.lastPlay = { by: botKey, cards: [threeD], combo };

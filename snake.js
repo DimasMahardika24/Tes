@@ -1,6 +1,6 @@
 // ======================================================
 // snake.js — Hybrid Board (Image Background + Canvas Pawn)
-// Animasi Dadu Monopoli Modern + Suara Step Pion
+// Fixed: Back button error & unsubscription
 // ======================================================
 
 const SNAKES_AND_LADDERS = [
@@ -10,23 +10,22 @@ const SNAKES_AND_LADDERS = [
   { start: 91, end: 72 },  { start: 97, end: 78 }
 ];
 
-// Warna Pion Vektor 3D
 const PLAYER_COLORS = [
-  { main: '#ef4444', dark: '#991b1b', light: '#fca5a5' }, // Merah
-  { main: '#3b82f6', dark: '#1e40af', light: '#93c5fd' }, // Biru
-  { main: '#eab308', dark: '#854d0e', light: '#fef08a' }, // Kuning
-  { main: '#10b981', dark: '#065f46', light: '#6ee7b7' }, // Hijau
-  { main: '#a855f7', dark: '#6b21a8', light: '#d8b4fe' }, // Ungu
-  { main: '#f97316', dark: '#9a3412', light: '#fdba74' }, // Orange
-  { main: '#ec4899', dark: '#9d174d', light: '#fbcfe8' }  // Pink
+  { main: '#ef4444', dark: '#991b1b', light: '#fca5a5' },
+  { main: '#3b82f6', dark: '#1e40af', light: '#93c5fd' },
+  { main: '#eab308', dark: '#854d0e', light: '#fef08a' },
+  { main: '#10b981', dark: '#065f46', light: '#6ee7b7' },
+  { main: '#a855f7', dark: '#6b21a8', light: '#d8b4fe' },
+  { main: '#f97316', dark: '#9a3412', light: '#fdba74' },
+  { main: '#ec4899', dark: '#9d174d', light: '#fbcfe8' }
 ];
 
 let snakeUnsub = null;
+let snakeRefGlobal = null;
 let isAnimatingLocal = false;
 let currentGameState = null;
 let localVisualPositions = {};
 
-// SIFAT SOUND ENGINE (Menggunakan Web Audio API dari Monopoli Engine)
 let audioCtxSnake = null;
 function getSnakeAudioContext() {
   if (!audioCtxSnake) {
@@ -62,12 +61,9 @@ function getCanvasContext() {
   return canvas ? canvas.getContext('2d') : null;
 }
 
-// Menghitung Posisi Koordinat Pixel Pion pada Canvas (800x800)
 function getBoardCoordinates(pos, playerIndex) {
   const row = Math.floor((pos - 1) / 10);
   const col = (pos - 1) % 10;
-  
-  // Posisi Papan Zig-Zag
   const actualCol = (row % 2 === 0) ? col : (9 - col);
   const actualRow = 9 - row;
 
@@ -75,7 +71,6 @@ function getBoardCoordinates(pos, playerIndex) {
   const baseX = actualCol * tileSize + tileSize / 2;
   const baseY = actualRow * tileSize + tileSize / 2;
 
-  // Offset mikro jika bertumpuk di kotak yang sama
   const offsets = [
     { x: -12, y: -12 }, { x: 12, y: 12 }, { x: -12, y: 12 },
     { x: 12, y: -12 }, { x: 0, y: -16 }, { x: 0, y: 16 }, { x: 0, y: 0 }
@@ -85,14 +80,11 @@ function getBoardCoordinates(pos, playerIndex) {
   return { x: baseX + offset.x, y: baseY + offset.y };
 }
 
-// Render Canvas Layer (Pion + Efek Canvas)
 function drawCanvasState() {
   const ctx = getCanvasContext();
   if (!ctx) return;
 
-  // Clear layar transparan canvas
   ctx.clearRect(0, 0, 800, 800);
-
   if (!currentGameState || !currentGameState.players) return;
 
   const playerKeys = Object.keys(currentGameState.players);
@@ -104,13 +96,11 @@ function drawCanvasState() {
 
     ctx.save();
 
-    // Bayangan Pion
     ctx.beginPath();
     ctx.ellipse(coords.x, coords.y + 14, 18, 8, 0, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.fill();
 
-    // Gradien Bola 3D Glossy
     const gradient = ctx.createRadialGradient(
       coords.x - 6, coords.y - 8, 2,
       coords.x, coords.y, 22
@@ -119,7 +109,6 @@ function drawCanvasState() {
     gradient.addColorStop(0.4, color.main);
     gradient.addColorStop(1, color.dark);
 
-    // Bodi Pion Token
     ctx.beginPath();
     ctx.arc(coords.x, coords.y, 22, 0, Math.PI * 2);
     ctx.fillStyle = gradient;
@@ -128,7 +117,6 @@ function drawCanvasState() {
     ctx.strokeStyle = '#ffffff';
     ctx.stroke();
 
-    // Teks ID Pemain (P1, P2)
     ctx.fillStyle = '#ffffff';
     ctx.font = '700 14px "Space Grotesk", sans-serif';
     ctx.textAlign = 'center';
@@ -146,17 +134,17 @@ function initSnake() {
   document.getElementById('snakeRoleTag').textContent = myRole.toUpperCase();
   setupPresence('snakeStatus', roomIdGlobal);
 
-  const snakeRef = roomRef.child('snake');
+  snakeRefGlobal = roomRef.child('snake');
 
   if(myRole === 'p1') {
-    snakeRef.get().then(snap => {
+    snakeRefGlobal.get().then(snap => {
       if(!snap.exists()) {
         const maxP = window.snakeSelectedMaxPlayers || 2;
         const initPlayers = {};
         for(let i = 1; i <= maxP; i++) {
           initPlayers[`p${i}`] = { pos: 1, rank: 0 };
         }
-        snakeRef.set({
+        snakeRefGlobal.set({
           maxPlayers: maxP,
           turnIndex: 0,
           isRolling: false,
@@ -168,8 +156,12 @@ function initSnake() {
     });
   }
 
-  if(snakeUnsub) snakeUnsub();
-  snakeUnsub = snakeRef.on('value', snap => {
+  if(snakeUnsub) {
+    snakeRefGlobal.off('value', snakeUnsub);
+    snakeUnsub = null;
+  }
+
+  snakeUnsub = snakeRefGlobal.on('value', snap => {
     const data = snap.val();
     if(!data) return;
 
@@ -208,7 +200,6 @@ function updateSnakeControls(data) {
 
   btnRoll.disabled = !(myRole === currentTurnKey && !data.isRolling && !isAnimatingLocal);
 
-  // List Pemain
   const listWrap = document.getElementById('snakePlayersList');
   listWrap.innerHTML = '';
   playerKeys.forEach((pKey, i) => {
@@ -227,7 +218,6 @@ function updateSnakeControls(data) {
   });
 }
 
-// Animasi Langkah demi Langkah Pion di Canvas
 async function animatePionMovement(pKey, startPos, diceVal) {
   let currentPos = startPos;
   
@@ -237,12 +227,11 @@ async function animatePionMovement(pKey, startPos, diceVal) {
     
     localVisualPositions[pKey] = currentPos;
     drawCanvasState();
-    playSnakeStepSound(); // Efek suara per langkah
+    playSnakeStepSound(); 
     
     await new Promise(r => setTimeout(r, 260));
   }
 
-  // Cek Tangga / Ular
   const eventPoint = SNAKES_AND_LADDERS.find(s => s.start === currentPos);
   if(eventPoint) {
     await new Promise(r => setTimeout(r, 250));
@@ -265,11 +254,10 @@ async function animatePionMovement(pKey, startPos, diceVal) {
 }
 
 document.getElementById('snakeBtnRoll').onclick = () => {
-  if(!roomRef || isAnimatingLocal) return;
+  if(!snakeRefGlobal || isAnimatingLocal) return;
   getSnakeAudioContext();
-  const snakeRef = roomRef.child('snake');
 
-  snakeRef.get().then(async snap => {
+  snakeRefGlobal.get().then(async snap => {
     const data = snap.val();
     if(!data) return;
 
@@ -281,9 +269,6 @@ document.getElementById('snakeBtnRoll').onclick = () => {
     isAnimatingLocal = true;
     document.getElementById('snakeBtnRoll').disabled = true;
 
-    // ==========================================
-    // 1. ANIMASI DADU MONOPOLI (POP-OUT & SPIN)
-    // ==========================================
     const diceBox = document.getElementById('snakeDiceBox');
     diceBox.style.transition = 'transform 0.1s ease, box-shadow 0.1s ease';
     diceBox.style.transform = 'scale(1.4) rotate(15deg)';
@@ -295,47 +280,30 @@ document.getElementById('snakeBtnRoll').onclick = () => {
     const rollInterval = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(1, elapsed / duration);
-      
-      // Rotasi acak dadu
       const rot = Math.floor(Math.random() * 360);
       const randomDice = Math.floor(Math.random() * 6) + 1;
       
       diceBox.style.transform = `scale(${1.4 - progress * 0.4}) rotate(${rot}deg)`;
       diceBox.textContent = randomDice;
 
-      if (elapsed >= duration) {
-        clearInterval(rollInterval);
-      }
+      if (elapsed >= duration) clearInterval(rollInterval);
     }, 60);
 
     await new Promise(r => setTimeout(r, duration));
 
-    // Reset style dadu ke kondisi normal
     diceBox.style.transform = 'scale(1) rotate(0deg)';
     diceBox.style.boxShadow = '0 6px 14px rgba(0,0,0,0.4)';
 
-    // ==========================================
-    // 2. DAPATKAN HASIL DADU FINAL
-    // ==========================================
     const dice = Math.floor(Math.random() * 6) + 1;
     diceBox.textContent = dice;
 
     await new Promise(r => setTimeout(r, 350));
 
-    // ==========================================
-    // 3. JALANKAN PERGERAKAN PION
-    // ==========================================
     let oldPos = data.players[myRole].pos || 1;
     let finalPos = await animatePionMovement(myRole, oldPos, dice);
 
-    // Tabrakan Pion (Hanya menginjak pion pemain yang BELUM menang)
     playerKeys.forEach(otherKey => {
-      if(
-        otherKey !== myRole && 
-        data.players[otherKey].pos === finalPos && 
-        finalPos < 100 && 
-        !data.players[otherKey].rank
-      ) {
+      if(otherKey !== myRole && data.players[otherKey].pos === finalPos && finalPos < 100 && !data.players[otherKey].rank) {
         data.players[otherKey].pos = 1;
         localVisualPositions[otherKey] = 1;
         showCustomAlert(`💥 Pion ${myRole.toUpperCase()} menginjak ${otherKey.toUpperCase()}! Target kembali ke START.`);
@@ -344,10 +312,8 @@ document.getElementById('snakeBtnRoll').onclick = () => {
 
     data.players[myRole].pos = finalPos;
 
-    // Hitung pemain yang sudah selesai
     const finishedPlayers = playerKeys.filter(k => data.players[k].rank > 0);
 
-    // Jika player baru saja sampai di FINISH
     if (finalPos >= 100 && !data.players[myRole].rank) {
       const nextRank = finishedPlayers.length + 1;
       data.players[myRole].rank = nextRank;
@@ -357,25 +323,19 @@ document.getElementById('snakeBtnRoll').onclick = () => {
     const currentFinishedCount = playerKeys.filter(k => data.players[k].rank > 0).length;
     let nextTurnIndex = data.turnIndex;
 
-    // Game selesai jika tersisa 1 orang saja yang belum finis
     if (currentFinishedCount >= playerKeys.length - 1) {
       data.status = 'ended';
     } else {
-      // LOGIKA DADU 6: Boleh lempar dadu lagi jika dapet 6 dan belum finis
       if (dice === 6 && finalPos < 100) {
         nextTurnIndex = data.turnIndex;
         showCustomAlert(`🎲 HOKI! Dapat Dadu 6, ${myRole.toUpperCase()} Lempar Lagi!`);
       } else {
-        do {
-          nextTurnIndex = (nextTurnIndex + 1) % playerKeys.length;
-        } while (data.players[playerKeys[nextTurnIndex]].rank > 0);
+        do { nextTurnIndex = (nextTurnIndex + 1) % playerKeys.length; } 
+        while (data.players[playerKeys[nextTurnIndex]].rank > 0);
       }
     }
 
-    // ==========================================
-    // 4. UPDATE DATABASE REALTIME
-    // ==========================================
-    await snakeRef.update({
+    await snakeRefGlobal.update({
       players: data.players,
       lastDice: dice,
       isRolling: false,
@@ -389,20 +349,26 @@ document.getElementById('snakeBtnRoll').onclick = () => {
   });
 };
 
+// 🛠️ FIX: Unsubscribe yang benar & hapus listener bot
 document.getElementById('btnSnakeBack').onclick = () => {
-  // 1. Unsubscribe listener Firebase Snake
-  if (snakeUnsub) {
-    snakeUnsub();
+  // 1. Matikan listener dengan benar
+  if (snakeRefGlobal && snakeUnsub) {
+    snakeRefGlobal.off('value', snakeUnsub);
     snakeUnsub = null;
   }
 
-  // 2. Lepaskan Presence Multiplayer di Firebase
+  // 2. Matikan listener Bot jika dalam mode bot
+  if (typeof cleanupBotListeners === 'function') {
+    cleanupBotListeners();
+  }
+
+  // 3. Hapus presence
   if (activePresenceRef) {
     activePresenceRef.remove();
     activePresenceRef = null;
   }
 
-  // 3. Jika P1 yang keluar saat di lobby/room, hapus data room publik
+  // 4. Hapus room jika kita host (P1)
   if (roomRef && myRole === 'p1') {
     roomRef.child('snake').remove().catch(() => {});
     if (roomIdGlobal) {
@@ -410,7 +376,6 @@ document.getElementById('btnSnakeBack').onclick = () => {
     }
   }
 
-  // 4. Bersihkan Session Storage & Variable Global Game Hub
   clearSession();
   hideRoomBadge();
   currentGame = null;
@@ -418,6 +383,5 @@ document.getElementById('btnSnakeBack').onclick = () => {
   roomIdGlobal = null;
   roomRef = null;
 
-  // 5. Kembali ke Layar Utama
   showScreen('startScreen');
 };
