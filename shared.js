@@ -8,6 +8,36 @@ const firebaseConfig = {
 if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const dbRoot = firebase.database();
 
+// ======================================================
+// AUTO-CLEANUP: hapus SEMUA data room yang umurnya > 1 hari
+// (rooms + publicRooms, termasuk sisa data tanpa tanggal/yatim)
+// ======================================================
+const DATA_TTL_MS = 24 * 60 * 60 * 1000;      // 1 hari
+const CLEANUP_EVERY_MS = 30 * 60 * 1000;      // cek ulang tiap 30 menit
+
+function cleanupOldData(){
+  const cutoff = Date.now() - DATA_TTL_MS;
+  const targets = [
+    { path: 'rooms',       key: 'created'   },
+    { path: 'publicRooms', key: 'createdAt' }
+  ];
+  targets.forEach(t => {
+    dbRoot.ref(t.path).orderByChild(t.key).endAt(cutoff).once('value')
+      .then(snap => {
+        if(!snap.exists()) return;
+        const updates = {};
+        snap.forEach(child => { updates[t.path + '/' + child.key] = null; });
+        const n = Object.keys(updates).length;
+        return dbRoot.ref().update(updates).then(() => {
+          console.log('[cleanup] ' + t.path + ': ' + n + ' data lama dihapus');
+        });
+      })
+      .catch(err => console.warn('[cleanup] ' + t.path + ' gagal:', err && err.message));
+  });
+}
+cleanupOldData();
+setInterval(cleanupOldData, CLEANUP_EVERY_MS);
+
 // HELPER: POP-UP CUSTOM ALERT MODERN
 function showCustomAlert(text, title = "⚠️ Pemberitahuan") {
   document.getElementById('customAlertTitle').textContent = title;
