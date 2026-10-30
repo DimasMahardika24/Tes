@@ -2,6 +2,9 @@
 // shared.js — Logic bersama semua game (Game Hub 2P Realtime)
 // ======================================================
 
+// 🆕 Flag global: mode bot aktif atau tidak
+window.isBotMode = false;
+
 const firebaseConfig = {
   databaseURL: "https://tester-b643b-default-rtdb.firebaseio.com/"
 };
@@ -10,10 +13,9 @@ const dbRoot = firebase.database();
 
 // ======================================================
 // AUTO-CLEANUP: hapus SEMUA data room yang umurnya > 1 hari
-// (rooms + publicRooms, termasuk sisa data tanpa tanggal/yatim)
 // ======================================================
-const DATA_TTL_MS = 24 * 60 * 60 * 1000;      // 1 hari
-const CLEANUP_EVERY_MS = 30 * 60 * 1000;      // cek ulang tiap 30 menit
+const DATA_TTL_MS = 24 * 60 * 60 * 1000;
+const CLEANUP_EVERY_MS = 30 * 60 * 1000;
 
 function cleanupOldData(){
   const cutoff = Date.now() - DATA_TTL_MS;
@@ -79,11 +81,11 @@ function showScreen(id){
   document.getElementById(id).classList.add('active');
 }
 
-let currentGame = null;   
-let myRole = null;        
+let currentGame = null;
+let myRole = null;
 let roomRef = null;
 let roomIdGlobal = null;
-let chessTimeControl = 0; 
+let chessTimeControl = 0;
 
 let pendingJoinRoomId = null;
 let pendingRoomPass = null;
@@ -132,12 +134,23 @@ const gameMeta = {
   snake:    { title: '🐍 Ular Tangga Board', screen: 'snakeScreen' }
 };
 
+// 🛡️ HANDLER PEMILIHAN GAME (dengan guard maintenance + skip time di bot mode)
 document.querySelectorAll('#gamePickScreen .btn-menu[data-game]').forEach(btn => {
   btn.onclick = () => {
+    // Guard: cegah akses game yang sedang maintenance walau class 'disabled' dihapus manual
+    if(btn.classList.contains('disabled') || btn.dataset.game === 'monopoli'){
+      showCustomAlert('Game ini sedang dalam pemeliharaan.', '🔒 Maintenance');
+      return;
+    }
     currentGame = btn.dataset.game;
     myRole = 'p1';
     if(currentGame === 'chess'){
-      showScreen('chessTimeScreen');
+      if(window.isBotMode){
+        chessTimeControl = 0;   // bot mode = tanpa jam
+        proceedCreateRoom();
+      } else {
+        showScreen('chessTimeScreen');
+      }
     } else if(currentGame === 'uno'){
       showScreen('unoPlayerCountScreen');
     } else if(currentGame === 'monopoli'){
@@ -167,7 +180,15 @@ document.querySelectorAll('#snakePlayerCountScreen .btn-menu[data-snake-players]
 });
 document.getElementById('btnSnakeCountBack').onclick = () => showScreen('gamePickScreen');
 
-document.getElementById('btnGoCreate').onclick = () => showScreen('gamePickScreen');
+// 🆕 Handler tombol utama
+document.getElementById('btnGoCreate').onclick = () => {
+  window.isBotMode = false;
+  showScreen('gamePickScreen');
+};
+document.getElementById('btnGoBot').onclick = () => {
+  window.isBotMode = true;
+  showScreen('gamePickScreen');
+};
 document.getElementById('btnGoJoin').onclick = () => showScreen('joinScreen');
 document.getElementById('btnGamePickBack').onclick = () => showScreen('startScreen');
 document.getElementById('btnJoinBack').onclick = () => showScreen('startScreen');
@@ -200,7 +221,7 @@ function executeCreateRoom(){
   function tryCreateRoom(attemptsLeft){
     const roomId = Math.floor(100000 + Math.random() * 900000).toString();
     const candidateRef = dbRoot.ref('rooms/' + roomId);
-    
+
     let maxP = 2;
     if(currentGame === 'poker') maxP = 4;
     if(currentGame === 'uno') maxP = window.unoSelectedMaxPlayers || 4;
@@ -209,11 +230,11 @@ function executeCreateRoom(){
 
     candidateRef.transaction(
       (current) => (current === null
-        ? { 
-            created: Date.now(), 
-            game: currentGame, 
-            mapSeed: Math.floor(Math.random() * 1e9), 
-            timeControl: chessTimeControl,
+        ? {
+            created: Date.now(),
+            game: currentGame,
+            mapSeed: Math.floor(Math.random() * 1e9),
+            timeControl: window.isBotMode ? 0 : chessTimeControl,   // 🆕 bot mode = no clock
             maxPlayers: maxP
           }
         : undefined),
@@ -225,6 +246,14 @@ function executeCreateRoom(){
         }
         roomIdGlobal = roomId;
         roomRef = candidateRef;
+
+        // 🤖 Bot mode: langsung masuk game, skip created screen & publicRooms
+        if(window.isBotMode){
+          hideRoomBadge();
+          safeDelay(() => enterGame(), 300);
+          return;
+        }
+
         showRoomBadge(roomId);
 
         const pubRef = dbRoot.ref('publicRooms/' + roomId);
@@ -279,7 +308,15 @@ function fetchOnlineRooms() {
   const listContainer = document.getElementById('onlineRoomList');
   listContainer.innerHTML = '<div style="text-align:center; color:var(--ink-dim); font-size:13px; padding:20px;">Memuat daftar room...</div>';
 
+  const errHtml = (msg) => '<div style="text-align:center; color:#ff6b6b; font-size:13px; padding:20px;">' + msg + '</div>';
+  let loaded = false;
+  const slowTimer = setTimeout(() => {
+    if(!loaded) listContainer.innerHTML = errHtml('Koneksi ke database lambat / gagal. Cek internet atau Rules Firebase, lalu coba lagi.');
+  }, 10000);
+
   dbRoot.ref('publicRooms').once('value', snap => {
+    loaded = true;
+    clearTimeout(slowTimer);
     const rooms = snap.val();
     listContainer.innerHTML = '';
 
@@ -290,7 +327,7 @@ function fetchOnlineRooms() {
 
     Object.keys(rooms).forEach(roomId => {
       const info = rooms[roomId];
-      
+
       dbRoot.ref(`rooms/${roomId}/presence`).once('value', presSnap => {
         const presence = presSnap.val() || {};
         const onlineCount = Object.keys(presence).length;
@@ -312,6 +349,11 @@ function fetchOnlineRooms() {
         listContainer.appendChild(card);
       });
     });
+  }, err => {
+    loaded = true;
+    clearTimeout(slowTimer);
+    console.error('[fetchOnlineRooms]', err);
+    listContainer.innerHTML = errHtml('Gagal memuat room: ' + (err && err.message ? err.message : 'tidak diketahui'));
   });
 }
 
@@ -502,6 +544,11 @@ function enterGame(){
     if(currentGame === 'uno') initUno();
     if(currentGame === 'monopoli') initMonopoli();
     if(currentGame === 'snake') initSnake();
+
+    // 🤖 HOOK BOT MODE: aktifkan setelah state game ready
+    if(window.isBotMode && typeof startBotForCurrentGame === 'function'){
+      setTimeout(() => startBotForCurrentGame(), 2000);
+    }
   }, 50);
 }
 
@@ -511,7 +558,8 @@ let pendingResumeCoin = 0;
 function saveSession(){
   try{
     localStorage.setItem(SESSION_KEY, JSON.stringify({
-      roomId: roomIdGlobal, game: currentGame, role: myRole, coin: 0
+      roomId: roomIdGlobal, game: currentGame, role: myRole, coin: 0,
+      isBotMode: !!window.isBotMode   // 🆕 persist flag
     }));
   }catch(e){}
 }
@@ -559,8 +607,9 @@ document.getElementById('btnResumeContinue').onclick = () => {
     currentGame = pendingSession.game;
     myRole = pendingSession.role;
     roomIdGlobal = pendingSession.roomId;
+    window.isBotMode = !!pendingSession.isBotMode;  // 🆕 restore
     roomRef = dbRoot.ref('rooms/' + pendingSession.roomId);
-    showRoomBadge(pendingSession.roomId);
+    if(!window.isBotMode) showRoomBadge(pendingSession.roomId);
     enterGame();
   }).catch(() => {
     btn.disabled = false;
@@ -571,7 +620,7 @@ document.getElementById('btnResumeContinue').onclick = () => {
 
 history.pushState({ghub:true}, '', location.href);
 window.addEventListener('popstate', () => {
-  if(!currentGame) return; 
+  if(!currentGame) return;
   showCustomConfirm(
     'Keluar dari game? Kamu bisa lanjut lagi nanti lewat "Lanjutkan Room".',
     () => { location.reload(); },
@@ -611,7 +660,7 @@ function setupPresence(statusElId, roomLabel, onPresenceChange) {
   roomRef.child('presence').on('value', (snap) => {
     const presenceData = snap.val() || {};
     const statusEl = document.getElementById(statusElId);
-    
+
     if (statusEl) {
       const onlineRoles = Object.keys(presenceData);
       if (onlineRoles.length > 1) {
