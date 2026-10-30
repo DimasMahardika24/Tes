@@ -1,5 +1,5 @@
 // ======================================================
-// bot.js — Single-player mode (Fixed Capsa Array Bug + Difficulty)
+// bot.js — Single-player mode (Uno & Snake tanpa Difficulty)
 // ======================================================
 
 let botActiveRoles = [];
@@ -63,38 +63,51 @@ function startBotForCurrentGame() {
 }
 
 // ============================================================
-// ♟ CATUR BOT (Ada Mode Difficulty)
+// ♟ CATUR BOT
 // ============================================================
-const CHESS_VAL = { p:100, n:320, b:330, r:500, q:900, k:20000 };
-
 function chessBotEval(board) {
   let score = 0;
-  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
-    const p = board[y][x];
-    if (!p) continue;
-    const v = CHESS_VAL[p.toLowerCase()] || 0;
-    score += chessColorOf(p) === 'w' ? v : -v;
+  const vals = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+  const pst = {
+    p: [[0,0,0,0,0,0,0,0],[50,50,50,50,50,50,50,50],[10,10,20,30,30,20,10,10],[5,5,10,25,25,10,5,5],[0,0,0,20,20,0,0,0],[5,-5,-10,0,0,-10,-5,5],[5,10,10,-20,-20,10,10,5],[0,0,0,0,0,0,0,0]],
+    n: [[-50,-40,-30,-30,-30,-30,-40,-50],[-40,-20,0,0,0,0,-20,-40],[-30,0,10,15,15,10,0,-30],[-30,5,15,20,20,15,5,-30],[-30,0,15,20,20,15,0,-30],[-30,5,10,15,15,10,5,-30],[-40,-20,0,5,5,0,-20,-40],[-50,-40,-30,-30,-30,-30,-40,-50]]
+  };
+
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 8; x++) {
+      const p = board[y][x];
+      if (!p) continue;
+      const type = p.toLowerCase();
+      const isWhite = p === p.toUpperCase();
+      let val = vals[type] || 0;
+      if (pst[type]) {
+        const py = isWhite ? y : 7 - y;
+        val += pst[type][py][x];
+      }
+      score += isWhite ? val : -val;
+    }
   }
   return score;
 }
 
-function chessBotMinimax(board, state, depth, side, botColor, alpha, beta) {
+function chessBotMinimax(board, state, depth, side, alpha, beta) {
   const moves = chessAllLegalMoves(board, state, side);
   if (moves.length === 0) {
-    if (chessIsInCheck(board, side)) return side === botColor ? -99999 : 99999;
+    if (chessIsInCheck(board, side)) return side === 'w' ? -99999 : 99999;
     return 0;
   }
   if (depth === 0) return chessBotEval(board);
 
-  const maximizing = (side === botColor);
-  let best = maximizing ? -Infinity : Infinity;
+  const isWhite = (side === 'w');
+  let best = isWhite ? -Infinity : Infinity;
   moves.sort((a, b) => (b.capture ? 1 : 0) - (a.capture ? 1 : 0));
 
   for (const m of moves) {
     const res = chessApplyMove(board, state, m, m.promotion ? 'q' : null);
     const nextSide = side === 'w' ? 'b' : 'w';
-    const score = chessBotMinimax(res.board, { castling: res.castling, ep: res.ep, halfmove: res.halfmove }, depth - 1, nextSide, botColor, alpha, beta);
-    if (maximizing) {
+    const score = chessBotMinimax(res.board, { castling: res.castling, ep: res.ep, halfmove: res.halfmove }, depth - 1, nextSide, alpha, beta);
+    
+    if (isWhite) {
       if (score > best) best = score;
       if (best > alpha) alpha = best;
     } else {
@@ -125,18 +138,32 @@ function makeChessBotMove(data) {
   const moves = chessAllLegalMoves(board, state, 'b');
   if (moves.length === 0) return;
 
-  // Logika Difficulty
   let depth = 1; 
-  if(window.botDifficulty === 'medium') depth = 2;
-  if(window.botDifficulty === 'hard') depth = 3;
+  let blunderChance = 0;
 
-  let bestScore = Infinity, bestMove = null;
-  moves.sort((a, b) => (b.capture ? 1 : 0) - (a.capture ? 1 : 0));
+  if (window.botDifficulty === 'normal') {
+    depth = 1;
+    blunderChance = 0.5; 
+  } else if (window.botDifficulty === 'medium') {
+    depth = 2;
+    blunderChance = 0.1; 
+  } else if (window.botDifficulty === 'hard') {
+    depth = 3;
+    blunderChance = 0;
+  }
 
-  for (const m of moves) {
-    const res = chessApplyMove(board, state, m, m.promotion ? 'q' : null);
-    const score = chessBotMinimax(res.board, { castling: res.castling, ep: res.ep, halfmove: res.halfmove }, depth - 1, 'w', 'b', -Infinity, Infinity);
-    if (score < bestScore) { bestScore = score; bestMove = m; }
+  let bestScore = Infinity;
+  let bestMove = null;
+
+  if (Math.random() < blunderChance) {
+    bestMove = moves[Math.floor(Math.random() * moves.length)];
+  } else {
+    moves.sort((a, b) => (b.capture ? 1 : 0) - (a.capture ? 1 : 0));
+    for (const m of moves) {
+      const res = chessApplyMove(board, state, m, m.promotion ? 'q' : null);
+      const score = chessBotMinimax(res.board, { castling: res.castling, ep: res.ep, halfmove: res.halfmove }, depth - 1, 'w', -Infinity, Infinity);
+      if (score < bestScore) { bestScore = score; bestMove = m; }
+    }
   }
 
   if (!bestMove) bestMove = moves[0];
@@ -160,7 +187,7 @@ function chessBotPostMoveCheck(board, res) {
 }
 
 // ============================================================
-// ⭕ TTT BOT (Ada Mode Difficulty)
+// ⭕ TTT BOT
 // ============================================================
 function tttBotMinimax(board, isMax) {
   const result = tttEval(board);
@@ -195,10 +222,9 @@ function startTTTBot() {
         if (!cur || cur.turn !== 'O') return cur;
         if (tttEval(cur.board)) return cur;
 
-        // Logika Difficulty
         let isRandom = false;
-        if(window.botDifficulty === 'normal' && Math.random() < 0.4) isRandom = true; // 40% random
-        if(window.botDifficulty === 'medium' && Math.random() < 0.15) isRandom = true; // 15% random
+        if(window.botDifficulty === 'normal' && Math.random() < 0.4) isRandom = true;
+        if(window.botDifficulty === 'medium' && Math.random() < 0.15) isRandom = true;
         
         let bestMove = null;
         if(isRandom) {
@@ -275,7 +301,7 @@ function snakeBotRoll(snakeRef, botKey) {
 }
 
 // ============================================================
-// 🎴 UNO BOT (FIX: Object ke Array)
+// 🎴 UNO BOT (Tanpa logika Blunder/Difficulty)
 // ============================================================
 function startUnoBot() {
   const unoRef = roomRef.child('uno');
@@ -314,9 +340,8 @@ function unoBotMove(unoRef, botKey) {
     if (!cur || cur.phase !== 'playing' || cur.turn !== botKey) return cur;
     const s = JSON.parse(JSON.stringify(cur));
     
-    // FIX OBJECT KE ARRAY
     let hand = s.hands[botKey] || [];
-    if (!Array.isArray(hand)) hand = Object.values(hand);
+    if (!Array.isArray(hand)) hand = Object.values(hand); 
     
     if (hand.length === 0) return cur;
 
@@ -346,10 +371,11 @@ function unoBotMove(unoRef, botKey) {
       return s;
     }
 
+    // Bot Uno selalu main optimal
     const prio = c => c.value === 'draw4' ? 5 : c.value === 'draw2' ? 4 : c.value === 'skip' ? 3 : c.value === 'reverse' ? 2 : c.color === 'wild' ? 0 : 1;
     valid.sort((a, b) => prio(b) - prio(a));
-    const chosen = valid[0];
 
+    const chosen = valid[0];
     const idx = hand.findIndex(c => c.id === chosen.id);
     if (idx < 0) return cur;
     hand.splice(idx, 1);
@@ -384,7 +410,7 @@ function unoBotMove(unoRef, botKey) {
 }
 
 // ============================================================
-// 🃏 POKER (CAPSA) BOT (FIX OBJECT KE ARRAY)
+// 🃏 POKER (CAPSA) BOT (Tetap pakai Difficulty)
 // ============================================================
 function pokerCombinations(arr, k) {
   const out = [];
@@ -423,14 +449,12 @@ function pokerBotMove(pokerRef, botKey) {
     if (!cur || cur.phase !== 'playing' || cur.turn !== botKey) return cur;
     const s = JSON.parse(JSON.stringify(cur));
     
-    // FIX OBJECT KE ARRAY
     let hand = s.hands[botKey] || [];
-    if (!Array.isArray(hand)) hand = Object.values(hand);
+    if (!Array.isArray(hand)) hand = Object.values(hand); 
 
     if (s.isFirstPlay) {
       const threeD = hand.find(c => c.rank === '03' && c.suit === 'd');
       if (!threeD) {
-        // FALLBACK: Kalau gak punya 3♦ (bug), buang kartu terkecil
         if (hand.length > 0) {
           const sorted = sortCards(hand);
           const chosenCard = sorted[0];
@@ -465,14 +489,30 @@ function pokerBotMove(pokerRef, botKey) {
       }
     } else {
       const allCombos = pokerCombinations(hand, targetCount);
-      let bestScore = Infinity;
+      
+      let validMoves = [];
       for (const cards of allCombos) {
         const combo = detectCombo(cards);
         if (!combo.valid) continue;
         if (isBlockedBeat(s.lastPlay, combo, cards)) continue;
         if (compareCombo(combo, s.lastPlay.combo) <= 0) continue;
-        const sc = combo.level * 1000 + (combo.tiebreak[0] || 0);
-        if (sc < bestScore) { bestScore = sc; candidate = { cards, combo }; }
+        validMoves.push({ cards, combo });
+      }
+
+      if (validMoves.length > 0) {
+        let blunderChance = 0;
+        if (window.botDifficulty === 'normal') blunderChance = 0.4;
+        if (window.botDifficulty === 'medium') blunderChance = 0.1;
+
+        if (Math.random() < blunderChance) {
+           candidate = validMoves[Math.floor(Math.random() * validMoves.length)];
+        } else {
+           let bestScore = Infinity;
+           for (const mv of validMoves) {
+             const sc = mv.combo.level * 1000 + (mv.combo.tiebreak[0] || 0);
+             if (sc < bestScore) { bestScore = sc; candidate = mv; }
+           }
+        }
       }
     }
 

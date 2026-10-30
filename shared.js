@@ -177,9 +177,14 @@ document.getElementById('btnCreatedBack').onclick = () => {
   clearSession(); location.reload();
 };
 
-// ✅ LOGIKA BARU: Buka Modal Bot Difficulty / Password
+// ✅ FIX: Skip popup difficulty untuk Uno & Ular Tangga
 function proceedCreateRoom(){
   if(window.isBotMode){
+    // Uno & Ular Tangga murni hoki, langsung gas tanpa pilih difficulty
+    if(currentGame === 'uno' || currentGame === 'snake') {
+      executeCreateRoom();
+      return;
+    }
     document.getElementById('botDifficultyOverlay').style.display = 'flex';
     return;
   }
@@ -187,7 +192,6 @@ function proceedCreateRoom(){
   document.getElementById('createPassOverlay').style.display = 'flex';
 }
 
-// Handle Pilihan Bot Difficulty
 document.querySelectorAll('.bot-diff-btn').forEach(btn => {
   btn.onclick = () => {
     window.botDifficulty = btn.dataset.diff;
