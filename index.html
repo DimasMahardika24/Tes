@@ -114,16 +114,10 @@ body {
   #startScreen .btn-menu { animation:none !important; opacity:1 !important; }
 }
 
-.room-badge-wrap {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 12px;
-}
+.room-badge-wrap { display: flex; justify-content: center; margin-bottom: 12px; }
 .room-badge {
-  position: relative;
-  top: 0; left: 0; transform: none; z-index: 10;
-  background: var(--panel-3);
-  border: 1px solid var(--line);
+  position: relative; top: 0; left: 0; transform: none; z-index: 10;
+  background: var(--panel-3); border: 1px solid var(--line);
   color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: .5px;
   padding: 6px 14px; border-radius: 30px; cursor: pointer;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
@@ -158,46 +152,12 @@ body {
 .spinner { width:18px; height:18px; border-radius:50%; border:2px solid var(--line); border-top-color: var(--gold); display:inline-block; animation: spin .7s linear infinite; margin-top: 4px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.room-item-card {
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 12px 14px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: transform .1s ease, border-color .1s ease;
-  cursor: pointer;
-}
-.room-item-card:active {
-  transform: scale(0.98);
-  border-color: var(--blue);
-}
-.room-item-info {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.room-item-title {
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.room-item-sub {
-  font-size: 11px;
-  color: var(--ink-dim);
-}
-.room-item-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 20px;
-  background: var(--panel-3);
-  color: var(--gold);
-}
+.room-item-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; transition: transform .1s ease, border-color .1s ease; cursor: pointer; }
+.room-item-card:active { transform: scale(0.98); border-color: var(--blue); }
+.room-item-info { display: flex; flex-direction: column; gap: 3px; }
+.room-item-title { font-weight: 700; font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 6px; }
+.room-item-sub { font-size: 11px; color: var(--ink-dim); }
+.room-item-badge { font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 20px; background: var(--panel-3); color: var(--gold); }
 
 .g-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .g-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 18px; font-weight: 700; color: var(--ink); }
@@ -205,33 +165,9 @@ body {
 .g-status { font-size: 13px; color: var(--green); margin-bottom: 12px; font-weight: 600; text-align: center; background: var(--void); padding: 10px; border-radius: 10px; border: 1px solid var(--line); transition: color .2s ease; }
 
 /* STYLE ULAR TANGGA BOARD & PION */
-.snake-board-container {
-  position: relative;
-  width: 100%;
-  max-width: 480px;
-  aspect-ratio: 1/1;
-  margin: 0 auto;
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 12px 30px rgba(0,0,0,0.6);
-  border: 2px solid var(--line);
-}
-#snakeBoardBg {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.snake-pion {
-  position: absolute;
-  width: 7.5%;
-  height: 7.5%;
-  border-radius: 50%;
-  border: 2px solid #fff;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.6);
-  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-  z-index: 5;
-}
+.snake-board-container { position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; border-radius: 14px; overflow: hidden; box-shadow: 0 12px 30px rgba(0,0,0,0.6); border: 2px solid var(--line); }
+#snakeBoardBg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.snake-pion { position: absolute; width: 7.5%; height: 7.5%; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 3px 8px rgba(0,0,0,0.6); transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); z-index: 5; }
 .snake-pion-0 { background: #3d6bf0; }
 .snake-pion-1 { background: #1e3a8a; }
 .snake-pion-2 { background: #e8ac1f; }
@@ -241,34 +177,10 @@ body {
 .snake-pion-6 { background: #f97316; }
 
 /* ANIMASI DADU 3D */
-.dice-animation-wrap {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: 15px 0;
-  height: 60px;
-}
-.dice-box {
-  width: 50px;
-  height: 50px;
-  background: #ffffff;
-  border-radius: 10px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 28px;
-  font-weight: 800;
-  color: #1a1f2a;
-  box-shadow: 0 6px 14px rgba(0,0,0,0.4);
-}
-.dice-box.rolling {
-  animation: diceRoll 0.5s ease-in-out infinite;
-}
-@keyframes diceRoll {
-  0% { transform: rotate(0deg) scale(0.9); }
-  50% { transform: rotate(180deg) scale(1.1); }
-  100% { transform: rotate(360deg) scale(0.9); }
-}
+.dice-animation-wrap { display: flex; justify-content: center; align-items: center; margin: 15px 0; height: 60px; }
+.dice-box { width: 50px; height: 50px; background: #ffffff; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 28px; font-weight: 800; color: #1a1f2a; box-shadow: 0 6px 14px rgba(0,0,0,0.4); }
+.dice-box.rolling { animation: diceRoll 0.5s ease-in-out infinite; }
+@keyframes diceRoll { 0% { transform: rotate(0deg) scale(0.9); } 50% { transform: rotate(180deg) scale(1.1); } 100% { transform: rotate(360deg) scale(0.9); } }
 
 .game-wrapper { width: 100%; aspect-ratio: 16/9; background: #5c94fc; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); position: relative; box-shadow: 0 10px 26px rgba(0,0,0,0.4); }
 canvas { width: 100%; height: 100%; display: block; }
@@ -278,9 +190,7 @@ canvas { width: 100%; height: 100%; display: block; }
 .win-overlay .btn-menu { width: 80%; max-width: 240px; margin: 0; }
 
 /* CATUR REALISTIS KAYU ELEGANT */
-#chessScreen .board-wrapper {
-  width: 100%; max-width: 500px; margin: 0 auto; aspect-ratio: 1/1; position: relative; border-radius: 12px; padding: 18px; background: #2b1f1d; box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.1); border: 2px solid #3d2b27;
-}
+#chessScreen .board-wrapper { width: 100%; max-width: 500px; margin: 0 auto; aspect-ratio: 1/1; position: relative; border-radius: 12px; padding: 18px; background: #2b1f1d; box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.1); border: 2px solid #3d2b27; }
 #chessScreen .board { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); width: 100%; height: 100%; border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
 #chessScreen .cell { display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; width: 100%; height: 100%; transition: background .1s ease; }
 #chessScreen .cell.light { background-color: #f0d9b5; color: #b58863; }
@@ -304,6 +214,47 @@ canvas { width: 100%; height: 100%; display: block; }
 #chessScreen .promo-choices { display:flex; gap:10px; }
 #chessScreen .promo-btn { width:60px; height:60px; border-radius:12px; background: var(--panel-2); border:1px solid var(--line); font-size:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
 #chessScreen .promo-btn:active { transform: scale(0.92); background: var(--panel-3); }
+
+/* --- FULL ANIMASI CATUR --- */
+@keyframes pieceDrop {
+  0% { transform: translateY(-40px) scale(1.2); opacity: 0; }
+  60% { transform: translateY(5px) scale(0.95); opacity: 1; }
+  80% { transform: translateY(-2px) scale(1.02); }
+  100% { transform: translateY(0) scale(1); }
+}
+#chessScreen .piece-drop { animation: pieceDrop 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+
+@keyframes captureExplode {
+  0% { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+#chessScreen .capture-fx { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, rgba(228,87,79,0.9) 0%, rgba(228,87,79,0) 70%); border-radius: 50%; animation: captureExplode 0.4s ease-out forwards; pointer-events: none; z-index: 10; }
+
+#chessScreen .cell.move-origin::before { content: ''; position: absolute; inset: 0; background: rgba(255, 255, 255, 0.15); animation: fadeOutHighlight 0.5s ease-out forwards; }
+#chessScreen .cell.move-dest::before { content: ''; position: absolute; inset: 0; background: rgba(232, 172, 31, 0.3); animation: fadeOutHighlight 0.5s ease-out forwards; }
+@keyframes fadeOutHighlight { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+@keyframes selectedBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+#chessScreen .cell.selected .piece { animation: selectedBounce 1s ease-in-out infinite; }
+
+@keyframes validPulse { 0% { transform: scale(1); opacity: 0.6; } 50% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(1); opacity: 0.6; } }
+#chessScreen .cell.valid::after { animation: validPulse 1.2s infinite; }
+#chessScreen .cell.capture::after { animation: validPulse 1.2s infinite; border-color: rgba(228, 87, 79, 1); }
+
+@keyframes checkPulse { 0% { filter: drop-shadow(0 0 0px red); } 50% { filter: drop-shadow(0 0 15px red); } 100% { filter: drop-shadow(0 0 0px red); } }
+#chessScreen .king-in-check .piece { animation: checkPulse 1s infinite; color: #ff4d4d !important; }
+
+@keyframes boardShake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+#chessScreen .board-shake { animation: boardShake 0.5s ease-in-out; }
+
+#chessScreen .cell.move-origin::after, #chessScreen .cell.move-dest::after {
+  content: ''; position: absolute; width: 100%; height: 100%; border: 2px solid rgba(232,172,31,0.8); box-sizing: border-box; pointer-events: none; animation: trailFade 0.8s ease-out forwards; z-index: 5;
+}
+@keyframes trailFade { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.1); } }
 
 /* Tic Tac Toe */
 #tttScreen .ttt-scoreline { display:flex; justify-content:center; gap:20px; font-size:14px; color: var(--ink-dim); margin-bottom:12px; background: var(--void); padding:10px; border-radius:10px; border:1px solid var(--line); }
@@ -402,10 +353,7 @@ canvas { width: 100%; height: 100%; display: block; }
       <div class="hub-sub">Main bareng temen secara online, tinggal share kode room</div>
     </div>
     <div class="hub-divider"></div>
-
-    <!-- 🤖 TOMBOL BOT MODE -->
     <button class="btn-menu g-poker" id="btnGoBot" style="justify-content:center;text-align:center;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;">🤖 MAIN VS BOT</button>
-
     <button class="btn-menu g-chess" id="btnGoCreate" style="justify-content:center;text-align:center">🎮 BUAT ROOM</button>
     <button class="btn-menu g-ttt" id="btnGoJoin" style="justify-content:center;text-align:center">🔗 GABUNG ROOM</button>
     <button class="btn-menu g-chess" id="btnGoOnlineRooms" style="justify-content:center;text-align:center; background:#3d6bf0; color:#fff;">🌐 ONLINE ROOMS (PUBLIC)</button>
@@ -435,19 +383,19 @@ canvas { width: 100%; height: 100%; display: block; }
       </div>
     </div>
   </div>
-  
+
   <!-- MODAL CUSTOM: PILIH KESULITAN BOT -->
-<div class="capsa-name-overlay" id="botDifficultyOverlay" style="display:none">
-  <div class="capsa-name-box" style="text-align:center;">
-    <div class="capsa-name-title">🤖 Pilih Tingkat Kesulitan Bot</div>
-    <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
-      <button class="capsa-name-btn save bot-diff-btn" data-diff="normal" style="background:#3d6bf0; color:#fff; padding:15px;">🟢 Normal (Santai)</button>
-      <button class="capsa-name-btn save bot-diff-btn" data-diff="medium" style="background:#e8ac1f; color:#000; padding:15px;">🟡 Medium (Menantang)</button>
-      <button class="capsa-name-btn save bot-diff-btn" data-diff="hard" style="background:#e4574f; color:#fff; padding:15px;">🔴 Hard (Sulit)</button>
+  <div class="capsa-name-overlay" id="botDifficultyOverlay" style="display:none">
+    <div class="capsa-name-box" style="text-align:center;">
+      <div class="capsa-name-title">🤖 Pilih Tingkat Kesulitan Bot</div>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+        <button class="capsa-name-btn save bot-diff-btn" data-diff="normal" style="background:#3d6bf0; color:#fff; padding:15px;">🟢 Normal (Santai)</button>
+        <button class="capsa-name-btn save bot-diff-btn" data-diff="medium" style="background:#e8ac1f; color:#000; padding:15px;">🟡 Medium (Menantang)</button>
+        <button class="capsa-name-btn save bot-diff-btn" data-diff="hard" style="background:#e4574f; color:#fff; padding:15px;">🔴 Hard (Sulit)</button>
+      </div>
+      <button class="capsa-name-btn cancel" id="btnBotDiffCancel" style="width:100%; margin-top:14px;">Batal</button>
     </div>
-    <button class="capsa-name-btn cancel" id="btnBotDiffCancel" style="width:100%; margin-top:14px;">Batal</button>
   </div>
-</div>
 
   <!-- MODAL CUSTOM: INPUT PASSWORD SAAT JOIN ROOM TERKUNCI -->
   <div class="capsa-name-overlay" id="roomPassOverlay" style="display:none">
@@ -556,7 +504,6 @@ canvas { width: 100%; height: 100%; display: block; }
     </div>
     <div class="g-status" id="snakeStatus">-</div>
 
-    <!-- KONTAINER PAPAN GAMBAR & CANVAS PION -->
     <div class="snake-board-container" id="snakeBoardArea" style="position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; border-radius: 14px; overflow: hidden; border: 2px solid var(--line);">
       <img id="snakeBoardBg" src="https://i.pinimg.com/originals/2f/68/a7/2f68a7e1eee18556b055418f7305b3c0.jpg" alt="Board Ular Tangga" style="position: absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:1;">
       <canvas id="snakeCanvas" width="800" height="800" style="position: absolute; top:0; left:0; width: 100%; height: 100%; display: block; z-index:2;"></canvas>
@@ -573,8 +520,6 @@ canvas { width: 100%; height: 100%; display: block; }
     </div>
 
     <div class="capsa-result" id="snakeResult" style="display:none;"></div>
-
-    <!-- TOMBOL KEMBALI -->
     <button class="btn-menu btn-back" id="btnSnakeBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
   </div>
 
