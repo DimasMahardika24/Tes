@@ -1,12 +1,47 @@
 // ======================================================
 // bot.js — Single-player mode: bot menggantikan pemain lain
-// Game yang didukung: Catur, TTT, Poker, Uno, Ular Tangga
-// (Monopoli sedang maintenance, tidak termasuk)
+// Game: Catur, TTT, Poker, Uno, Ular Tangga
+// (Monopoli tetap maintenance)
 // ======================================================
 
 let botActiveRoles = [];
 const botTimers = {};
 const botPresenceRefs = {};
+
+// Handlers disimpan agar bisa di-off saat re-enter
+let chessBotHandler = null;
+let tttBotHandler = null;
+let snakeBotHandler = null;
+let unoBotHandler = null;
+let pokerBotHandler = null;
+
+function cleanupBotListeners() {
+  try {
+    if (chessBotHandler && roomRef) {
+      roomRef.child('state').off('value', chessBotHandler);
+      chessBotHandler = null;
+    }
+    if (tttBotHandler && roomRef) {
+      roomRef.child('state').off('value', tttBotHandler);
+      tttBotHandler = null;
+    }
+    if (snakeBotHandler && roomRef) {
+      roomRef.child('snake').off('value', snakeBotHandler);
+      snakeBotHandler = null;
+    }
+    if (unoBotHandler && roomRef) {
+      roomRef.child('uno').off('value', unoBotHandler);
+      unoBotHandler = null;
+    }
+    if (pokerBotHandler && roomRef) {
+      roomRef.child('poker').off('value', pokerBotHandler);
+      pokerBotHandler = null;
+    }
+  } catch(e) {}
+  Object.keys(botTimers).forEach(k => {
+    if (botTimers[k]) { clearTimeout(botTimers[k]); botTimers[k] = null; }
+  });
+}
 
 function startBotForCurrentGame() {
   if (!window.isBotMode || !roomRef) return;
@@ -25,12 +60,12 @@ function startBotForCurrentGame() {
     const maxP = window.snakeSelectedMaxPlayers || 2;
     botRoles = ['p2','p3','p4','p5','p6','p7'].slice(0, maxP - 1);
   } else {
-    // Monopoli / game tak dikenal — skip
     console.warn('[bot] game tidak didukung mode bot:', game);
     return;
   }
 
   botActiveRoles = botRoles;
+  cleanupBotListeners();
 
   // Daftarkan presence semua bot
   botRoles.forEach(r => {
@@ -40,7 +75,6 @@ function startBotForCurrentGame() {
     botPresenceRefs[r] = ref;
   });
 
-  // Mulai AI sesuai game
   setTimeout(() => {
     if (game === 'chess') startChessBot();
     if (game === 'ttt')   startTTTBot();
@@ -51,7 +85,7 @@ function startBotForCurrentGame() {
 }
 
 // ============================================================
-// ♟ CATUR BOT — Minimax depth 3 + alpha-beta
+// ♟ CATUR BOT — Minimax depth 2 (total) + alpha-beta
 // ============================================================
 const CHESS_VAL = { p:100, n:320, b:330, r:500, q:900, k:20000 };
 
@@ -98,13 +132,13 @@ function chessBotMinimax(board, state, depth, side, botColor, alpha, beta) {
 }
 
 function startChessBot() {
-  const botColor = 'b';
   const stateRef = roomRef.child('state');
+  if (chessBotHandler) stateRef.off('value', chessBotHandler);
 
-  stateRef.on('value', snap => {
+  chessBotHandler = (snap) => {
     const data = snap.val();
     if (!data) return;
-    if (data.turn !== botColor) {
+    if (data.turn !== 'b') {
       if (botTimers.chess) { clearTimeout(botTimers.chess); botTimers.chess = null; }
       return;
     }
@@ -113,7 +147,8 @@ function startChessBot() {
       botTimers.chess = null;
       makeChessBotMove(data);
     }, 700 + Math.random() * 800);
-  });
+  };
+  stateRef.on('value', chessBotHandler);
 }
 
 function makeChessBotMove(data) {
@@ -125,7 +160,7 @@ function makeChessBotMove(data) {
   };
 
   const moves = chessAllLegalMoves(board, state, 'b');
-  if (moves.length === 0) return; // mate / stalemate — game detect sendiri
+  if (moves.length === 0) return; // sudah dikirim sebagai checkmate/stalemate oleh player
 
   let bestScore = Infinity;
   let bestMove = null;
@@ -133,10 +168,11 @@ function makeChessBotMove(data) {
 
   for (const m of moves) {
     const res = chessApplyMove(board, state, m, m.promotion ? 'q' : null);
+    // depth tambahan 1 → total 2 ply (bot→opponent)
     const score = chessBotMinimax(
       res.board,
       { castling: res.castling, ep: res.ep, halfmove: res.halfmove },
-      2,
+      1,
       'w',
       'b',
       -Infinity,
@@ -158,6 +194,29 @@ function makeChessBotMove(data) {
     clocks: null,
     turnStartAt: null
   });
+
+  // ✅ FIX: cek game over setelah bot move
+  chessBotPostMoveCheck(res.board, res);
+}
+
+function chessBotPostMoveCheck(board, res) {
+  // Cek player putih masih punya legal move?
+  const legalWhite = chessAllLegalMoves(board, { castling: res.castling, ep: res.ep }, 'w');
+  if (legalWhite.length === 0) {
+    if (chessIsInCheck(board, 'w')) {
+      roomRef.child('result').transaction(cur => cur || { winner: 'p2', reason: 'checkmate' });
+    } else {
+      roomRef.child('result').transaction(cur => cur || { winner: 'draw', reason: 'stalemate' });
+    }
+    return;
+  }
+  if ((res.halfmove || 0) >= 100) {
+    roomRef.child('result').transaction(cur => cur || { winner: 'draw', reason: 'fifty' });
+    return;
+  }
+  if (chessIsInsufficientMaterial(board)) {
+    roomRef.child('result').transaction(cur => cur || { winner: 'draw', reason: 'insufficient' });
+  }
 }
 
 // ============================================================
@@ -183,7 +242,10 @@ function tttBotMinimax(board, isMax) {
 }
 
 function startTTTBot() {
-  roomRef.child('state').on('value', snap => {
+  const stateRef = roomRef.child('state');
+  if (tttBotHandler) stateRef.off('value', tttBotHandler);
+
+  tttBotHandler = (snap) => {
     const data = snap.val();
     if (!data || data.turn !== 'O') {
       if (botTimers.ttt) { clearTimeout(botTimers.ttt); botTimers.ttt = null; }
@@ -210,7 +272,8 @@ function startTTTBot() {
         return { board: newBoard, turn: 'X', round: cur.round || 0 };
       });
     }, 500 + Math.random() * 500);
-  });
+  };
+  stateRef.on('value', tttBotHandler);
 }
 
 // ============================================================
@@ -218,7 +281,9 @@ function startTTTBot() {
 // ============================================================
 function startSnakeBot() {
   const snakeRef = roomRef.child('snake');
-  snakeRef.on('value', snap => {
+  if (snakeBotHandler) snakeRef.off('value', snakeBotHandler);
+
+  snakeBotHandler = (snap) => {
     const data = snap.val();
     if (!data || !data.players || data.status === 'ended' || data.isRolling) return;
     const keys = Object.keys(data.players);
@@ -232,7 +297,8 @@ function startSnakeBot() {
       botTimers.snake = null;
       snakeBotRoll(snakeRef, turnKey);
     }, 1100 + Math.random() * 900);
-  });
+  };
+  snakeRef.on('value', snakeBotHandler);
 }
 
 function snakeBotRoll(snakeRef, botKey) {
@@ -267,7 +333,7 @@ function snakeBotRoll(snakeRef, botKey) {
     } else {
       let nextIdx = state.turnIndex;
       if (dice === 6 && pos < 100) {
-        // roll again — tetap
+        // roll again
       } else {
         do { nextIdx = (nextIdx + 1) % keys.length; }
         while (state.players[keys[nextIdx]].rank > 0);
@@ -281,16 +347,18 @@ function snakeBotRoll(snakeRef, botKey) {
 }
 
 // ============================================================
-// 🎴 UNO BOT — greedy dengan prioritas aksi + shout otomatis
+// 🎴 UNO BOT
 // ============================================================
 function startUnoBot() {
   const unoRef = roomRef.child('uno');
-  unoRef.on('value', snap => {
+  if (unoBotHandler) unoRef.off('value', unoBotHandler);
+
+  unoBotHandler = (snap) => {
     const data = snap.val();
     if (!data || data.phase !== 'playing') return;
     const botKey = data.turn;
 
-    // Bot jadi target UNO challenge → buru-buru teriak
+    // Shout UNO kalau bot jadi target
     if (data.unoChallenge && data.unoChallenge.target === botKey && !data.unoChallenge.shouted) {
       const elapsed = Date.now() - data.unoChallenge.startTime;
       if (elapsed < 2800 && !botTimers.unoShout) {
@@ -317,7 +385,8 @@ function startUnoBot() {
       botTimers.uno = null;
       unoBotMove(unoRef, botKey);
     }, 800 + Math.random() * 700);
-  });
+  };
+  unoRef.on('value', unoBotHandler);
 }
 
 function unoBotMove(unoRef, botKey) {
@@ -404,7 +473,7 @@ function unoBotMove(unoRef, botKey) {
 }
 
 // ============================================================
-// 🃏 POKER BOT — greedy: cari combo valid terkecil
+// 🃏 POKER BOT
 // ============================================================
 function pokerCombinations(arr, k) {
   const out = [];
@@ -425,7 +494,9 @@ function pokerCombinations(arr, k) {
 
 function startPokerBot() {
   const pokerRef = roomRef.child('poker');
-  pokerRef.on('value', snap => {
+  if (pokerBotHandler) pokerRef.off('value', pokerBotHandler);
+
+  pokerBotHandler = (snap) => {
     const data = snap.val();
     if (!data || data.phase !== 'playing') return;
     const botKey = data.turn;
@@ -438,7 +509,8 @@ function startPokerBot() {
       botTimers.poker = null;
       pokerBotMove(pokerRef, botKey);
     }, 900 + Math.random() * 700);
-  });
+  };
+  pokerRef.on('value', pokerBotHandler);
 }
 
 function pokerBotMove(pokerRef, botKey) {
@@ -447,7 +519,6 @@ function pokerBotMove(pokerRef, botKey) {
     const s = JSON.parse(JSON.stringify(cur));
     const hand = s.hands[botKey] || [];
 
-    // First play: wajib 3♦
     if (s.isFirstPlay) {
       const threeD = hand.find(c => c.rank === '03' && c.suit === 'd');
       if (!threeD) return cur;
@@ -462,7 +533,6 @@ function pokerBotMove(pokerRef, botKey) {
       return s;
     }
 
-    // Cari play yang valid
     let targetCount;
     if (!s.lastPlay) targetCount = 1;
     else targetCount = s.lastPlay.combo.count;
