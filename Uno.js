@@ -1,5 +1,5 @@
 // ======================================================
-// Uno.js — Uno Battle Arena (Anti-Flicker + Smart Timer)
+// Uno.js — Uno Battle Arena (Anti-Freeze & No-Flicker)
 // ======================================================
 
 let unoRef = null;
@@ -38,6 +38,13 @@ const UNO_CARD_URLS = {
   "back": UNO_BASE_URL + "back.png"
 };
 
+// 🛠️ FIX: Konversi Firebase Object jadi Array biar ga nge-stuck
+function ensureArray(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  return Object.values(val);
+}
+
 function getUnoCardImgUrl(card) {
   if (!card) return UNO_CARD_URLS.back;
   const key = card.color === 'wild' ? `wild_${card.value}` : `${card.color}_${card.value}`;
@@ -61,6 +68,7 @@ function createUnoDeck() {
 
 function drawUnoCards(game, count) {
   let drawn = [];
+  game.deck = ensureArray(game.deck);
   for (let i = 0; i < count; i++) {
     if (game.deck.length === 0) game.deck = createUnoDeck();
     drawn.push(game.deck.pop());
@@ -75,7 +83,8 @@ function nextUnoTurn(game, jump = 1) {
   let curIdx = activeRoles.indexOf(game.turn);
   let nextIdx = (curIdx + (game.direction * jump) % total + total) % total;
   let loopCount = 0;
-  while (game.finished && game.finished.includes(activeRoles[nextIdx]) && loopCount < total) {
+  const finished = ensureArray(game.finished);
+  while (finished.includes(activeRoles[nextIdx]) && loopCount < total) {
     nextIdx = (nextIdx + (game.direction * 1) % total + total) % total; loopCount++;
   }
   return activeRoles[nextIdx];
@@ -98,7 +107,8 @@ function buildNewUnoGame(maxPlayers, prev) {
 function unoDoPlay(chosenColor = null) {
   const data = latestUnoData;
   if (!data || data.phase !== 'playing' || data.turn !== myRole) return;
-  const hand = data.hands[myRole] || [];
+  
+  const hand = ensureArray(data.hands && data.hands[myRole]);
   const selected = hand.filter(c => selectedUnoKeys.has(c.id));
 
   if (selected.length === 0) return showCustomAlert('Pilih kartu yang ingin dibuang!');
@@ -112,7 +122,8 @@ function unoDoPlay(chosenColor = null) {
   unoRef.transaction(cur => {
     if (!cur || cur.phase !== 'playing' || cur.turn !== myRole) return cur;
     const state = JSON.parse(JSON.stringify(cur));
-    let curHand = state.hands[myRole] || [];
+    let curHand = ensureArray(state.hands[myRole]);
+    
     selected.forEach(card => {
       const idx = curHand.findIndex(c => c.id === card.id);
       if (idx !== -1) curHand.splice(idx, 1);
@@ -139,7 +150,7 @@ function unoDoPlay(chosenColor = null) {
       state.unoChallenge = null;
     }
 
-    const finished = state.finished || [];
+    const finished = ensureArray(state.finished);
     if (curHand.length === 0 && !finished.includes(myRole)) {
       finished.push(myRole); state.finished = finished;
       if (finished.length >= getUnoRoles(state.maxPlayers).length - 1) { state.phase = 'roundover'; return state; }
@@ -159,7 +170,7 @@ function unoDoDraw() {
 
     if (state.drawStack > 0) {
       const drawn = drawUnoCards(state, state.drawStack);
-      state.hands[myRole] = [...(state.hands[myRole] || []), ...drawn];
+      state.hands[myRole] = [...ensureArray(state.hands[myRole]), ...drawn];
       state.drawStack = 0; state.hasDrawn = false; state.turn = nextUnoTurn(state, 1);
       state.lastActionText = `📥 ${(unoNames && unoNames[myRole]) || myRole.toUpperCase()} mengambil penalti +${drawn.length} kartu.`;
       return state;
@@ -167,7 +178,7 @@ function unoDoDraw() {
 
     if (!state.hasDrawn) {
       const drawn = drawUnoCards(state, 1);
-      state.hands[myRole] = [...(state.hands[myRole] || []), ...drawn];
+      state.hands[myRole] = [...ensureArray(state.hands[myRole]), ...drawn];
       state.hasDrawn = true; state.lastActionText = `📥 ${(unoNames && unoNames[myRole]) || myRole.toUpperCase()} mengambil 1 kartu.`;
     }
     return state;
@@ -200,10 +211,12 @@ function unoCatch() {
     const state = JSON.parse(JSON.stringify(cur));
     const target = state.unoChallenge.target;
     const drawn = drawUnoCards(state, 2);
-    state.hands[target] = [...(state.hands[target] || []), ...drawn];
+    state.hands[target] = [...ensureArray(state.hands[target]), ...drawn];
 
-    if (state.finished && state.finished.includes(target)) {
-      state.finished = state.finished.filter(r => r !== target);
+    let finished = ensureArray(state.finished);
+    if (finished.includes(target)) {
+      finished = finished.filter(r => r !== target);
+      state.finished = finished;
       if (state.phase === 'roundover') state.phase = 'playing';
     }
 
@@ -264,10 +277,10 @@ function renderUnoUICore(data) {
   document.getElementById('unoTopCardImg').src = getUnoCardImgUrl(data.currentCard);
   const myHandContainer = document.getElementById('unoHandMe');
   myHandContainer.innerHTML = '';
-  const myHand = data.hands ? (data.hands[myRole] || []) : [];
+  const myHand = ensureArray(data.hands && data.hands[myRole]);
   const canPlay = data.phase === 'playing' && data.turn === myRole;
 
-  // 🛠️ FIX ANTI-KEDAP KEDIP UNO
+  // 🛠️ FIX ANTI-KEDAP KEDIP UNO (Cukup ubah class, jangan render ulang semua kartu)
   myHand.forEach(card => {
     const img = document.createElement('img');
     img.className = 'capsa-card-img' + (selectedUnoKeys.has(card.id) ? ' selected' : '');
@@ -290,7 +303,7 @@ function renderUnoUICore(data) {
   opponentsContainer.innerHTML = '';
   activeRoles.forEach(role => {
     if (role === myRole) return;
-    const cardCount = data.hands && data.hands[role] ? data.hands[role].length : 0;
+    const cardCount = data.hands && data.hands[role] ? ensureArray(data.hands[role]).length : 0;
     const isTurn = data.turn === role && data.phase === 'playing';
     const div = document.createElement('div');
     div.className = `capsa-seat ${isTurn ? 'active-turn' : ''}`;
@@ -314,12 +327,16 @@ function renderUnoUICore(data) {
     playBtn.onclick = () => unoDoPlay();
   }
 
-  updateUnoChallengeUI(data); // Render tombol DOR dengan fungsi khusus
+  updateUnoChallengeUI(data);
 
   const resultEl = document.getElementById('unoResult'), nextBtn = document.getElementById('unoBtnNext');
   if (data.phase === 'roundover') {
-    resultEl.innerHTML = (data.finished || []).map((r, i) => `🥇 Juara ${i + 1}: ${(unoNames && unoNames[r]) || r.toUpperCase()}`).join('<br>');
-    resultEl.style.display = 'block'; nextBtn.style.display = 'block';
+    const finished = ensureArray(data.finished);
+    resultEl.innerHTML = finished.map((r, i) => `🥇 Juara ${i + 1}: ${(unoNames && unoNames[r]) || r.toUpperCase()}`).join('<br>');
+    resultEl.style.display = 'block'; 
+    nextBtn.style.display = 'block';
+    nextBtn.textContent = myRole === 'p1' ? '▶ Main Lagi' : '⏳ Menunggu host mulai lagi';
+    nextBtn.disabled = myRole !== 'p1';
   } else {
     resultEl.style.display = 'none'; nextBtn.style.display = 'none';
   }
@@ -335,7 +352,7 @@ function renderUnoUI(data) {
   else renderUnoUICore(data);
 }
 
-// 🛠️ FIX ANTI-KEDAP KEDIP DOR TIMER (HANYA UPDATE TEKS TOMBOL)
+// 🛠️ FIX: Fungsi khusus update timer DOR (Anti-Kedip)
 function updateUnoChallengeUI(data) {
   let unoContainer = document.getElementById('unoChallengeBox');
   if (!unoContainer) {
@@ -387,7 +404,7 @@ function initUno() {
 
   document.getElementById('btnUnoBack').onclick = () => { if (activePresenceRef) activePresenceRef.remove(); clearSession(); location.reload(); };
   document.getElementById('unoBtnNext').onclick = () => {
-    if (!unoRef) return;
+    if (!unoRef || myRole !== 'p1') return;
     unoRef.transaction(cur => cur ? buildNewUnoGame(cur.maxPlayers, cur) : cur, (error, committed) => {
       if (committed) {
         selectedUnoKeys.clear();

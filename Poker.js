@@ -1,5 +1,5 @@
 // ======================================================
-// Poker.js — Capsa Banting 4 Pemain (Anti-Flicker Version)
+// Poker.js — Capsa Banting 4 Pemain (Anti-Freeze Version)
 // ======================================================
 
 let pokerRef = null;
@@ -23,6 +23,13 @@ const SUIT_TO_API = { c:'C', d:'D', h:'H', s:'S' };
 const RANK_ORDER = { '03':0,'04':1,'05':2,'06':3,'07':4,'08':5,'09':6,'10':7,'J':8,'Q':9,'K':10,'A':11,'02':12 };
 const SUIT_ORDER = { c:0, d:1, h:2, s:3 };
 
+// 🛠️ FIX: Konversi Firebase Object jadi Array
+function ensureArray(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  return Object.values(val);
+}
+
 function makeDeck(){
   const deck = [];
   RANKS.forEach(rank => SUITS.forEach(suit => deck.push({ rank, suit })));
@@ -39,12 +46,14 @@ function shuffleDeck(deck){
 function cardImg(c){ return CARD_IMG_BASE + RANK_TO_API[c.rank] + SUIT_TO_API[c.suit] + '.png'; }
 function cardValue(c){ return RANK_ORDER[c.rank] * 4 + SUIT_ORDER[c.suit]; }
 function cardKey(c){ return c.rank + '|' + c.suit; }
+
 function sortCards(hand){
+  hand = ensureArray(hand); // 🛠️ FIX: Konversi
   return hand.slice().sort((a, b) => RANK_ORDER[a.rank] - RANK_ORDER[b.rank] || SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit]);
 }
 
 function nextActiveRole(current, finished){
-  finished = finished || [];
+  finished = ensureArray(finished); // 🛠️ FIX: Konversi
   let idx = ROLES.indexOf(current);
   for(let i = 0; i < 4; i++){
     idx = (idx + 1) % 4;
@@ -54,6 +63,7 @@ function nextActiveRole(current, finished){
 }
 
 function removeCards(hand, selected){
+  hand = ensureArray(hand); // 🛠️ FIX: Konversi
   const remaining = selected.map(cardKey);
   return hand.filter(c => {
     const k = cardKey(c);
@@ -163,7 +173,8 @@ function pokerBuildNewGame(prev){
 function pokerDoPlay(){
   const data = latestPokerData;
   if(!data || data.phase !== 'playing' || data.turn !== myRole) return;
-  const hand = sortCards((data.hands && data.hands[myRole]) || []);
+  
+  const hand = sortCards(data.hands && data.hands[myRole]);
   const selected = hand.filter(c => selectedKeys.has(cardKey(c)));
   if(selected.length === 0){ showCustomAlert('Pilih kartu dulu.'); return; }
 
@@ -179,7 +190,8 @@ function pokerDoPlay(){
   pokerRef.transaction(cur => {
     if(!cur || cur.phase !== 'playing' || cur.turn !== myRole) return cur;
     const state = JSON.parse(JSON.stringify(cur));
-    const curHand = state.hands[myRole] || [];
+    
+    const curHand = ensureArray(state.hands[myRole]); // 🛠️ FIX: Konversi
     const remain = removeCards(curHand, selected);
     if(remain.length !== curHand.length - selected.length) return cur;
 
@@ -195,7 +207,7 @@ function pokerDoPlay(){
     state.lastPlayer = myRole; state.passCount = 0; state.isFirstPlay = false;
     state.lastActionText = comboDisplayName(c2);
 
-    const finished = state.finished || [];
+    const finished = ensureArray(state.finished); // 🛠️ FIX: Konversi
     if(remain.length === 0 && !finished.includes(myRole)){
       finished.push(myRole); state.finished = finished;
       if(finished.length >= 3){
@@ -212,7 +224,8 @@ function pokerDoPass(){
   pokerRef.transaction(cur => {
     if(!cur || cur.phase !== 'playing' || cur.turn !== myRole || !cur.lastPlay) return cur;
     const state = JSON.parse(JSON.stringify(cur));
-    const finished = state.finished || [];
+    const finished = ensureArray(state.finished); // 🛠️ FIX: Konversi
+    
     state.passCount = (state.passCount || 0) + 1;
     state.lastActionText = 'pass';
     const activeCount = 4 - finished.length, threshold = Math.max(activeCount - 1, 1);
@@ -246,11 +259,10 @@ function pokerRenderBackHand(container, count){
   wrap.appendChild(img); wrap.appendChild(badge); container.appendChild(wrap);
 }
 
-// 🛠️ FIX ANTI-KEDAP KEDIP: HANYA UBAH CLASS SAAT KLIK
 function pokerRenderMyHand(data){
   const container = document.getElementById('capsaHandMe');
   container.innerHTML = '';
-  const hand = sortCards((data.hands && data.hands[myRole]) || []);
+  const hand = sortCards(data.hands && data.hands[myRole]); // 🛠️ sortCards sudah handle object
   const canSelect = data.phase === 'playing' && data.turn === myRole;
   
   hand.forEach(c => {
@@ -264,10 +276,10 @@ function pokerRenderMyHand(data){
         const k = cardKey(c);
         if(selectedKeys.has(k)) {
           selectedKeys.delete(k);
-          img.classList.remove('selected'); // Cukup hapus class
+          img.classList.remove('selected');
         } else {
           selectedKeys.add(k);
-          img.classList.add('selected'); // Cukup tambah class
+          img.classList.add('selected');
         }
       };
     }
@@ -306,7 +318,7 @@ function pokerRenderStatus(data){
 function pokerRenderRankBar(data){
   const el = document.getElementById('capsaRankBar');
   if(!el) return;
-  const finished = data.finished || [];
+  const finished = ensureArray(data.finished); // 🛠️ FIX: Konversi
   if(finished.length === 0 || data.phase === 'waiting'){ el.style.display = 'none'; el.innerHTML = ''; return; }
   
   const medals = ['🥇', '🥈', '🥉'];
@@ -335,10 +347,10 @@ function pokerRenderCore(data){
     bottom: { seat: document.getElementById('capsaSeatBottom') }
   };
 
-  const finished = data.finished || [];
+  const finished = ensureArray(data.finished); // 🛠️ FIX: Konversi
   ROLES.forEach(role => {
     const pos = seatPosFor(role), el = posEls[pos];
-    const count = (data.hands && data.hands[role]) ? data.hands[role].length : 0;
+    const count = (data.hands && data.hands[role]) ? ensureArray(data.hands[role]).length : 0;
     const online = !!pokerPresence[role], isFinished = finished.includes(role);
     el.seat.classList.toggle('active-turn', data.turn === role && data.phase === 'playing');
     el.seat.classList.toggle('capsa-seat-done', isFinished);

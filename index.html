@@ -77,7 +77,10 @@ body {
 #createdScreen .status, #resumeScreen .status { font-size: 14px; color: var(--ink-dim); margin: 4px 0 16px; font-weight: 500; text-align: center; background: var(--void); padding: 20px 16px; border-radius: 14px; border: 1px solid var(--line); line-height: 1.7; width: 100%; min-height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 #createdScreen .status .code-big, #resumeScreen .status .code-big { display: block; font-family: 'Space Grotesk', monospace; font-size: 34px; font-weight: 700; letter-spacing: 8px; color: var(--gold); margin: 10px 0; }
 #createdScreen .status .game-name, #resumeScreen .status .game-name { color: var(--ink); font-weight: 700; }
-#createdScreen .btn-copy-code, #resumeScreen .btn-copy-code { background: var(--blue); color: #fff; width: 100%; text-align: center; justify-content: center; margin-bottom: 10px; }
+
+/* 🛠️ FIX: Tombol copy code dibuat global biar tombol Main Lagi warnanya bener */
+.btn-copy-code { background: var(--blue); color: #fff; width: 100%; text-align: center; justify-content: center; margin-bottom: 10px; }
+
 .btn-join-mode { background: var(--blue); color: #fff; border-bottom: 3px solid #1f3f9e; margin-top: 6px; }
 .btn-join-mode:active { background: #3560d6; } .btn-join-mode:disabled { background: var(--panel-3); color: var(--ink-dim); border-bottom-color: rgba(0,0,0,0.28); cursor: not-allowed; }
 .btn-back { background: transparent; color: var(--ink-dim); border: 1px solid var(--line); text-align: center; justify-content: center; box-shadow: none; width: 100%; }
@@ -109,83 +112,31 @@ canvas { width: 100%; height: 100%; display: block; }
 @keyframes popIn { from{ transform: scale(.7); opacity:0; } to{ transform:scale(1); opacity:1; } }
 .win-overlay .btn-menu { width: 80%; max-width: 240px; margin: 0; }
 
-/* ==========================================
-   CATUR MODERN & PROFESIONAL
-   ========================================== */
-#chessScreen .board-wrapper {
-  width: 100%; max-width: 500px; margin: 0 auto; aspect-ratio: 1/1; position: relative; border-radius: 12px; padding: 18px;
-  background: #2b1f1d; box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.1); border: 2px solid #3d2b27;
-  transition: box-shadow 0.3s ease;
-}
+/* CATUR MODERN */
+#chessScreen .board-wrapper { width: 100%; max-width: 500px; margin: 0 auto; aspect-ratio: 1/1; position: relative; border-radius: 12px; padding: 18px; background: #2b1f1d; box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.1); border: 2px solid #3d2b27; transition: box-shadow 0.3s ease; }
 #chessScreen .board-wrapper.in-check { box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 0 60px rgba(228, 87, 79, 0.4); }
 #chessScreen .board { position: relative; width: 100%; height: 100%; border-radius: 4px; overflow: hidden; }
-
-/* Layer Kotak */
 #chessScreen .squares-layer { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); }
 #chessScreen .cell { position: relative; width: 100%; height: 100%; cursor: pointer; transition: background .1s ease; }
 #chessScreen .cell.light { background-color: #f0d9b5; }
 #chessScreen .cell.dark { background-color: #b58863; }
-
-/* Layer Bidak (Absolute Overlay) */
 #chessScreen .pieces-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
-
-/* Animasi Bidak Bergerak (Smooth Slide) */
-.piece-wrapper {
-  position: absolute; width: 12.5%; height: 12.5%; display: flex; align-items: center; justify-content: center;
-  will-change: transform; /* Optimasi performa */
-  transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1.1); /* Efek Bouncy halus */
-  pointer-events: auto; /* Biar bisa di-klik */
-  cursor: pointer;
-}
+.piece-wrapper { position: absolute; width: 12.5%; height: 12.5%; display: flex; align-items: center; justify-content: center; will-change: transform; transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1.1); pointer-events: auto; cursor: pointer; }
 .piece-wrapper.selected .piece { transform: scale(1.15) translateY(-5px); filter: drop-shadow(0 8px 8px rgba(0,0,0,0.5)); }
 .piece-wrapper.capturing { animation: pieceDestroy 0.35s cubic-bezier(0.5, 0, 0.8, 0.2) forwards; z-index: 15; pointer-events: none; }
-
-@keyframes pieceDestroy {
-  0% { transform: scale(1) rotate(0deg); opacity: 1; }
-  100% { transform: scale(0.2) rotate(45deg); opacity: 0; }
-}
-
-/* Bidak Font */
+@keyframes pieceDestroy { 0% { transform: scale(1) rotate(0deg); opacity: 1; } 100% { transform: scale(0.2) rotate(45deg); opacity: 0; } }
 #chessScreen .piece { font-size: clamp(26px, 9vw, 46px); line-height: 1; transition: transform 0.2s ease, filter 0.2s ease; }
 #chessScreen .piece.white { color: #ffffff; text-shadow: 0 2px 4px rgba(0,0,0,0.5), 0 0 1px rgba(0,0,0,0.8); }
 #chessScreen .piece.black { color: #1a1a1a; text-shadow: 0 2px 4px rgba(255,255,255,0.2), 0 0 1px rgba(0,0,0,0.9); }
-
-/* Efek Valid Move (Titik Hijau Modern) */
-#chessScreen .cell.valid::after {
-  content: ''; position: absolute; top: 50%; left: 50%; width: 25%; height: 25%;
-  transform: translate(-50%, -50%); background: rgba(43, 182, 115, 0.7); border-radius: 50%;
-  box-shadow: 0 0 10px rgba(43, 182, 115, 0.5); pointer-events: none;
-  animation: validPulse 1.5s infinite;
-}
-/* Efek Capture Move (Cincin Merah) */
-#chessScreen .cell.capture::after {
-  content: ''; position: absolute; inset: 8%; background: transparent; border: 4px solid rgba(228, 87, 79, 0.9);
-  border-radius: 50%; pointer-events: none; box-shadow: inset 0 0 10px rgba(228,87,79,0.5);
-  animation: validPulse 1.5s infinite;
-}
+#chessScreen .cell.valid::after { content: ''; position: absolute; top: 50%; left: 50%; width: 25%; height: 25%; transform: translate(-50%, -50%); background: rgba(43, 182, 115, 0.7); border-radius: 50%; box-shadow: 0 0 10px rgba(43, 182, 115, 0.5); pointer-events: none; animation: validPulse 1.5s infinite; }
+#chessScreen .cell.capture::after { content: ''; position: absolute; inset: 8%; background: transparent; border: 4px solid rgba(228, 87, 79, 0.9); border-radius: 50%; pointer-events: none; box-shadow: inset 0 0 10px rgba(228,87,79,0.5); animation: validPulse 1.5s infinite; }
 @keyframes validPulse { 0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.7; } 50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.7; } }
-
-/* Highlight Jejak Langkah */
-#chessScreen .cell.trail {
-  background-color: rgba(232, 172, 31, 0.4) !important; box-shadow: inset 0 0 0 3px rgba(232, 172, 31, 0.6);
-}
-/* Highlight Raja Skak */
+#chessScreen .cell.trail { background-color: rgba(232, 172, 31, 0.4) !important; box-shadow: inset 0 0 0 3px rgba(232, 172, 31, 0.6); }
 #chessScreen .cell.king-check { background: radial-gradient(circle, rgba(228,87,79,0.8) 0%, rgba(228,87,79,0.2) 80%) !important; }
 #chessScreen .cell.king-check .piece { animation: kingPulse 1s infinite alternate; }
 @keyframes kingPulse { from { filter: drop-shadow(0 0 0px red); } to { filter: drop-shadow(0 0 15px red); } }
-
-/* Efek Ledakan Partikel (Capture) */
-.particle-ring {
-  position: absolute; width: 12.5%; height: 12.5%; border-radius: 50%; border: 3px solid #e4574f;
-  transform: scale(0.5); opacity: 1; pointer-events: none; z-index: 20;
-  animation: explodeRing 0.5s ease-out forwards;
-}
-@keyframes explodeRing {
-  0% { transform: scale(0.5); opacity: 1; border-width: 6px; }
-  100% { transform: scale(2.5); opacity: 0; border-width: 1px; }
-}
-
-/* UI Kontrol Catur */
+.particle-ring { position: absolute; width: 12.5%; height: 12.5%; border-radius: 50%; border: 3px solid #e4574f; transform: scale(0.5); opacity: 1; pointer-events: none; z-index: 20; animation: explodeRing 0.5s ease-out forwards; }
+@keyframes explodeRing { 0% { transform: scale(0.5); opacity: 1; border-width: 6px; } 100% { transform: scale(2.5); opacity: 0; border-width: 1px; } }
 #chessScreen .chess-controls { display:flex; gap:8px; margin-bottom:12px; justify-content:center; }
 #chessScreen .btn-flip { flex:1; background: var(--panel-2); border:1px solid var(--line); color: var(--ink); padding:12px; border-radius:10px; font-size:13px; font-weight:700; border-bottom: 3px solid rgba(0,0,0,0.3); }
 #chessScreen .btn-flip:active { transform: translateY(2px); border-bottom-width: 1px; }
@@ -198,7 +149,7 @@ canvas { width: 100%; height: 100%; display: block; }
 #chessScreen .promo-btn { width:60px; height:60px; border-radius:12px; background: var(--panel-2); border:1px solid var(--line); font-size:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition: transform 0.1s; }
 #chessScreen .promo-btn:active { transform: scale(0.92); background: var(--panel-3); }
 
-/* TTT, CAPSA, UNO (Sama kayak sebelumnya) */
+/* TTT, CAPSA, UNO (Standar) */
 #tttScreen .ttt-scoreline { display:flex; justify-content:center; gap:20px; font-size:14px; color: var(--ink-dim); margin-bottom:12px; background: var(--void); padding:10px; border-radius:10px; border:1px solid var(--line); }
 #tttScreen .ttt-scoreline b { color: var(--ink); margin-left:4px; font-size: 15px; }
 #tttScreen .ttt-board-wrap { position: relative; margin-bottom: 6px; border-radius: 14px; box-shadow: 0 14px 30px rgba(0,0,0,0.4); }
@@ -268,17 +219,11 @@ canvas { width: 100%; height: 100%; display: block; }
 <body>
 
 <div class="card">
-  <!-- Room Badge -->
-  <div class="room-badge-wrap">
-    <div class="room-badge" id="roomBadge"><span id="roomBadgeText">Room: ------</span><span class="rb-copy" id="roomBadgeCopy">⧉ salin</span></div>
-  </div>
+  <div class="room-badge-wrap"><div class="room-badge" id="roomBadge"><span id="roomBadgeText">Room: ------</span><span class="rb-copy" id="roomBadgeCopy">⧉ salin</span></div></div>
 
-  <!-- START SCREEN -->
   <div class="screen active" id="startScreen">
     <div class="hub-head">
-      <div class="hub-logo-wrap">
-        <img class="hub-logo" src="https://c.termai.cc/i157/OpH.jpeg" alt="Logo Game Hub" draggable="false" decoding="async" onerror="this.parentNode.style.display='none'">
-      </div>
+      <div class="hub-logo-wrap"><img class="hub-logo" src="https://c.termai.cc/i157/OpH.jpeg" alt="Logo Game Hub" draggable="false" onerror="this.parentNode.style.display='none'"></div>
       <div class="hub-title"><span class="badge-dot"></span>Game Hub</div>
       <div class="hub-sub">Main bareng temen secara online, tinggal share kode room</div>
     </div>
@@ -290,29 +235,21 @@ canvas { width: 100%; height: 100%; display: block; }
     <div class="hub-foot">🧹 Room otomatis dibersihkan setelah 24 jam</div>
   </div>
 
-  <!-- ONLINE ROOMS SCREEN -->
   <div class="screen" id="onlineRoomScreen">
     <div class="lobby-title">🌐 Daftar Room Online</div>
-    <div id="onlineRoomList" style="display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto; margin-bottom:12px; padding-right:4px;">
-      <div style="text-align:center; color:var(--ink-dim); font-size:13px; padding:20px;">Memuat daftar room...</div>
-    </div>
+    <div id="onlineRoomList" style="display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto; margin-bottom:12px; padding-right:4px;"><div style="text-align:center; color:var(--ink-dim); font-size:13px; padding:20px;">Memuat daftar room...</div></div>
     <button class="btn-menu btn-back" id="btnOnlineRoomBack">‹ Kembali</button>
   </div>
 
-  <!-- MODAL CUSTOM: SET PASSWORD SAAT BUAT ROOM -->
   <div class="capsa-name-overlay" id="createPassOverlay" style="display:none">
     <div class="capsa-name-box">
       <div class="capsa-name-title">🔑 Set Password Room</div>
       <div style="font-size: 12px; color: var(--ink-dim); text-align: center; margin-bottom: 12px;">Kosongkan jika ingin room Publik (Bebas Masuk)</div>
       <input type="password" id="createPassInput" placeholder="Password (opsional)...">
-      <div class="capsa-name-actions">
-        <button class="capsa-name-btn cancel" id="btnCreatePassCancel">Batal</button>
-        <button class="capsa-name-btn save" id="btnCreatePassSubmit">Buat Room</button>
-      </div>
+      <div class="capsa-name-actions"><button class="capsa-name-btn cancel" id="btnCreatePassCancel">Batal</button><button class="capsa-name-btn save" id="btnCreatePassSubmit">Buat Room</button></div>
     </div>
   </div>
 
-  <!-- MODAL CUSTOM: PILIH KESULITAN BOT -->
   <div class="capsa-name-overlay" id="botDifficultyOverlay" style="display:none">
     <div class="capsa-name-box" style="text-align:center;">
       <div class="capsa-name-title">🤖 Pilih Tingkat Kesulitan Bot</div>
@@ -325,19 +262,14 @@ canvas { width: 100%; height: 100%; display: block; }
     </div>
   </div>
 
-  <!-- MODAL CUSTOM: INPUT PASSWORD SAAT JOIN ROOM TERKUNCI -->
   <div class="capsa-name-overlay" id="roomPassOverlay" style="display:none">
     <div class="capsa-name-box">
       <div class="capsa-name-title">🔒 Room Terkunci</div>
       <input type="password" id="roomPassInput" placeholder="Masukkan Password...">
-      <div class="capsa-name-actions">
-        <button class="capsa-name-btn cancel" id="btnPassCancel">Batal</button>
-        <button class="capsa-name-btn save" id="btnPassSubmit">Masuk</button>
-      </div>
+      <div class="capsa-name-actions"><button class="capsa-name-btn cancel" id="btnPassCancel">Batal</button><button class="capsa-name-btn save" id="btnPassSubmit">Masuk</button></div>
     </div>
   </div>
 
-  <!-- MODAL CUSTOM: ALERT / INFORMASI NOTIFIKASI -->
   <div class="capsa-name-overlay" id="customAlertOverlay" style="display:none">
     <div class="capsa-name-box" style="text-align:center;">
       <div class="capsa-name-title" id="customAlertTitle">⚠️ Pemberitahuan</div>
@@ -346,19 +278,14 @@ canvas { width: 100%; height: 100%; display: block; }
     </div>
   </div>
 
-  <!-- MODAL CUSTOM: CONFIRM / KONFIRMASI TINDAKAN -->
   <div class="capsa-name-overlay" id="customConfirmOverlay" style="display:none">
     <div class="capsa-name-box" style="text-align:center;">
       <div class="capsa-name-title" id="customConfirmTitle">❓ Konfirmasi</div>
       <div id="customConfirmText" style="font-size: 13.5px; color: var(--ink); margin-bottom: 18px; line-height: 1.5;"></div>
-      <div class="capsa-name-actions">
-        <button class="capsa-name-btn cancel" id="btnCustomConfirmCancel">Batal</button>
-        <button class="capsa-name-btn save" id="btnCustomConfirmOk">Ya, Lanjutkan</button>
-      </div>
+      <div class="capsa-name-actions"><button class="capsa-name-btn cancel" id="btnCustomConfirmCancel">Batal</button><button class="capsa-name-btn save" id="btnCustomConfirmOk">Ya, Lanjutkan</button></div>
     </div>
   </div>
 
-  <!-- GAME PICK SCREEN -->
   <div class="screen" id="gamePickScreen">
     <div class="lobby-title">Pilih Game</div>
     <button class="btn-menu g-chess" data-game="chess"><span class="ic">♟</span> Catur 2P Online</button>
@@ -366,15 +293,10 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu g-poker" data-game="poker"><span class="ic">🃏</span> Poker Capsa (4 Pemain)</button>
     <button class="btn-menu g-poker" data-game="uno" style="background: #e4574f; color:#fff;"><span class="ic">🎴</span> Uno Battle Arena (2-6 Player)</button>
     <button class="btn-menu g-snake" data-game="snake"><span class="ic">🐍</span> Ular Tangga Board (2-7 Player)</button>
-
-    <button class="btn-menu disabled" style="background: #334155; color: #94a3b8; border-bottom-color: #1e293b;" title="Game sedang dalam pemeliharaan">
-      <span class="ic">🔒</span> Monopoli Klasik <span style="margin-left: auto; font-size: 11px; background: #0f172a; padding: 3px 8px; border-radius: 6px; color: #ef4444;">MAINTENANCE</span>
-    </button>
-
+    <button class="btn-menu disabled" style="background: #334155; color: #94a3b8; border-bottom-color: #1e293b;" title="Game sedang dalam pemeliharaan"><span class="ic">🔒</span> Monopoli Klasik <span style="margin-left: auto; font-size: 11px; background: #0f172a; padding: 3px 8px; border-radius: 6px; color: #ef4444;">MAINTENANCE</span></button>
     <button class="btn-menu btn-back" id="btnGamePickBack">‹ Kembali</button>
   </div>
 
-  <!-- SNAKE PLAYER COUNT SCREEN -->
   <div class="screen" id="snakePlayerCountScreen">
     <div class="lobby-title">Pilih Max Pemain Ular Tangga</div>
     <button class="btn-menu g-snake" data-snake-players="2">👥 2 Pemain</button>
@@ -386,29 +308,20 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnSnakeCountBack">‹ Kembali</button>
   </div>
 
-  <!-- SNAKE SCREEN -->
   <div class="screen" id="snakeScreen">
-    <div class="g-header">
-      <div class="g-title">🐍 Ular Tangga Board</div>
-      <div class="g-role" id="snakeRoleTag">-</div>
-    </div>
+    <div class="g-header"><div class="g-title">🐍 Ular Tangga Board</div><div class="g-role" id="snakeRoleTag">-</div></div>
     <div class="g-status" id="snakeStatus">-</div>
-
     <div class="snake-board-container" id="snakeBoardArea" style="position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; border-radius: 14px; overflow: hidden; border: 2px solid var(--line);">
       <img id="snakeBoardBg" src="https://i.pinimg.com/originals/2f/68/a7/2f68a7e1eee18556b055418f7305b3c0.jpg" alt="Board Ular Tangga" style="position: absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:1;">
       <canvas id="snakeCanvas" width="800" height="800" style="position: absolute; top:0; left:0; width: 100%; height: 100%; display: block; z-index:2;"></canvas>
     </div>
-
     <div class="dice-animation-wrap"><div class="dice-box" id="snakeDiceBox">🎲</div></div>
     <div id="snakePlayersList" style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:12px;"></div>
-    <div class="capsa-actions" id="snakeActions">
-      <button class="capsa-act play" id="snakeBtnRoll" style="grid-column: span 2; background: var(--gold); color: #000;">🎲 Kocok Dadu!</button>
-    </div>
+    <div class="capsa-actions" id="snakeActions"><button class="capsa-act play" id="snakeBtnRoll" style="grid-column: span 2; background: var(--gold); color: #000;">🎲 Kocok Dadu!</button></div>
     <div class="capsa-result" id="snakeResult" style="display:none;"></div>
     <button class="btn-menu btn-back" id="btnSnakeBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
   </div>
 
-  <!-- CHESS TIME SCREEN -->
   <div class="screen" id="chessTimeScreen">
     <div class="lobby-title">Pilih Waktu Jalan</div>
     <button class="btn-menu g-chess" data-time="180" style="justify-content:center;text-align:center">⏱ 3 Menit</button>
@@ -418,7 +331,6 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnChessTimeBack">‹ Kembali</button>
   </div>
 
-  <!-- CREATED SCREEN -->
   <div class="screen" id="createdScreen">
     <div class="lobby-title">Room Dibuat!</div>
     <div class="created-icon">🎉</div>
@@ -428,7 +340,6 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnCreatedBack">‹ Batal</button>
   </div>
 
-  <!-- JOIN SCREEN -->
   <div class="screen" id="joinScreen">
     <div class="lobby-title">Gabung Room</div>
     <div class="join-box" style="display:flex">
@@ -439,7 +350,6 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnJoinBack">‹ Kembali</button>
   </div>
 
-  <!-- RESUME SCREEN -->
   <div class="screen" id="resumeScreen">
     <div class="lobby-title">Lanjutkan Room?</div>
     <div class="created-icon">🔌</div>
@@ -452,12 +362,8 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnResumeNew">✕ Room Baru / Menu Utama</button>
   </div>
 
-  <!-- CHESS SCREEN -->
   <div class="screen" id="chessScreen">
-    <div class="g-header">
-      <div class="g-title">♟ Catur 2P Online</div>
-      <div class="g-role" id="chessRoleTag">-</div>
-    </div>
+    <div class="g-header"><div class="g-title">♟ Catur 2P Online</div><div class="g-role" id="chessRoleTag">-</div></div>
     <div class="g-status" id="chessStatus">-</div>
     <div class="chess-clocks" id="chessClockWrap" style="display:none">
       <div class="chess-clock" id="chessClockOppWrap">Lawan<span id="chessClockOpp">--:--</span></div>
@@ -467,14 +373,11 @@ canvas { width: 100%; height: 100%; display: block; }
       <button class="btn-flip" id="btnChessFlip">🔄 Flip Papan</button>
       <button class="btn-flip" id="btnChessBack">‹ Menu Utama</button>
     </div>
-    
-    <!-- PAPAN CATUR STRUKTUR BARU -->
     <div class="board-wrapper" id="chessWrapper">
       <div class="board" id="chessBoard">
         <div class="squares-layer" id="chessSquares"></div>
         <div class="pieces-layer" id="chessPiecesLayer"></div>
       </div>
-      
       <div class="win-overlay" id="chessPromoOverlay" style="display:none">
         <div class="win-text" style="font-size:18px">Pilih Promosi Pion</div>
         <div class="promo-choices" id="chessPromoChoices"></div>
@@ -486,7 +389,6 @@ canvas { width: 100%; height: 100%; display: block; }
     </div>
   </div>
 
-  <!-- TTT SCREEN -->
   <div class="screen" id="tttScreen">
     <div class="g-header"><div class="g-title">⭕ Tic-Tac-Toe 2P</div><div class="g-role" id="tttRoleTag">-</div></div>
     <div class="g-status" id="tttStatus">-</div>
@@ -495,12 +397,10 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnTttBack" style="margin-top:12px;text-align:center;justify-content:center">‹ Menu Utama</button>
   </div>
 
-  <!-- POKER SCREEN -->
   <div class="screen" id="pokerScreen">
     <div class="g-header"><div class="g-title">🃏 Capsa Banting 4P</div><div class="g-role" id="pokerRoleTag">-</div></div>
     <div class="g-status" id="pokerStatus">-</div>
     <div class="capsa-rankbar" id="capsaRankBar" style="display:none"></div>
-
     <div class="capsa-table">
       <div class="capsa-seat capsa-top" id="capsaSeatTop"><div class="capsa-seat-info" id="capsaNameTop">P?</div><div class="capsa-hand" id="capsaHandTop"></div></div>
       <div class="capsa-mid-row">
@@ -513,27 +413,20 @@ canvas { width: 100%; height: 100%; display: block; }
         <div class="capsa-seat-info"><span id="capsaMyNameLabel">Kamu</span><button class="capsa-edit-name-btn" id="capsaBtnEditName" title="Ganti nama">✏️</button></div>
       </div>
     </div>
-
     <div class="capsa-name-overlay" id="capsaNameOverlay" style="display:none">
-      <div class="capsa-name-box">
-        <div class="capsa-name-title">✏️ Ganti Nama Kamu</div>
-        <input type="text" id="capsaNameInput" maxlength="14" placeholder="Nama panggilan...">
-        <div class="capsa-name-actions"><button class="capsa-name-btn cancel" id="capsaNameCancel">Batal</button><button class="capsa-name-btn save" id="capsaNameSave">Simpan</button></div>
-      </div>
+      <div class="capsa-name-box"><div class="capsa-name-title">✏️ Ganti Nama Kamu</div><input type="text" id="capsaNameInput" maxlength="14" placeholder="Nama panggilan..."><div class="capsa-name-actions"><button class="capsa-name-btn cancel" id="capsaNameCancel">Batal</button><button class="capsa-name-btn save" id="capsaNameSave">Simpan</button></div></div>
     </div>
-
     <div class="capsa-hint">Ketuk kartu untuk pilih, lalu tekan "Banting!" atau "Pass".</div>
     <div class="capsa-actions" id="capsaActions" style="display:none">
       <button class="capsa-act pass" id="capsaBtnPass">Pass</button>
       <button class="capsa-act play" id="capsaBtnPlay">🔥 Banting!</button>
     </div>
-
     <div class="capsa-result" id="capsaResult" style="display:none"></div>
-    <button class="btn-menu btn-copy-code" id="capsaBtnNext" style="display:none;justify-content:center;text-align:center;margin-top:10px;">▶ Main Lagi</button>
-    <button class="btn-menu btn-back" id="btnPokerBack" style="margin-top:12px;text-align:center;justify-content:center">‹ Menu Utama</button>
+    <!-- 🛠️ FIX: Tombol Main Lagi warna biru -->
+    <button class="btn-menu btn-copy-code" id="capsaBtnNext" style="display:none; justify-content:center; text-align:center; margin-top:10px;">▶ Main Lagi</button>
+    <button class="btn-menu btn-back" id="btnPokerBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
   </div>
 
-  <!-- UNO PLAYER COUNT SCREEN -->
   <div class="screen" id="unoPlayerCountScreen">
     <div class="lobby-title">Pilih Jumlah Pemain Uno</div>
     <button class="btn-menu g-chess" data-uno-players="2">👥 2 Pemain</button>
@@ -544,16 +437,12 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnUnoCountBack">‹ Kembali</button>
   </div>
 
-  <!-- UNO SCREEN -->
   <div class="screen" id="unoScreen">
     <div class="g-header"><div class="g-title">🃏 Uno Battle Arena</div><div class="g-role" id="unoRoleTag">-</div></div>
     <div class="g-status" id="unoStatus">-</div>
     <div class="capsa-table">
       <div id="unoOpponentsWrap" style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap;"></div>
-      <div class="capsa-center" style="margin: 10px 0;">
-        <div style="font-size:12px; color:var(--ink-dim); font-weight:600;">Kartu Meja</div>
-        <img id="unoTopCardImg" class="capsa-card-img" src="" style="cursor:default;">
-      </div>
+      <div class="capsa-center" style="margin: 10px 0;"><div style="font-size:12px; color:var(--ink-dim); font-weight:600;">Kartu Meja</div><img id="unoTopCardImg" class="capsa-card-img" src="" style="cursor:default;"></div>
       <div class="capsa-seat capsa-bottom"><div class="capsa-hand-me" id="unoHandMe"></div></div>
     </div>
     <div class="capsa-actions" id="unoActions" style="display:none; margin-top:12px;">
@@ -572,10 +461,10 @@ canvas { width: 100%; height: 100%; display: block; }
       </div>
     </div>
     <div class="capsa-result" id="unoResult" style="display:none;"></div>
+    <!-- 🛠️ FIX: Tombol Main Lagi warna biru -->
     <button class="btn-menu btn-copy-code" id="unoBtnNext" style="display:none; margin-top:12px; justify-content:center;">▶ Main Lagi</button>
     <button class="btn-menu btn-back" id="btnUnoBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
   </div>
-
 </div>
 
 <script src="shared.js"></script>
