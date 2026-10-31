@@ -314,8 +314,8 @@ function startUnoBot() {
 
     if (data.unoChallenge && data.unoChallenge.target === botKey && !data.unoChallenge.shouted) {
       const elapsed = Date.now() - data.unoChallenge.startTime;
-      if (elapsed < 2800 && !botTimers.unoShout) {
-        botTimers.unoShout = setTimeout(() => {
+      if (elapsed < 2800) {
+       if (!botTimers.unoShout) botTimers.unoShout = setTimeout(() => {
           botTimers.unoShout = null;
           unoRef.transaction(cur => {
             if (!cur || !cur.unoChallenge || cur.unoChallenge.target !== botKey || cur.unoChallenge.shouted) return cur;
@@ -324,8 +324,9 @@ function startUnoBot() {
             return s;
           });
         }, 2000 + Math.random() * 500);
+        return;
       }
-      return;
+      // jendela teriak sudah lewat -> lanjut jalan, jangan macet
     }
 
     if (!botActiveRoles.includes(botKey)) { if (botTimers.uno) { clearTimeout(botTimers.uno); botTimers.uno = null; } return; }
@@ -348,19 +349,25 @@ function unoBotMove(unoRef, botKey) {
     const curCard = s.currentCard;
     const curCol = curCard.chosenColor || curCard.color;
 
+    if (s.drawStack > 0) s.hasDrawn = false;
+
     let valid = hand.filter(c => {
-      if (s.drawStack > 0) return c.value === curCard.value || c.value === 'draw4';
+      if (s.drawStack > 0) return String(c.value) === String(curCard.value) || c.value === 'draw4';
       return c.color === 'wild' || c.color === curCol || String(c.value) === String(curCard.value);
     });
 
     if (valid.length === 0) {
+      // Ada penalti (+2/+4) dan tidak punya kartu balasan -> WAJIB ambil semua, TIDAK BOLEH pass
       if (s.drawStack > 0) {
-        const drawn = drawUnoCards(s, s.drawStack);
+        const n = s.drawStack;
+        const drawn = drawUnoCards(s, n);
         s.hands[botKey] = [...hand, ...drawn];
         s.drawStack = 0; s.hasDrawn = false; s.turn = nextUnoTurn(s, 1);
-        s.lastActionText = `📥 ${botKey.toUpperCase()} terpaksa ambil penalti +${drawn.length} kartu.`;
+        s.unoChallenge = null;
+        s.lastActionText = `📥 ${botKey.toUpperCase()} tidak punya kartu balasan, ambil penalti +${n} kartu.`;
         return s;
       }
+      // Tidak ada kartu cocok -> ambil 1 dulu; pass hanya boleh SETELAH ambil
       if (s.hasDrawn) {
         s.hasDrawn = false; s.turn = nextUnoTurn(s, 1); s.lastActionText = `⏭️ ${botKey.toUpperCase()} Pass.`;
       } else {

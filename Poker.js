@@ -45,10 +45,15 @@ pokerStyleEl.innerHTML = `
   #pokerScreen .capsa-card-back-count.bump { animation: pokerBump .5s cubic-bezier(.2,1.5,.4,1); }
   @keyframes pokerBump { 0% { transform: scale(1); } 40% { transform: scale(1.55); } 100% { transform: scale(1); } }
 
-  /* Tangan: dikipas (overlap otomatis) supaya 13 kartu muat 1 baris */
-  #pokerScreen .capsa-hand-me { flex-wrap: nowrap; gap: 0; padding-top: 20px; min-height: 108px; }
+  /* Tangan: dikipas setengah lingkaran (busur) dan selalu muat di dalam kotak */
+  #pokerScreen .capsa-hand-me {
+    flex-wrap: nowrap; gap: 0; justify-content: center; align-items: flex-end;
+    box-sizing: border-box; padding: 26px 26px 20px; min-height: 130px; overflow: hidden;
+  }
   #pokerScreen .capsa-hand-me .capsa-card-img {
     margin-left: var(--ov, -8px); position: relative; flex-shrink: 0; -webkit-tap-highlight-color: transparent; -webkit-user-drag: none;
+    transform-origin: 50% 100%;
+    transform: translateY(var(--dy, 0px)) rotate(var(--rot, 0deg));
     animation: none;
     transition: transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .16s ease;
   }
@@ -60,13 +65,13 @@ pokerStyleEl.innerHTML = `
   }
   #pokerScreen .capsa-hand-me .capsa-card-img.myturn { cursor: pointer; }
   #pokerScreen .capsa-hand-me .capsa-card-img.selected {
-    transform: translateY(-18px) scale(1.05); z-index: 5;
+    transform: translateY(calc(var(--dy, 0px) - 18px)) rotate(var(--rot, 0deg)) scale(1.05); z-index: 5;
     box-shadow: 0 0 0 3px var(--gold), 0 12px 22px rgba(0,0,0,.7);
   }
   #pokerScreen .capsa-hand-me .capsa-card-img.shake { animation: pokerShake .3s ease; }
   @keyframes pokerShake { 0%,100% { translate: 0 0; } 25% { translate: -5px 0; } 75% { translate: 5px 0; } }
   @media (hover: hover) {
-    #pokerScreen .capsa-hand-me .capsa-card-img.myturn:not(.selected):hover { transform: translateY(-8px); z-index: 4; }
+    #pokerScreen .capsa-hand-me .capsa-card-img.myturn:not(.selected):hover { transform: translateY(calc(var(--dy, 0px) - 8px)) rotate(var(--rot, 0deg)); z-index: 4; }
   }
 
   /* Kartu di tengah meja: terbang dari kursi pemain */
@@ -515,12 +520,27 @@ function pokerRenderBackHand(container, count){
 // RENDER TANGAN SAYA (diff + kipas)
 // ======================================================
 function pokerFanOverlap(container, n){
-  const avail = container.clientWidth - 8;
-  if(!avail || n < 2){ container.style.setProperty('--ov', '-8px'); return; }
-  const cardW = 52;
-  let ov = (avail - n * cardW) / (n - 1);
-  ov = Math.max(-32, Math.min(6, ov));
-  container.style.setProperty('--ov', ov + 'px');
+  const cards = Array.from(container.children).filter(el => el.classList && el.classList.contains('capsa-card-img'));
+  n = cards.length;
+  const cs = getComputedStyle(container);
+  const avail = container.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+  const cardW = (cards[0] && cards[0].offsetWidth) || 52;
+  if(!avail || n < 1) return;
+
+  // jarak antar kartu: rapat kalau banyak, longgar (maks 75% lebar kartu) kalau sedikit
+  let step = n > 1 ? (avail - cardW) / (n - 1) : 0;
+  step = Math.max(14, Math.min(cardW * 0.75, step));
+  container.style.setProperty('--ov', (step - cardW) + 'px');
+
+  // busur setengah lingkaran: tengah paling tinggi & tegak, pinggir miring & turun
+  const span = Math.min(24, (n - 1) * 4);   // derajat maksimal di ujung kiri/kanan
+  const drop = Math.min(16, (n - 1) * 2.5); // px turun di ujung
+  const mid = (n - 1) / 2;
+  cards.forEach((el, i) => {
+    const t = mid ? (i - mid) / mid : 0;     // -1 .. 1
+    el.style.setProperty('--rot', (t * span).toFixed(2) + 'deg');
+    el.style.setProperty('--dy', (t * t * drop).toFixed(2) + 'px');
+  });
 }
 
 function pokerPaintHand(data){
