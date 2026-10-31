@@ -1,1071 +1,560 @@
 // ======================================================
-// Poker.js — Capsa Banting 4 Pemain (Upgrade: Diff Render + FX + Sound)
-// Membutuhkan shared.js sudah dimuat lebih dulu
-// Logika kombinasi/urutan angka TIDAK diubah. Yang diupgrade: render tangan
-// tanpa rebuild, kipas kartu, preview kombinasi, efek, suara, confetti.
+// bot.js — Single-player mode (Uno & Snake tanpa Difficulty)
 // ======================================================
 
-let pokerRef = null;
-let latestPokerData = null;
-let pokerPresence = {};
-let selectedKeys = new Set();
-let pokerNames = {};
+let botActiveRoles = [];
+const botTimers = {};
+const botPresenceRefs = {};
 
-let pokerLastAnimatedHand = null;
-let pokerHasRenderedOnce = false;
+let chessBotHandler = null;
+let tttBotHandler = null;
+let snakeBotHandler = null;
+let unoBotHandler = null;
+let pokerBotHandler = null;
 
-let pokerPrev = { init: false, hand: null, playSig: null, passSig: null, turn: null, phase: null, finished: 0, centerSig: null };
-let pokerAudio = null;
-
-const ROLES = ['p1', 'p2', 'p3', 'p4'];
-
-const CARD_IMG_BASE = 'https://deckofcardsapi.com/static/img/';
-const CARD_BACK_IMG = CARD_IMG_BASE + 'back.png';
-
-// Urutan murni dari terkecil (3) sampai terbesar (2)
-const RANKS = ['03','04','05','06','07','08','09','10','J','Q','K','A','02'];
-const SUITS = ['c','d','h','s'];
-const RANK_TO_API = { '03':'3','04':'4','05':'5','06':'6','07':'7','08':'8','09':'9','10':'0','J':'J','Q':'Q','K':'K','A':'A','02':'2' };
-const SUIT_TO_API = { c:'C', d:'D', h:'H', s:'S' };
-const RANK_ORDER = { '03':0,'04':1,'05':2,'06':3,'07':4,'08':5,'09':6,'10':7,'J':8,'Q':9,'K':10,'A':11,'02':12 };
-const SUIT_ORDER = { c:0, d:1, h:2, s:3 }; // Cuma buat sort di tangan biar rapi
-
-// ======================================================
-// CSS (diinjeksi, menimpa style lama di index.html)
-// ======================================================
-const pokerStyleEl = document.createElement('style');
-pokerStyleEl.innerHTML = `
-  #pokerScreen .capsa-table { position: relative; }
-  #pokerScreen .capsa-seat { position: relative; }
-  #pokerScreen .capsa-seat.active-turn { animation: pokerTurnGlow 1.4s ease-in-out infinite; }
-  @keyframes pokerTurnGlow {
-    0%, 100% { box-shadow: 0 0 0 2px var(--gold) inset, 0 0 8px rgba(232,172,31,.2); }
-    50%      { box-shadow: 0 0 0 2px var(--gold) inset, 0 0 20px rgba(232,172,31,.6); }
-  }
-  #pokerScreen .capsa-card-back-count.bump { animation: pokerBump .5s cubic-bezier(.2,1.5,.4,1); }
-  @keyframes pokerBump { 0% { transform: scale(1); } 40% { transform: scale(1.55); } 100% { transform: scale(1); } }
-
-  /* Tangan: kipas melengkung, posisi kartu dihitung JS supaya selalu di dalam kotak kuning.
-     Tinggi total (136px) = sama dengan tinggi lama, jadi ukuran kotak kuning tidak berubah. */
-  #pokerScreen .capsa-hand-me {
-    display: block; position: relative; box-sizing: border-box;
-    width: 100%; max-width: 100%; min-width: 0; align-self: stretch;
-    height: 136px; min-height: 0; padding: 0; overflow: hidden; touch-action: manipulation;
-  }
-  #pokerScreen .capsa-hand-me .capsa-card-img {
-    position: absolute; left: 0; top: 0; margin: 0; flex-shrink: 0;
-    -webkit-tap-highlight-color: transparent; -webkit-user-drag: none; user-select: none;
-    transform-origin: 50% 100%;
-    transform: translateY(var(--dy, 0px)) rotate(var(--rot, 0deg));
-    animation: none;
-    transition: transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .16s ease, left .22s ease;
-  }
-  #pokerScreen .capsa-hand-me .capsa-card-img.enter { animation: pokerCardIn .42s cubic-bezier(.2,.9,.3,1.2) backwards; }
-  @keyframes pokerCardIn {
-    from { transform: translateY(-60px) scale(.5) rotate(-12deg); opacity: 0; }
-    to   { transform: translateY(var(--dy, 0px)) rotate(var(--rot, 0deg)); opacity: 1; }
-  }
-  #pokerScreen .capsa-hand-me .capsa-card-img.myturn { cursor: pointer; }
-  #pokerScreen .capsa-hand-me .capsa-card-img.selected {
-    transform: translateY(calc(var(--dy, 0px) - 18px)) rotate(var(--rot, 0deg)) scale(1.05); z-index: 60 !important;
-    box-shadow: 0 0 0 3px var(--gold), 0 12px 22px rgba(0,0,0,.7);
-  }
-  #pokerScreen .capsa-hand-me .capsa-card-img.shake { animation: pokerShake .3s ease; }
-  @keyframes pokerShake { 0%,100% { translate: 0 0; } 25% { translate: -5px 0; } 75% { translate: 5px 0; } }
-  @media (hover: hover) {
-    #pokerScreen .capsa-hand-me .capsa-card-img.myturn:not(.selected):hover { transform: translateY(calc(var(--dy, 0px) - 8px)) rotate(var(--rot, 0deg)); z-index: 59 !important; }
-  }
-  /* Pembatas kelompok kiri | kanan */
-  #pokerScreen .poker-hand-divider {
-    position: absolute; width: 3px; border-radius: 3px; pointer-events: none; z-index: 70; display: none;
-    background: linear-gradient(to bottom, transparent, var(--gold) 20%, var(--gold) 80%, transparent);
-    box-shadow: 0 0 8px rgba(232,172,31,.55); opacity: .9;
-  }
-  /* Tombol kecil: pindah kelompok & gabung */
-  #pokerScreen .poker-hand-btn {
-    position: absolute; top: 4px; z-index: 80; width: 28px; height: 28px; padding: 0; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center; font-size: 15px; line-height: 1; cursor: pointer;
-    background: rgba(0,0,0,.5); color: var(--gold); border: 1px solid rgba(232,172,31,.7);
-    -webkit-tap-highlight-color: transparent;
-  }
-  #pokerScreen .poker-hand-btn:active { transform: scale(.9); }
-  #pokerScreen .poker-hand-btn.move { left: 4px; }
-  #pokerScreen .poker-hand-btn.merge { right: 4px; display: none; }
-  #pokerScreen .poker-hand-btn.dim { opacity: .45; }
-
-  /* Kartu di tengah meja: terbang dari kursi pemain */
-  #pokerScreen .capsa-lastplay .capsa-card-img.fly { animation: pokerFly .45s cubic-bezier(.2,.9,.3,1.1) backwards; }
-  @keyframes pokerFly {
-    from { transform: translate(var(--fx), var(--fy)) scale(.7) rotate(var(--rot, 0deg)); opacity: 0; }
-    to   { transform: none; opacity: 1; }
-  }
-  #pokerScreen .capsa-lastplay .capsa-card-img.small { box-shadow: 0 6px 14px rgba(0,0,0,.55); }
-
-  /* Preview kombinasi */
-  #pokerScreen .capsa-preview {
-    text-align: center; font-size: 13px; font-weight: 700; margin-top: 10px; padding: 8px 12px; border-radius: 10px;
-    background: var(--void); border: 1px solid var(--line); color: var(--ink-dim); transition: color .15s ease, border-color .15s ease;
-  }
-  #pokerScreen .capsa-preview.ok  { color: var(--green); border-color: rgba(43,182,115,.5); }
-  #pokerScreen .capsa-preview.bad { color: var(--red);   border-color: rgba(228,87,79,.5); }
-
-  /* Bubble PASS di kursi */
-  .poker-bubble {
-    position: absolute; left: 50%; top: -6px; z-index: 40; pointer-events: none; white-space: nowrap;
-    font-size: 12px; font-weight: 800; color: #fff; background: var(--blue); padding: 4px 12px; border-radius: 20px;
-    box-shadow: 0 4px 12px rgba(0,0,0,.5); animation: pokerBubble 1.1s ease-out forwards;
-  }
-  @keyframes pokerBubble {
-    0%   { transform: translate(-50%, 8px) scale(.6); opacity: 0; }
-    20%  { transform: translate(-50%, -4px) scale(1.08); opacity: 1; }
-    75%  { transform: translate(-50%, -8px) scale(1); opacity: 1; }
-    100% { transform: translate(-50%, -22px) scale(1); opacity: 0; }
-  }
-
-  /* Toast di tengah meja */
-  .poker-toast {
-    position: absolute; left: 50%; top: 46%; z-index: 40; pointer-events: none; white-space: nowrap;
-    font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 800; color: #fff;
-    text-shadow: 0 3px 12px rgba(0,0,0,.85), 0 0 18px rgba(0,0,0,.6);
-    animation: pokerToast 1.15s ease-out forwards;
-  }
-  .poker-toast.big { font-size: 28px; color: #ffd36b; }
-  @keyframes pokerToast {
-    0%   { transform: translate(-50%, -30%) scale(.4); opacity: 0; }
-    20%  { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
-    70%  { transform: translate(-50%, -55%) scale(1); opacity: 1; }
-    100% { transform: translate(-50%, -110%) scale(1); opacity: 0; }
-  }
-  #pokerScreen .capsa-table.shake { animation: pokerTableShake .35s ease-in-out; }
-  @keyframes pokerTableShake {
-    0%, 100% { transform: translate(0, 0); }
-    20% { transform: translate(-4px, 2px); } 40% { transform: translate(4px, -2px); }
-    60% { transform: translate(-3px, -1px); } 80% { transform: translate(3px, 1px); }
-  }
-
-  /* Confetti */
-  .poker-confetti-box { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 35; border-radius: 18px; }
-  .poker-confetti-box i { position: absolute; top: -14px; width: 8px; height: 13px; border-radius: 2px; animation: pokerConfetti linear forwards; }
-  @keyframes pokerConfetti {
-    0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
-    100% { transform: translate(var(--dx), 480px) rotate(var(--rot)); opacity: .9; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    #pokerScreen *, #pokerScreen *::after, .poker-toast, .poker-bubble, .poker-confetti-box i { animation-duration: .01ms !important; animation-delay: 0s !important; }
-  }
-`;
-document.head.appendChild(pokerStyleEl);
-
-// ======================================================
-// SOUND
-// ======================================================
-function pokerGetAudio() {
+function cleanupBotListeners() {
   try {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return null;
-    if (!pokerAudio) pokerAudio = new AC();
-    if (pokerAudio.state === 'suspended') pokerAudio.resume();
-    return pokerAudio;
-  } catch (e) { return null; }
-}
-function pokerTone(f, at, dur, type, vol, f2) {
-  const a = pokerGetAudio(); if (!a) return;
-  const t = a.currentTime + at;
-  const o = a.createOscillator(), g = a.createGain();
-  o.type = type || 'sine';
-  o.frequency.setValueAtTime(f, t);
-  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
-  g.gain.setValueAtTime(vol || .15, t);
-  g.gain.exponentialRampToValueAtTime(.001, t + dur);
-  o.connect(g); g.connect(a.destination);
-  o.start(t); o.stop(t + dur + .02);
-}
-function pokerSfx(kind) {
-  try {
-    if (kind === 'tick') pokerTone(620, 0, .05, 'sine', .1);
-    else if (kind === 'bad') pokerTone(180, 0, .14, 'square', .08, 110);
-    else if (kind === 'play') { pokerTone(280, 0, .09, 'triangle', .22, 140); pokerTone(500, .04, .06, 'sine', .08); }
-    else if (kind === 'combo') [392, 494, 587, 784].forEach((f, i) => pokerTone(f, i * .06, .12, 'triangle', .13));
-    else if (kind === 'bomb') { pokerTone(160, 0, .3, 'sawtooth', .22, 40); pokerTone(900, 0, .08, 'square', .1, 200); [523, 659, 784, 1047].forEach((f, i) => pokerTone(f, .12 + i * .06, .14, 'sine', .12)); }
-    else if (kind === 'pass') pokerTone(330, 0, .12, 'sine', .1, 220);
-    else if (kind === 'turn') { pokerTone(660, 0, .1, 'sine', .12); pokerTone(880, .1, .12, 'sine', .12); }
-    else if (kind === 'deal') pokerTone(700, 0, .04, 'square', .05, 500);
-    else if (kind === 'finish') [523, 659, 784].forEach((f, i) => pokerTone(f, i * .08, .15, 'sine', .14));
-    else if (kind === 'win') [523, 659, 784, 1047, 1319].forEach((f, i) => pokerTone(f, i * .09, .2, 'sine', .15));
-    else if (kind === 'lose') [392, 330, 262].forEach((f, i) => pokerTone(f, i * .13, .24, 'triangle', .15));
-  } catch (e) {}
-}
+    if (chessBotHandler && roomRef) roomRef.child('state').off('value', chessBotHandler);
+    if (tttBotHandler && roomRef) roomRef.child('state').off('value', tttBotHandler);
+    if (snakeBotHandler && roomRef) roomRef.child('snake').off('value', snakeBotHandler);
+    if (unoBotHandler && roomRef) roomRef.child('uno').off('value', unoBotHandler);
+    if (pokerBotHandler && roomRef) roomRef.child('poker').off('value', pokerBotHandler);
+  } catch(e) {}
+  
+  chessBotHandler = null; tttBotHandler = null; snakeBotHandler = null; unoBotHandler = null; pokerBotHandler = null;
 
-// ======================================================
-// Util
-// ======================================================
-function ensureArray(val) {
-  if (!val) return [];
-  if (Array.isArray(val)) return val;
-  return Object.values(val);
-}
-
-function makeDeck(){
-  const deck = [];
-  RANKS.forEach(rank => SUITS.forEach(suit => deck.push({ rank, suit })));
-  return deck;
-}
-function shuffleDeck(deck){
-  const d = deck.slice();
-  for(let i = d.length - 1; i > 0; i--){
-    const j = Math.floor(Math.random() * (i + 1));
-    [d[i], d[j]] = [d[j], d[i]];
-  }
-  return d;
-}
-function cardImg(c){ return CARD_IMG_BASE + RANK_TO_API[c.rank] + SUIT_TO_API[c.suit] + '.png'; }
-
-function cardKey(c){ return c.rank + '|' + c.suit; }
-
-// Sorting di tangan pakai Suit biar rapi,
-// tapi kalkulasi menang/kalah HANYA pakai RANK_ORDER.
-function sortCards(hand){
-  hand = ensureArray(hand);
-  return hand.slice().sort((a, b) => RANK_ORDER[a.rank] - RANK_ORDER[b.rank] || SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit]);
-}
-
-function nextActiveRole(current, finished){
-  finished = ensureArray(finished);
-  let idx = ROLES.indexOf(current);
-  for(let i = 0; i < 4; i++){
-    idx = (idx + 1) % 4;
-    if(!finished.includes(ROLES[idx])) return ROLES[idx];
-  }
-  return current;
-}
-
-function removeCards(hand, selected){
-  hand = ensureArray(hand);
-  const remaining = selected.map(cardKey);
-  return hand.filter(c => {
-    const k = cardKey(c);
-    const idx = remaining.indexOf(k);
-    if(idx >= 0){ remaining.splice(idx, 1); return false; }
-    return true;
+  Object.keys(botTimers).forEach(k => {
+    if (botTimers[k]) { clearTimeout(botTimers[k]); botTimers[k] = null; }
   });
 }
 
-function displayName(role){
-  const n = pokerNames && pokerNames[role];
-  return (n && n.trim()) ? n.trim() : role.toUpperCase();
+function startBotForCurrentGame() {
+  if (!window.isBotMode || !roomRef) return;
+  const game = currentGame;
+  let botRoles = [];
+
+  if (game === 'chess' || game === 'ttt') botRoles = ['p2'];
+  else if (game === 'poker') botRoles = ['p2', 'p3', 'p4'];
+  else if (game === 'uno') {
+    const maxP = window.unoSelectedMaxPlayers || 4;
+    botRoles = ['p2','p3','p4','p5','p6'].slice(0, maxP - 1);
+  } else if (game === 'snake') {
+    const maxP = window.snakeSelectedMaxPlayers || 2;
+    botRoles = ['p2','p3','p4','p5','p6','p7'].slice(0, maxP - 1);
+  } else return;
+
+  botActiveRoles = botRoles;
+  cleanupBotListeners();
+
+  botRoles.forEach(r => {
+    const ref = roomRef.child('presence/' + r);
+    ref.set(true);
+    ref.onDisconnect().remove();
+    botPresenceRefs[r] = ref;
+  });
+
+  setTimeout(() => {
+    if (game === 'chess') startChessBot();
+    if (game === 'ttt')   startTTTBot();
+    if (game === 'snake') startSnakeBot();
+    if (game === 'uno')   startUnoBot();
+    if (game === 'poker') startPokerBot();
+  }, 500);
 }
 
-// TIEBREAK CUMA PAKE ANGKA (TANPA SUIT)
-function detectCombo(cards){
-  const n = cards.length;
-
-  // 1 Kartu (Single)
-  if(n === 1) {
-    return { valid: true, type: 'single', count: 1, level: 0, tiebreak: [RANK_ORDER[cards[0].rank]] };
-  }
-
-  // 2 Kartu (Pair)
-  if(n === 2){
-    if(cards[0].rank !== cards[1].rank) return { valid: false };
-    return { valid: true, type: 'pair', count: 2, level: 0, tiebreak: [RANK_ORDER[cards[0].rank]] };
-  }
-
-  // 3 Kartu (Triss atau Bom Seri 3)
-  if(n === 3){
-    if(cards.every(c => c.rank === cards[0].rank)) {
-      return { valid: true, type: 'triple', count: 3, level: 1, tiebreak: [RANK_ORDER[cards[0].rank]] };
-    }
-    const sorted = cards.slice().sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
-    const idxs = sorted.map(c => RANK_ORDER[c.rank]);
-    const uniq = [...new Set(idxs)];
-    if(uniq.length === 3 && (uniq[0] - uniq[2] === 2)) {
-      return { valid: true, type: 'run3', count: 3, level: 0, tiebreak: [idxs[0]] };
-    }
-    return { valid: false };
-  }
-
-  // 4 Kartu (Bom 4 Angka Sama atau Bom Seri 4)
-  if(n === 4){
-    if(cards.every(c => c.rank === cards[0].rank)) {
-      return { valid: true, type: 'four_pure', count: 4, level: 2, tiebreak: [RANK_ORDER[cards[0].rank]] };
-    }
-    const sorted = cards.slice().sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
-    const idxs = sorted.map(c => RANK_ORDER[c.rank]);
-    const uniq = [...new Set(idxs)];
-    if(uniq.length === 4 && (uniq[0] - uniq[3] === 3)) {
-      return { valid: true, type: 'run4', count: 4, level: 1, tiebreak: [idxs[0]] };
-    }
-    return { valid: false };
-  }
-
-  // 5 Kartu
-  if(n === 5) return detectFiveCombo(cards);
-
-  return { valid: false };
-}
-
-function detectFiveCombo(cards){
-  const sorted = cards.slice().sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
-  const idxs = sorted.map(c => RANK_ORDER[c.rank]);
-  const isFlush = cards.every(c => c.suit === cards[0].suit);
-  const uniqueIdx = [...new Set(idxs)];
-  const isStraight = uniqueIdx.length === 5 && (uniqueIdx[0] - uniqueIdx[4] === 4);
-  const counts = {};
-  idxs.forEach(i => counts[i] = (counts[i] || 0) + 1);
-  const groups = Object.entries(counts).map(([i, c]) => ({ i: +i, c })).sort((a, b) => b.c - a.c || b.i - a.i);
-
-  if(isStraight && isFlush) return { valid: true, type: 'straightflush', count: 5, level: 6, tiebreak: [idxs[0]] };
-  if(groups[0].c === 4) return { valid: true, type: 'four', count: 5, level: 5, tiebreak: [groups[0].i] };
-  if(isFlush) return { valid: true, type: 'flush', count: 5, level: 3, tiebreak: [...idxs] }; // Cuma urutan angka
-  if(groups[0].c === 3 && groups[1] && groups[1].c === 2) return { valid: true, type: 'fullhouse', count: 5, level: 4, tiebreak: [groups[0].i] };
-  if(groups.length === 4 && groups[0].c === 2 && groups.slice(1).every(g => g.c === 1)){
-    const singleRanks = groups.slice(1).map(g => g.i).sort((a, b) => a - b);
-    if(singleRanks[2] - singleRanks[0] === 2) return { valid: true, type: 'seripolo', count: 5, level: 2, tiebreak: [singleRanks[2], groups[0].i] };
-  }
-  if(isStraight) return { valid: true, type: 'straight', count: 5, level: 1, tiebreak: [idxs[0]] };
-  return { valid: false };
-}
-
-function compareCombo(a, b){
-  if(a.count !== b.count) return a.count - b.count;
-  if(a.level !== b.level) return a.level - b.level;
-  const len = Math.max(a.tiebreak.length, b.tiebreak.length);
-  for(let i = 0; i < len; i++){
-    const av = a.tiebreak[i] || 0, bv = b.tiebreak[i] || 0;
-    if(av !== bv) return av - bv;
-  }
-  return 0; // 0 Artinya SAMA KUAT (Gak bisa bantai)
-}
-
-function comboDisplayName(combo){
-  const map = { single: 'Single', pair: 'Pair', triple: 'Triss', run3: 'Bom Seri (3 Kartu)', run4: 'Bom Seri (4 Kartu)', four_pure: 'Bom 4 Angka Sama', straight: 'Seri 5 Kartu (Straight)', flush: 'Flush', seripolo: 'Polo Seri (Seri + Pair)', fullhouse: 'Polo (Full House)', four: 'Poker (Four of a Kind + Kicker)' };
-  if (combo.type === 'straightflush') return combo.tiebreak[0] === RANK_ORDER['02'] ? 'Royal Flush' : 'Straight Flush';
-  return map[combo.type] || '-';
-}
-
-// Fungsi ini udah gak terlalu kepake karena compareCombo udah otomatis nolak
-// Tapi dibiarin aja buat jaga-jaga
-function isPureAceCombo(cards){ return cards.length > 0 && cards.every(c => c.rank === 'A'); }
-function isBlockedBeat(lastPlay, newCombo, newCards){
-  if(!lastPlay) return false;
-  if((lastPlay.combo.type === 'four' || lastPlay.combo.type === 'four_pure') && (newCombo.type === 'four' || newCombo.type === 'four_pure')) return 'poker';
-  return false;
-}
-function blockedBeatMessage(reason){
-  if(reason === 'poker') return 'Bom 4 Angka Sama gak bisa dibantai sesama Bom 4 Angka Sama!';
-  return 'Kombinasi tidak diperbolehkan.';
-}
-
-function pokerBuildNewGame(prev){
-  const deck = shuffleDeck(makeDeck());
-  const hands = { p1: deck.slice(0, 13), p2: deck.slice(13, 26), p3: deck.slice(26, 39), p4: deck.slice(39, 52) };
-  let starter = 'p1';
-  ROLES.forEach(r => { if(hands[r].some(c => c.rank === '03' && c.suit === 'd')) starter = r; });
-  return {
-    phase: 'playing', hands, turn: starter, starter, isFirstPlay: true, lastPlay: null, lastPlayer: null, passCount: 0,
-    finished: [], loser: null, winner: null, lastActionText: null, handNumber: ((prev && prev.handNumber) || 0) + 1, names: (prev && prev.names) || {}
+// ============================================================
+// ♟ CATUR BOT
+// ============================================================
+function chessBotEval(board) {
+  let score = 0;
+  const vals = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+  const pst = {
+    p: [[0,0,0,0,0,0,0,0],[50,50,50,50,50,50,50,50],[10,10,20,30,30,20,10,10],[5,5,10,25,25,10,5,5],[0,0,0,20,20,0,0,0],[5,-5,-10,0,0,-10,-5,5],[5,10,10,-20,-20,10,10,5],[0,0,0,0,0,0,0,0]],
+    n: [[-50,-40,-30,-30,-30,-30,-40,-50],[-40,-20,0,0,0,0,-20,-40],[-30,0,10,15,15,10,0,-30],[-30,5,15,20,20,15,5,-30],[-30,0,15,20,20,15,0,-30],[-30,5,10,15,15,10,5,-30],[-40,-20,0,5,5,0,-20,-40],[-50,-40,-30,-30,-30,-30,-40,-50]]
   };
-}
 
-// ======================================================
-// AKSI PEMAIN
-// ======================================================
-function pokerDoPlay(){
-  const data = latestPokerData;
-  if(!data || data.phase !== 'playing' || data.turn !== myRole) return;
-
-  const hand = sortCards(data.hands && data.hands[myRole]);
-  const selected = hand.filter(c => selectedKeys.has(cardKey(c)));
-  if(selected.length === 0){ pokerSfx('bad'); showCustomAlert('Pilih kartu dulu.'); return; }
-
-  const combo = detectCombo(selected);
-  if(!combo.valid){ pokerSfx('bad'); showCustomAlert('Kombinasi kartu tidak valid.'); return; }
-  if(data.isFirstPlay && !selected.some(c => c.rank === '03' && c.suit === 'd')){ pokerSfx('bad'); showCustomAlert('Wajib jalan dengan kartu 3♦ (3 Wajik) di kartu pertama!'); return; }
-
-  if(!data.isFirstPlay && data.lastPlay){
-    if(combo.count !== data.lastPlay.combo.count){
-      pokerSfx('bad');
-      showCustomAlert('Jumlah kartu harus sama dengan yang di meja (' + data.lastPlay.combo.count + ' kartu).');
-      return;
-    }
-    if(isBlockedBeat(data.lastPlay, combo, selected)){
-      pokerSfx('bad');
-      showCustomAlert(blockedBeatMessage(isBlockedBeat(data.lastPlay, combo, selected)));
-      return;
-    }
-    // Harus LEBIH BESAR (> 0), kalau sama (0) ditolak
-    if(compareCombo(combo, data.lastPlay.combo) <= 0){
-      pokerSfx('bad');
-      showCustomAlert('Kombinasi kamu harus LEBIH TINGGI dari kartu terakhir di meja.');
-      return;
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 8; x++) {
+      const p = board[y][x];
+      if (!p) continue;
+      const type = p.toLowerCase();
+      const isWhite = p === p.toUpperCase();
+      let val = vals[type] || 0;
+      if (pst[type]) {
+        const py = isWhite ? y : 7 - y;
+        val += pst[type][py][x];
+      }
+      score += isWhite ? val : -val;
     }
   }
-
-  pokerRef.transaction(cur => {
-    if(!cur || cur.phase !== 'playing' || cur.turn !== myRole) return cur;
-    const state = JSON.parse(JSON.stringify(cur));
-
-    const curHand = ensureArray(state.hands[myRole]);
-    const remain = removeCards(curHand, selected);
-    if(remain.length !== curHand.length - selected.length) return cur;
-
-    const c2 = detectCombo(selected);
-    if(!c2.valid) return cur;
-    if(state.isFirstPlay && !selected.some(c => c.rank === '03' && c.suit === 'd')) return cur;
-    if(!state.isFirstPlay && state.lastPlay){
-      if(c2.count !== state.lastPlay.combo.count || isBlockedBeat(state.lastPlay, c2, selected) || compareCombo(c2, state.lastPlay.combo) <= 0) return cur;
-    }
-
-    state.hands[myRole] = remain;
-    state.lastPlay = { by: myRole, cards: selected, combo: c2 };
-    state.lastPlayer = myRole; state.passCount = 0; state.isFirstPlay = false;
-    state.lastActionText = comboDisplayName(c2);
-
-    const finished = ensureArray(state.finished);
-    if(remain.length === 0 && !finished.includes(myRole)){
-      finished.push(myRole); state.finished = finished;
-      if(finished.length >= 3){
-        state.phase = 'roundover'; state.loser = ROLES.find(r => !finished.includes(r)) || null; state.winner = finished[0];
-        return state;
-      }
-    }
-    state.turn = nextActiveRole(myRole, state.finished || []);
-    return state;
-  }, () => { selectedKeys.clear(); });
+  return score;
 }
 
-function pokerDoPass(){
-  pokerRef.transaction(cur => {
-    if(!cur || cur.phase !== 'playing' || cur.turn !== myRole || !cur.lastPlay) return cur;
-    const state = JSON.parse(JSON.stringify(cur));
-    const finished = ensureArray(state.finished);
+function chessBotMinimax(board, state, depth, side, alpha, beta) {
+  const moves = chessAllLegalMoves(board, state, side);
+  if (moves.length === 0) {
+    if (chessIsInCheck(board, side)) return side === 'w' ? -99999 : 99999;
+    return 0;
+  }
+  if (depth === 0) return chessBotEval(board);
 
-    state.passCount = (state.passCount || 0) + 1;
-    state.lastActionText = 'pass';
-    const activeCount = 4 - finished.length, threshold = Math.max(activeCount - 1, 1);
+  const isWhite = (side === 'w');
+  let best = isWhite ? -Infinity : Infinity;
+  moves.sort((a, b) => (b.capture ? 1 : 0) - (a.capture ? 1 : 0));
 
-    if(state.passCount >= threshold){
-      state.lastPlay = null; state.passCount = 0;
-      let returnee = state.lastPlayer || nextActiveRole(myRole, finished);
-      if(finished.includes(returnee)) returnee = nextActiveRole(returnee, finished);
-      state.turn = returnee;
+  for (const m of moves) {
+    const res = chessApplyMove(board, state, m, m.promotion ? 'q' : null);
+    const nextSide = side === 'w' ? 'b' : 'w';
+    const score = chessBotMinimax(res.board, { castling: res.castling, ep: res.ep, halfmove: res.halfmove }, depth - 1, nextSide, alpha, beta);
+    
+    if (isWhite) {
+      if (score > best) best = score;
+      if (best > alpha) alpha = best;
     } else {
-      state.turn = nextActiveRole(myRole, finished);
+      if (score < best) best = score;
+      if (best < beta) beta = best;
     }
-    return state;
-  }, () => { selectedKeys.clear(); });
-}
-
-function seatPosFor(role){
-  const my = ROLES.indexOf(myRole), r = ROLES.indexOf(role);
-  return ['bottom', 'right', 'top', 'left'][(r - my + 4) % 4];
-}
-
-// ======================================================
-// EFEK VISUAL
-// ======================================================
-function pokerToast(text, big) {
-  const table = document.querySelector('#pokerScreen .capsa-table'); if (!table) return;
-  const t = document.createElement('div');
-  t.className = 'poker-toast' + (big ? ' big' : ''); t.textContent = text;
-  table.appendChild(t);
-  setTimeout(() => t.remove(), 1250);
-}
-
-function pokerBubble(role, text) {
-  const pos = seatPosFor(role);
-  const seat = document.getElementById({ top: 'capsaSeatTop', left: 'capsaSeatLeft', right: 'capsaSeatRight', bottom: 'capsaSeatBottom' }[pos]);
-  if (!seat) return;
-  const b = document.createElement('div'); b.className = 'poker-bubble'; b.textContent = text;
-  seat.appendChild(b);
-  setTimeout(() => b.remove(), 1200);
-}
-
-function pokerTableShake() {
-  const table = document.querySelector('#pokerScreen .capsa-table'); if (!table) return;
-  table.classList.remove('shake'); void table.offsetWidth; table.classList.add('shake');
-  setTimeout(() => table.classList.remove('shake'), 380);
-}
-
-function pokerConfetti() {
-  const table = document.querySelector('#pokerScreen .capsa-table'); if (!table) return;
-  const colors = ['#e8ac1f', '#3d6bf0', '#2bb673', '#e4574f', '#ffffff', '#a855f7'];
-  const box = document.createElement('div'); box.className = 'poker-confetti-box';
-  for (let i = 0; i < 52; i++) {
-    const s = document.createElement('i');
-    s.style.left = (Math.random() * 100) + '%';
-    s.style.background = colors[i % colors.length];
-    s.style.animationDelay = (Math.random() * .5) + 's';
-    s.style.animationDuration = (1.6 + Math.random() * 1.3) + 's';
-    s.style.setProperty('--dx', (Math.random() * 120 - 60) + 'px');
-    s.style.setProperty('--rot', (Math.random() * 720 - 360) + 'deg');
-    box.appendChild(s);
+    if (beta <= alpha) break;
   }
-  table.appendChild(box);
-  setTimeout(() => box.remove(), 3600);
+  return best;
 }
 
-function pokerShakeCard(el) {
-  el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
-  el.addEventListener('animationend', () => el.classList.remove('shake'), { once: true });
-}
+function startChessBot() {
+  const stateRef = roomRef.child('state');
+  if (chessBotHandler) stateRef.off('value', chessBotHandler);
 
-// ======================================================
-// RENDER KARTU LAWAN (update di tempat)
-// ======================================================
-function pokerRenderBackHand(container, count){
-  const wrap = container.querySelector('.capsa-card-back-wrap');
-  if(count <= 0){ container.innerHTML = ''; return; }
-  if(!wrap){
-    container.innerHTML = '';
-    const w = document.createElement('div');
-    w.className = 'capsa-card-back-wrap';
-    const img = document.createElement('img');
-    img.className = 'capsa-card-back'; img.src = CARD_BACK_IMG; img.alt = 'kartu tertutup';
-    const badge = document.createElement('span');
-    badge.className = 'capsa-card-back-count'; badge.textContent = count;
-    w.appendChild(img); w.appendChild(badge); container.appendChild(w);
-    return;
-  }
-  const badge = wrap.querySelector('.capsa-card-back-count');
-  if(badge.textContent !== String(count)){
-    badge.textContent = count;
-    if(pokerPrev.init){ badge.classList.remove('bump'); void badge.offsetWidth; badge.classList.add('bump'); }
-  }
-}
-
-// ======================================================
-// RENDER TANGAN SAYA (diff + kipas)
-// ======================================================
-// Kelompok kartu (hanya tampilan di sisi klien; tidak menyentuh data game):
-// kartu yang ada di pokerGroupR = kelompok kanan, sisanya kelompok kiri.
-const pokerGroupR = new Set();
-let pokerGroupHandNo = null;
-
-function pokerEnsureHandTools(container){
-  if(container._pokerTools) return;
-  container._pokerTools = true;
-
-  const div = document.createElement('div'); div.className = 'poker-hand-divider';
-  const mv = document.createElement('button'); mv.type = 'button'; mv.className = 'poker-hand-btn move';
-  mv.textContent = '\u21C6'; mv.title = 'Pindahkan kartu terpilih ke kelompok seberang';
-  const mg = document.createElement('button'); mg.type = 'button'; mg.className = 'poker-hand-btn merge';
-  mg.textContent = '\u2715'; mg.title = 'Gabungkan semua kartu';
-  container.appendChild(div); container.appendChild(mv); container.appendChild(mg);
-
-  mv.addEventListener('click', e => { e.stopPropagation(); pokerMoveSelectedGroup(); });
-  mg.addEventListener('click', e => { e.stopPropagation(); pokerMergeGroups(); });
-
-  if(window.ResizeObserver){
-    new ResizeObserver(() => pokerFanOverlap(container)).observe(container);
-  }
-}
-
-function pokerMoveSelectedGroup(){
-  const container = document.getElementById('capsaHandMe');
-  const keys = Array.from(selectedKeys);
-  const mv = container.querySelector('.poker-hand-btn.move');
-  if(!keys.length){
-    if(mv){ pokerShakeCard(mv); }
-    pokerSfx('bad');
-    return;
-  }
-  // kalau semua yang dipilih sudah di kanan -> balik ke kiri; selain itu -> ke kanan
-  const toLeft = keys.every(k => pokerGroupR.has(k));
-  keys.forEach(k => { if(toLeft) pokerGroupR.delete(k); else pokerGroupR.add(k); });
-  pokerSfx('tick');
-  selectedKeys.clear();
-  pokerFanOverlap(container);
-  if(latestPokerData){ pokerPaintHand(latestPokerData); pokerUpdatePreview(latestPokerData); }
-}
-
-function pokerMergeGroups(){
-  const container = document.getElementById('capsaHandMe');
-  pokerGroupR.clear();
-  pokerSfx('tick');
-  pokerFanOverlap(container);
-}
-
-// Menyusun semua kartu sebagai kipas melengkung di dalam kotak tangan.
-// Ukuran & jarak kartu otomatis mengecil/merapat supaya tidak pernah keluar kotak.
-function pokerFanOverlap(container){
-  if(!container) return;
-  pokerEnsureHandTools(container);
-  const W = container.clientWidth, H = container.clientHeight;
-  if(!W || !H) return;
-
-  const all = Array.from(container.children).filter(el => el.classList.contains('capsa-card-img'));
-  const divider = container.querySelector('.poker-hand-divider');
-  const mergeBtn = container.querySelector('.poker-hand-btn.merge');
-  const moveBtn = container.querySelector('.poker-hand-btn.move');
-  const n = all.length;
-  if(!n){ divider.style.display = 'none'; mergeBtn.style.display = 'none'; return; }
-
-  // urutan: kelompok kiri dulu (terurut), lalu kelompok kanan (terurut)
-  const left = all.filter(el => !pokerGroupR.has(el.dataset.key));
-  const right = all.filter(el => pokerGroupR.has(el.dataset.key));
-  const split = left.length > 0 && right.length > 0;
-  const ordered = split ? left.concat(right) : all;
-  const nl = split ? left.length : 0;
-
-  const BASE_W = 52, BASE_H = 74, LIFT = 18, PAD = 6;
-  const gapPx = split ? 16 : 0;
-  const rad = d => d * Math.PI / 180;
-
-  const thetaMax = Math.min(22, Math.max(0, (n - 1) * 3.2));
-  const dropMax  = Math.min(14, Math.max(0, (n - 1) * 2.2));
-
-  // skala kartu: turun kalau banyak kartu, supaya jarak tetap terbaca
-  const margin = s => (BASE_H * s) * Math.sin(rad(thetaMax)) + (BASE_W * s / 2) * Math.cos(rad(thetaMax)) + 3;
-  const minStep = s => 0.36 * BASE_W * s;
-  let s = 1;
-  if(n > 1){
-    // butuh: W - 2*margin(s) - gap >= (n-1) * minStep(s)
-    const m1 = margin(1) , k = (n - 1) * minStep(1);
-    s = Math.min(1, (W - gapPx) / (2 * m1 + k));
-    s = Math.max(0.6, s);
-  }
-  const cw = BASE_W * s, ch = BASE_H * s;
-  const m = margin(s);
-  let step = n > 1 ? (W - 2 * m - gapPx) / (n - 1) : 0;
-  step = Math.max(0, Math.min(cw * 0.78, step));   // sedikit kartu -> tidak terlalu renggang
-  const total = (n - 1) * step + gapPx;
-  const startX = W / 2 - total / 2;
-
-  // posisi vertikal: tepi paling bawah (kartu pinggir yang miring) tetap di dalam kotak
-  const sideLow = (cw / 2) * Math.sin(rad(thetaMax));
-  const yBase = H - PAD - dropMax - sideLow;        // dasar kartu tengah
-  const topY = yBase - ch;
-
-  ordered.forEach((el, i) => {
-    const x = startX + i * step + (split && i >= nl ? gapPx : 0);
-    const t = total ? (x - W / 2) / (total / 2) : 0;   // -1..1
-    el.style.width = cw.toFixed(1) + 'px';
-    el.style.height = ch.toFixed(1) + 'px';
-    el.style.left = (x - cw / 2).toFixed(1) + 'px';
-    el.style.top = topY.toFixed(1) + 'px';
-    el.style.zIndex = String(i + 1);
-    el.style.setProperty('--rot', (t * thetaMax).toFixed(2) + 'deg');
-    el.style.setProperty('--dy', (t * t * dropMax).toFixed(2) + 'px');
-  });
-
-  if(split){
-    const dx = startX + (nl - 1) * step + step / 2 + gapPx / 2;   // tepat di celah kedua kelompok
-    const dh = ch * 0.8;
-    divider.style.display = 'block';
-    divider.style.height = dh.toFixed(0) + 'px';
-    divider.style.left = (dx - 1.5).toFixed(1) + 'px';
-    divider.style.top = (yBase - dh - 4).toFixed(0) + 'px';
-  } else divider.style.display = 'none';
-
-  mergeBtn.style.display = split ? 'flex' : 'none';
-  moveBtn.classList.toggle('dim', selectedKeys.size === 0);
-}
-
-function pokerPaintHand(data){
-  const canSelect = !!data && data.phase === 'playing' && data.turn === myRole;
-  document.querySelectorAll('#capsaHandMe .capsa-card-img').forEach(el => {
-    el.classList.toggle('selected', selectedKeys.has(el.dataset.key));
-    el.classList.toggle('myturn', canSelect);
-  });
-  const mvb = document.querySelector('#capsaHandMe .poker-hand-btn.move');
-  if(mvb) mvb.classList.toggle('dim', selectedKeys.size === 0);
-}
-
-function pokerToggleCard(el){
-  const d = latestPokerData;
-  pokerGetAudio();
-  if(!d || d.phase !== 'playing' || d.turn !== myRole){ pokerShakeCard(el); return; }
-  const k = el.dataset.key;
-  if(selectedKeys.has(k)) selectedKeys.delete(k); else selectedKeys.add(k);
-  pokerSfx('tick');
-  pokerPaintHand(d);
-  pokerUpdatePreview(d);
-}
-
-function pokerSyncMyHand(data, animateNew){
-  const container = document.getElementById('capsaHandMe');
-  const hand = sortCards(data.hands && data.hands[myRole]);
-  pokerEnsureHandTools(container);
-
-  // ronde baru -> kelompok direset
-  if(pokerGroupHandNo !== data.handNumber){ pokerGroupR.clear(); pokerGroupHandNo = data.handNumber; }
-
-  const existing = new Map();
-  Array.from(container.children).forEach(el => { if(el.classList.contains('capsa-card-img')) existing.set(el.dataset.key, el); });
-  const keep = new Set();
-  let idx = 0;
-
-  hand.forEach(c => {
-    const k = cardKey(c); keep.add(k);
-    let el = existing.get(k);
-    if(!el){
-      el = document.createElement('img');
-      el.dataset.key = k; el.draggable = false; el.alt = c.rank + c.suit;
-      el.src = cardImg(c);
-      el.className = 'capsa-card-img';
-      if(animateNew){
-        el.classList.add('enter');
-        el.style.animationDelay = (idx * 40) + 'ms';
-        el.addEventListener('animationend', () => { el.classList.remove('enter'); el.style.animationDelay = ''; }, { once: true });
-      }
-      el.addEventListener('click', () => pokerToggleCard(el));
-      container.appendChild(el);
-    }
-    el._card = c;
-    idx++;
-  });
-  existing.forEach((el, k) => { if(!keep.has(k)){ el.remove(); pokerGroupR.delete(k); } });
-
-  // urutan DOM mengikuti urutan kartu (z-order & aksesibilitas); posisi visual diatur pokerFanOverlap
-  hand.forEach(c => { const el = existing.get(cardKey(c)) || container.querySelector('[data-key="' + cardKey(c) + '"]'); if(el) container.appendChild(el); });
-  ['poker-hand-divider', 'poker-hand-btn move', 'poker-hand-btn merge'].forEach(cls => {
-    const t = container.querySelector('.' + cls.split(' ').join('.')); if(t) container.appendChild(t);
-  });
-
-  pokerFanOverlap(container);
-  pokerPaintHand(data);
-}
-
-// ======================================================
-// TENGAH MEJA
-// ======================================================
-function pokerRenderCenter(data, animate){
-  const wrap = document.getElementById('capsaLastPlay');
-  const byEl = document.getElementById('capsaLastBy');
-  if(!data.lastPlay){
-    if(pokerPrev.centerSig !== ''){ wrap.innerHTML = ''; pokerPrev.centerSig = ''; }
-    byEl.textContent = data.phase === 'playing' ? 'Meja kosong — bebas jalan!' : '';
-    return;
-  }
-
-  const cards = sortCards(data.lastPlay.cards);
-  const sig = data.handNumber + '|' + data.lastPlay.by + '|' + cards.map(cardKey).join(',');
-  if(sig !== pokerPrev.centerSig){
-    wrap.innerHTML = '';
-    const vec = { bottom: ['0px', '110px'], top: ['0px', '-110px'], left: ['-130px', '0px'], right: ['130px', '0px'] }[seatPosFor(data.lastPlay.by)];
-    cards.forEach((c, i) => {
-      const img = document.createElement('img');
-      img.className = 'capsa-card-img small'; img.src = cardImg(c);
-      if(animate){
-        img.classList.add('fly');
-        img.style.setProperty('--fx', vec[0]); img.style.setProperty('--fy', vec[1]);
-        img.style.setProperty('--rot', ((i - (cards.length - 1) / 2) * 8) + 'deg');
-        img.style.animationDelay = (i * 45) + 'ms';
-      }
-      wrap.appendChild(img);
-    });
-    pokerPrev.centerSig = sig;
-  }
-  const byLabel = data.lastPlay.by === myRole ? 'Kamu' : displayName(data.lastPlay.by);
-  byEl.textContent = byLabel + ' · ' + comboDisplayName(data.lastPlay.combo);
-}
-
-function pokerRenderStatus(data){
-  const statusEl = document.getElementById('pokerStatus');
-  if(data.phase === 'waiting'){
-    const onlineCount = ROLES.filter(r => pokerPresence[r]).length;
-    statusEl.textContent = '🟡 Menunggu pemain bergabung (' + onlineCount + '/4)...';
-  } else if(data.phase === 'playing'){
-    if(data.turn === myRole) statusEl.textContent = data.isFirstPlay ? '🟢 Giliranmu! Wajib jalan dengan 3♦ (3 Wajik).' : '🟢 Giliranmu!';
-    else statusEl.textContent = '🟡 Menunggu ' + displayName(data.turn) + '...';
-  } else if(data.phase === 'roundover'){
-    statusEl.textContent = '🏁 Ronde selesai.';
-  }
-  statusEl.style.color = (data.phase === 'playing' && data.turn === myRole) ? 'var(--green)' : '';
-}
-
-function pokerRenderRankBar(data){
-  const el = document.getElementById('capsaRankBar');
-  if(!el) return;
-  const finished = ensureArray(data.finished);
-  if(finished.length === 0 || data.phase === 'waiting'){ el.style.display = 'none'; el.innerHTML = ''; return; }
-
-  const medals = ['🥇', '🥈', '🥉'];
-  el.style.display = 'flex';
-  el.innerHTML = finished.map((r, i) => {
-    const label = (r === myRole) ? (displayName(r) + ' (Kamu)') : displayName(r);
-    return '<span class="capsa-rank-chip">' + (medals[i] || '🏅') + ' ' + label + '</span>';
-  }).join('');
-}
-
-function pokerRenderMyNameLabel(){
-  const el = document.getElementById('capsaMyNameLabel');
-  if(!el) return;
-  const n = pokerNames && pokerNames[myRole];
-  el.textContent = (n && n.trim()) ? (n.trim() + ' (Kamu)') : 'Kamu';
-}
-
-// ======================================================
-// PREVIEW KOMBINASI (live saat memilih kartu)
-// ======================================================
-function pokerEnsurePreview(){
-  let el = document.getElementById('capsaPreview');
-  if(!el){
-    el = document.createElement('div');
-    el.id = 'capsaPreview'; el.className = 'capsa-preview'; el.style.display = 'none';
-    const act = document.getElementById('capsaActions');
-    act.parentNode.insertBefore(el, act);
-  }
-  return el;
-}
-
-function pokerUpdatePreview(data){
-  const el = pokerEnsurePreview();
-  const playBtn = document.getElementById('capsaBtnPlay');
-  const canAct = !!data && data.phase === 'playing' && data.turn === myRole;
-  if(!canAct){ el.style.display = 'none'; return; }
-  el.style.display = 'block';
-
-  const hand = sortCards(data.hands && data.hands[myRole]);
-  const sel = hand.filter(c => selectedKeys.has(cardKey(c)));
-  playBtn.disabled = sel.length === 0;
-
-  if(sel.length === 0){
-    el.className = 'capsa-preview';
-    el.textContent = data.lastPlay ? ('Pilih ' + data.lastPlay.combo.count + ' kartu yang lebih tinggi, atau Pass') : (data.isFirstPlay ? 'Mulai dengan kombinasi yang berisi 3♦' : 'Meja kosong — bebas pilih kombinasi');
-    return;
-  }
-
-  const combo = detectCombo(sel);
-  if(!combo.valid){
-    el.className = 'capsa-preview bad';
-    el.textContent = '❌ Bukan kombinasi valid (' + sel.length + ' kartu)';
-    return;
-  }
-
-  let ok = true, why = '';
-  if(data.isFirstPlay && !sel.some(c => c.rank === '03' && c.suit === 'd')){ ok = false; why = 'wajib ada 3♦'; }
-  else if(!data.isFirstPlay && data.lastPlay){
-    if(combo.count !== data.lastPlay.combo.count){ ok = false; why = 'harus ' + data.lastPlay.combo.count + ' kartu'; }
-    else if(isBlockedBeat(data.lastPlay, combo, sel)){ ok = false; why = 'tidak bisa dibantai'; }
-    else if(compareCombo(combo, data.lastPlay.combo) <= 0){ ok = false; why = 'kalah dari meja'; }
-  }
-  el.className = 'capsa-preview ' + (ok ? 'ok' : 'bad');
-  el.textContent = (ok ? '✅ ' : '❌ ') + comboDisplayName(combo) + (why ? (' — ' + why) : '');
-}
-
-// ======================================================
-// EVENT (suara & efek)
-// ======================================================
-function pokerDetectEvents(data, first){
-  const finished = ensureArray(data.finished);
-  const lp = data.lastPlay;
-  const playSig = lp ? (data.handNumber + '|' + lp.by + '|' + ensureArray(lp.cards).map(cardKey).join(',')) : '';
-  const passSig = data.handNumber + '|' + data.turn + '|' + (data.passCount || 0) + '|' + (data.lastActionText || '');
-
-  if(!first && data.handNumber === pokerPrev.hand){
-    if(lp && playSig !== pokerPrev.playSig){
-      const t = lp.combo.type;
-      if(t === 'four_pure' || t === 'four' || t === 'straightflush'){
-        pokerSfx('bomb'); pokerToast('💣 ' + comboDisplayName(lp.combo).toUpperCase() + '!', true); pokerTableShake();
-      } else if(lp.combo.count >= 3){
-        pokerSfx('combo'); pokerToast(comboDisplayName(lp.combo));
-      } else pokerSfx('play');
-    } else if(data.lastActionText === 'pass' && passSig !== pokerPrev.passSig && pokerPrev.turn && pokerPrev.turn !== data.turn){
-      pokerSfx('pass'); pokerBubble(pokerPrev.turn, 'PASS');
-    }
-
-    if(finished.length > pokerPrev.finished){
-      finished.slice(pokerPrev.finished).forEach(r => pokerToast('🏅 ' + (r === myRole ? 'Kamu' : displayName(r)) + ' habis!'));
-      pokerSfx('finish');
-    }
-
-    if(data.phase === 'playing' && data.turn === myRole && pokerPrev.turn !== myRole){
-      setTimeout(() => pokerSfx('turn'), 200);
-      try { if(navigator.vibrate) navigator.vibrate(50); } catch(e) {}
-    }
-
-    if(data.phase === 'roundover' && pokerPrev.phase !== 'roundover'){
-      if(finished[0] === myRole){ pokerSfx('win'); pokerConfetti(); }
-      else if(finished.includes(myRole)) pokerSfx('finish');
-      else pokerSfx('lose');
-    }
-  }
-
-  pokerPrev.hand = data.handNumber;
-  pokerPrev.playSig = playSig;
-  pokerPrev.passSig = passSig;
-  pokerPrev.turn = data.turn;
-  pokerPrev.phase = data.phase;
-  pokerPrev.finished = finished.length;
-}
-
-// ======================================================
-// RENDER UTAMA
-// ======================================================
-function pokerRenderCore(data){
-  latestPokerData = data;
-  const first = !pokerPrev.init;
-  const newDeal = pokerPrev.init && data.handNumber !== pokerPrev.hand;
-  if(data.turn !== myRole || data.phase !== 'playing') selectedKeys.clear();
-
-  const posEls = {
-    top: { seat: document.getElementById('capsaSeatTop'), name: document.getElementById('capsaNameTop'), hand: document.getElementById('capsaHandTop') },
-    left: { seat: document.getElementById('capsaSeatLeft'), name: document.getElementById('capsaNameLeft'), hand: document.getElementById('capsaHandLeft') },
-    right: { seat: document.getElementById('capsaSeatRight'), name: document.getElementById('capsaNameRight'), hand: document.getElementById('capsaHandRight') },
-    bottom: { seat: document.getElementById('capsaSeatBottom') }
+  chessBotHandler = (snap) => {
+    const data = snap.val();
+    if (!data || data.turn !== 'b') { if (botTimers.chess) { clearTimeout(botTimers.chess); botTimers.chess = null; } return; }
+    if (botTimers.chess) return;
+    botTimers.chess = setTimeout(() => { botTimers.chess = null; makeChessBotMove(data); }, 700 + Math.random() * 500);
   };
+  stateRef.on('value', chessBotHandler);
+}
 
-  // sinkron kartu saya: pruning pilihan yang sudah tidak ada
-  const myKeys = new Set(sortCards(data.hands && data.hands[myRole]).map(cardKey));
-  Array.from(selectedKeys).forEach(k => { if(!myKeys.has(k)) selectedKeys.delete(k); });
+function makeChessBotMove(data) {
+  const board = typeof data.board === 'string' ? JSON.parse(data.board) : data.board;
+  const state = { castling: data.castling || { wK:false, wQ:false, bK:false, bQ:false }, ep: data.ep || null, halfmove: data.halfmove || 0 };
+  const moves = chessAllLegalMoves(board, state, 'b');
+  if (moves.length === 0) return;
 
-  const finished = ensureArray(data.finished);
-  ROLES.forEach(role => {
-    const pos = seatPosFor(role), el = posEls[pos];
-    const count = (data.hands && data.hands[role]) ? ensureArray(data.hands[role]).length : 0;
-    const online = !!pokerPresence[role], isFinished = finished.includes(role);
-    el.seat.classList.toggle('active-turn', data.turn === role && data.phase === 'playing');
-    el.seat.classList.toggle('capsa-seat-done', isFinished);
-    if(pos !== 'bottom'){
-      const rank = finished.indexOf(role);
-      const rankTag = rank === 0 ? ' 🥇' : rank === 1 ? ' 🥈' : rank === 2 ? ' 🥉' : '';
-      el.name.textContent = displayName(role) + (online ? ' 🟢' : ' 🔴') + rankTag + ' · ' + count + ' kartu';
-      pokerRenderBackHand(el.hand, count);
-    }
-  });
+  let depth = 1; 
+  let blunderChance = 0;
 
-  pokerSyncMyHand(data, !first);
-  pokerRenderCenter(data, !first && !newDeal);
-  pokerRenderStatus(data);
-  pokerRenderRankBar(data);
-  pokerRenderMyNameLabel();
+  if (window.botDifficulty === 'normal') {
+    depth = 1;
+    blunderChance = 0.5; 
+  } else if (window.botDifficulty === 'medium') {
+    depth = 2;
+    blunderChance = 0.1; 
+  } else if (window.botDifficulty === 'hard') {
+    depth = 3;
+    blunderChance = 0;
+  }
 
-  const canAct = data.phase === 'playing' && data.turn === myRole;
-  document.getElementById('capsaActions').style.display = canAct ? 'grid' : 'none';
-  if(canAct) document.getElementById('capsaBtnPass').disabled = !data.lastPlay;
-  pokerUpdatePreview(data);
+  let bestScore = Infinity;
+  let bestMove = null;
 
-  const resultEl = document.getElementById('capsaResult'), nextBtn = document.getElementById('capsaBtnNext');
-  if(data.phase === 'roundover'){
-    const medals = ['🥇 Juara 1', '🥈 Juara 2', '🥉 Juara 3'];
-    let html = finished.map((r, i) => (medals[i] || '🏅') + ': ' + displayName(r) + (r === myRole ? ' (Kamu)' : '')).join('<br>');
-    if(data.loser) html += '<br>💀 Buncit: ' + displayName(data.loser) + (data.loser === myRole ? ' (Kamu)' : '');
-    resultEl.innerHTML = html; resultEl.style.display = 'block';
-    nextBtn.style.display = 'block'; nextBtn.textContent = myRole === 'p1' ? '▶ Main Lagi' : '⏳ Menunggu host mulai lagi';
-    nextBtn.disabled = myRole !== 'p1';
+  if (Math.random() < blunderChance) {
+    bestMove = moves[Math.floor(Math.random() * moves.length)];
   } else {
-    resultEl.style.display = 'none'; nextBtn.style.display = 'none';
+    moves.sort((a, b) => (b.capture ? 1 : 0) - (a.capture ? 1 : 0));
+    for (const m of moves) {
+      const res = chessApplyMove(board, state, m, m.promotion ? 'q' : null);
+      const score = chessBotMinimax(res.board, { castling: res.castling, ep: res.ep, halfmove: res.halfmove }, depth - 1, 'w', -Infinity, Infinity);
+      if (score < bestScore) { bestScore = score; bestMove = m; }
+    }
   }
 
-  pokerDetectEvents(data, first);
-  pokerPrev.init = true;
-}
+  if (!bestMove) bestMove = moves[0];
+  const res = chessApplyMove(board, state, bestMove, bestMove.promotion ? 'q' : null);
 
-function pokerAnimateDeal(done){
-  const table = document.querySelector('#pokerScreen .capsa-table');
-  if(!table){ done(); return; }
-  const overlay = document.createElement('div'); overlay.className = 'capsa-deal-overlay'; table.appendChild(overlay);
-  const dealTargets = ['bottom', 'right', 'top', 'left'], cardsPerPlayer = 5, perCardDelay = 300, animDuration = 550;
-  let cardIndex = 0;
-  dealTargets.forEach(dir => {
-    for(let c = 0; c < cardsPerPlayer; c++){
-      const img = document.createElement('img');
-      img.src = CARD_BACK_IMG; img.className = 'capsa-deal-card deal-' + dir; img.style.animationDelay = (cardIndex * perCardDelay) + 'ms';
-      overlay.appendChild(img);
-      setTimeout(() => pokerSfx('deal'), cardIndex * perCardDelay);
-      cardIndex++;
-    }
+  roomRef.child('state').set({
+    board: JSON.stringify(res.board), turn: 'w', castling: res.castling, ep: res.ep, halfmove: res.halfmove, clocks: null, turnStartAt: null
   });
-  const totalDuration = (cardIndex - 1) * perCardDelay + animDuration + 150;
-  setTimeout(() => { overlay.remove(); done(); }, totalDuration);
+
+  chessBotPostMoveCheck(res.board, res);
 }
 
-function pokerRender(data){
-  const freshHand = data.phase === 'playing' && !!data.handNumber && data.handNumber !== pokerLastAnimatedHand;
-  const shouldAnimate = freshHand && pokerHasRenderedOnce;
-  if(freshHand) pokerLastAnimatedHand = data.handNumber;
-  pokerHasRenderedOnce = true;
-
-  if(shouldAnimate){ latestPokerData = data; pokerAnimateDeal(() => pokerRenderCore(latestPokerData || data)); }
-  else pokerRenderCore(data);
-}
-
-// ======================================================
-// PRESENCE & NAMA
-// ======================================================
-function pokerAttachPresence(){
-  const presenceRef = roomRef.child('presence/' + myRole); activePresenceRef = presenceRef;
-  dbRoot.ref('.info/connected').on('value', snap => {
-    if(snap.val() === true){ presenceRef.onDisconnect().remove(); presenceRef.set(true); }
-  });
-  if(!window.__capsaPagehideBound){
-    window.__capsaPagehideBound = true;
-    window.addEventListener('pagehide', () => { if(activePresenceRef) activePresenceRef.remove(); });
+function chessBotPostMoveCheck(board, res) {
+  const legalWhite = chessAllLegalMoves(board, { castling: res.castling, ep: res.ep }, 'w');
+  if (legalWhite.length === 0) {
+    if (chessIsInCheck(board, 'w')) roomRef.child('result').transaction(cur => cur || { winner: 'p2', reason: 'checkmate' });
+    else roomRef.child('result').transaction(cur => cur || { winner: 'draw', reason: 'stalemate' });
+    return;
   }
-  roomRef.child('presence').on('value', snap => {
-    pokerPresence = snap.val() || {};
-    if(latestPokerData) pokerRenderCore(latestPokerData);
-    if(myRole === 'p1' && latestPokerData && latestPokerData.phase === 'waiting'){
-      if(ROLES.every(s => pokerPresence[s])) pokerRef.transaction(cur => (cur && cur.phase === 'waiting') ? pokerBuildNewGame(cur) : cur);
-    }
-  });
+  if ((res.halfmove || 0) >= 100) roomRef.child('result').transaction(cur => cur || { winner: 'draw', reason: 'fifty' });
 }
 
-function pokerAttachNames(){
-  pokerRef.child('names').on('value', snap => {
-    pokerNames = snap.val() || {};
-    if(latestPokerData) pokerRenderCore(latestPokerData);
-  });
+// ============================================================
+// ⭕ TTT BOT
+// ============================================================
+function tttBotMinimax(board, isMax) {
+  const result = tttEval(board);
+  if (result) {
+    if (result.winner === 'O') return 10;
+    if (result.winner === 'X') return -10;
+    return 0;
+  }
+  const player = isMax ? 'O' : 'X';
+  let best = isMax ? -Infinity : Infinity;
+  for (let i = 0; i < 9; i++) {
+    if (board[i]) continue;
+    const nb = board.slice(); nb[i] = player;
+    const score = tttBotMinimax(nb, !isMax);
+    best = isMax ? Math.max(best, score) : Math.min(best, score);
+  }
+  return best;
 }
 
-function pokerOpenNameEditor(){
-  const overlay = document.getElementById('capsaNameOverlay'), input = document.getElementById('capsaNameInput');
-  if(!overlay || !input) return;
-  input.value = (pokerNames && pokerNames[myRole]) ? pokerNames[myRole] : '';
-  overlay.style.display = 'flex'; setTimeout(() => input.focus(), 50);
-}
-function pokerCloseNameEditor(){ const overlay = document.getElementById('capsaNameOverlay'); if(overlay) overlay.style.display = 'none'; }
-function pokerSaveName(){
-  const input = document.getElementById('capsaNameInput'); if(!input) return;
-  pokerRef.child('names/' + myRole).set(input.value.trim().slice(0, 14) || null);
-  pokerCloseNameEditor();
-}
+function startTTTBot() {
+  const stateRef = roomRef.child('state');
+  if (tttBotHandler) stateRef.off('value', tttBotHandler);
 
-// ======================================================
-// INIT
-// ======================================================
-function initPoker(){
-  pokerRef = roomRef.child('poker');
-  pokerPrev = { init: false, hand: null, playSig: null, passSig: null, turn: null, phase: null, finished: 0, centerSig: null };
-  pokerHasRenderedOnce = false; pokerLastAnimatedHand = null;
-  selectedKeys.clear();
-  document.getElementById('pokerRoleTag').textContent = myRole.toUpperCase();
-  document.documentElement.classList.add('force-landscape');
-  pokerEnsurePreview();
+  tttBotHandler = (snap) => {
+    const data = snap.val();
+    if (!data || data.turn !== 'O') { if (botTimers.ttt) { clearTimeout(botTimers.ttt); botTimers.ttt = null; } return; }
+    if (tttEval(data.board)) return;
+    if (botTimers.ttt) return;
+    botTimers.ttt = setTimeout(() => {
+      botTimers.ttt = null;
+      roomRef.child('state').transaction(cur => {
+        if (!cur || cur.turn !== 'O') return cur;
+        if (tttEval(cur.board)) return cur;
 
-  document.getElementById('btnPokerBack').onclick = () => {
-    document.documentElement.classList.remove('force-landscape');
-    if(activePresenceRef) activePresenceRef.remove(); clearSession(); location.reload();
+        let isRandom = false;
+        if(window.botDifficulty === 'normal' && Math.random() < 0.4) isRandom = true;
+        if(window.botDifficulty === 'medium' && Math.random() < 0.15) isRandom = true;
+        
+        let bestMove = null;
+        if(isRandom) {
+            const empty = cur.board.map((v, i) => v === '' ? i : null).filter(v => v !== null);
+            bestMove = empty[Math.floor(Math.random() * empty.length)];
+        } else {
+            let bestScore = -Infinity;
+            for (let i = 0; i < 9; i++) {
+              if (cur.board[i]) continue;
+              const nb = cur.board.slice(); nb[i] = 'O';
+              const score = tttBotMinimax(nb, false);
+              if (score > bestScore) { bestScore = score; bestMove = i; }
+            }
+        }
+
+        if (bestMove === null) return cur;
+        const newBoard = cur.board.slice(); newBoard[bestMove] = 'O';
+        return { board: newBoard, turn: 'X', round: cur.round || 0 };
+      });
+    }, 500 + Math.random() * 400);
   };
+  stateRef.on('value', tttBotHandler);
+}
 
-  roomRef.child('presence/' + myRole).transaction(cur => cur === null ? true : cur);
+// ============================================================
+// 🐍 SNAKE BOT
+// ============================================================
+function startSnakeBot() {
+  const snakeRef = roomRef.child('snake');
+  if (snakeBotHandler) snakeRef.off('value', snakeBotHandler);
 
-  if(myRole === 'p1'){
-    pokerRef.transaction(cur => cur || {
-      phase: 'waiting', hands: null, turn: null, starter: null, isFirstPlay: true, lastPlay: null, lastPlayer: null,
-      passCount: 0, finished: [], loser: null, winner: null, lastActionText: null, handNumber: 0, names: {}
+  snakeBotHandler = (snap) => {
+    const data = snap.val();
+    if (!data || !data.players || data.status === 'ended' || data.isRolling) return;
+    const keys = Object.keys(data.players);
+    const turnKey = keys[data.turnIndex];
+    if (!botActiveRoles.includes(turnKey)) { if (botTimers.snake) { clearTimeout(botTimers.snake); botTimers.snake = null; } return; }
+    if (botTimers.snake) return;
+    botTimers.snake = setTimeout(() => { botTimers.snake = null; snakeBotRoll(snakeRef, turnKey); }, 1100 + Math.random() * 500);
+  };
+  snakeRef.on('value', snakeBotHandler);
+}
+
+function snakeBotRoll(snakeRef, botKey) {
+  snakeRef.transaction(cur => {
+    if (!cur || cur.status === 'ended' || cur.isRolling) return cur;
+    const keys = Object.keys(cur.players);
+    if (keys[cur.turnIndex] !== botKey) return cur;
+
+    const state = JSON.parse(JSON.stringify(cur));
+    const dice = Math.floor(Math.random() * 6) + 1;
+    let pos = (state.players[botKey].pos || 1) + dice;
+    if (pos > 100) pos = 100;
+
+    const event = SNAKES_AND_LADDERS.find(s => s.start === pos);
+    if (event) pos = event.end;
+
+    keys.forEach(k => { if (k !== botKey && state.players[k].pos === pos && pos < 100 && !state.players[k].rank) state.players[k].pos = 1; });
+    state.players[botKey].pos = pos;
+    if (pos >= 100 && !state.players[botKey].rank) state.players[botKey].rank = keys.filter(k => state.players[k].rank > 0).length + 1;
+
+    const finishedNow = keys.filter(k => state.players[k].rank > 0);
+    if (finishedNow.length >= keys.length - 1) state.status = 'ended';
+    else {
+      let nextIdx = state.turnIndex;
+      if (dice !== 6 || pos >= 100) {
+        do { nextIdx = (nextIdx + 1) % keys.length; } while (state.players[keys[nextIdx]].rank > 0);
+        state.turnIndex = nextIdx;
+      }
+    }
+    state.lastDice = dice;
+    return state;
+  });
+}
+
+// ============================================================
+// 🎴 UNO BOT (Tanpa logika Blunder/Difficulty)
+// ============================================================
+function startUnoBot() {
+  const unoRef = roomRef.child('uno');
+  if (unoBotHandler) unoRef.off('value', unoBotHandler);
+
+  unoBotHandler = (snap) => {
+    const data = snap.val();
+    if (!data || data.phase !== 'playing') return;
+    const botKey = data.turn;
+
+    if (data.unoChallenge && data.unoChallenge.target === botKey && !data.unoChallenge.shouted) {
+      const elapsed = Date.now() - data.unoChallenge.startTime;
+      if (elapsed < 2800) {
+       if (!botTimers.unoShout) botTimers.unoShout = setTimeout(() => {
+          botTimers.unoShout = null;
+          unoRef.transaction(cur => {
+            if (!cur || !cur.unoChallenge || cur.unoChallenge.target !== botKey || cur.unoChallenge.shouted) return cur;
+            const s = JSON.parse(JSON.stringify(cur));
+            s.unoChallenge.shouted = true; s.lastActionText = `🎉 ${botKey.toUpperCase()} berhasil Teriak "UNO!"`;
+            return s;
+          });
+        }, 2000 + Math.random() * 500);
+        return;
+      }
+      // jendela teriak sudah lewat -> lanjut jalan, jangan macet
+    }
+
+    if (!botActiveRoles.includes(botKey)) { if (botTimers.uno) { clearTimeout(botTimers.uno); botTimers.uno = null; } return; }
+    if (botTimers.uno) return;
+    botTimers.uno = setTimeout(() => { botTimers.uno = null; unoBotMove(unoRef, botKey); }, 800 + Math.random() * 500);
+  };
+  unoRef.on('value', unoBotHandler);
+}
+
+function unoBotMove(unoRef, botKey) {
+  unoRef.transaction(cur => {
+    if (!cur || cur.phase !== 'playing' || cur.turn !== botKey) return cur;
+    const s = JSON.parse(JSON.stringify(cur));
+    
+    let hand = s.hands[botKey] || [];
+    if (!Array.isArray(hand)) hand = Object.values(hand); 
+    
+    if (hand.length === 0) return cur;
+
+    const curCard = s.currentCard;
+    const curCol = curCard.chosenColor || curCard.color;
+
+    if (s.drawStack > 0) s.hasDrawn = false;
+
+    let valid = hand.filter(c => {
+      if (s.drawStack > 0) return String(c.value) === String(curCard.value) || c.value === 'draw4';
+      return c.color === 'wild' || c.color === curCol || String(c.value) === String(curCard.value);
     });
+
+    if (valid.length === 0) {
+      // Ada penalti (+2/+4) dan tidak punya kartu balasan -> WAJIB ambil semua, TIDAK BOLEH pass
+      if (s.drawStack > 0) {
+        const n = s.drawStack;
+        const drawn = drawUnoCards(s, n);
+        s.hands[botKey] = [...hand, ...drawn];
+        s.drawStack = 0; s.hasDrawn = false; s.turn = nextUnoTurn(s, 1);
+        s.unoChallenge = null;
+        s.lastActionText = `📥 ${botKey.toUpperCase()} tidak punya kartu balasan, ambil penalti +${n} kartu.`;
+        return s;
+      }
+      // Tidak ada kartu cocok -> ambil 1 dulu; pass hanya boleh SETELAH ambil
+      if (s.hasDrawn) {
+        s.hasDrawn = false; s.turn = nextUnoTurn(s, 1); s.lastActionText = `⏭️ ${botKey.toUpperCase()} Pass.`;
+      } else {
+        const drawn = drawUnoCards(s, 1);
+        s.hands[botKey] = [...hand, ...drawn];
+        s.hasDrawn = true; s.lastActionText = `📥 ${botKey.toUpperCase()} ambil 1 kartu.`;
+      }
+      return s;
+    }
+
+    // Bot Uno selalu main optimal
+    const prio = c => c.value === 'draw4' ? 5 : c.value === 'draw2' ? 4 : c.value === 'skip' ? 3 : c.value === 'reverse' ? 2 : c.color === 'wild' ? 0 : 1;
+    valid.sort((a, b) => prio(b) - prio(a));
+
+    const chosen = valid[0];
+    const idx = hand.findIndex(c => c.id === chosen.id);
+    if (idx < 0) return cur;
+    hand.splice(idx, 1);
+
+    let jump = 1;
+    if (chosen.value === 'skip') jump++;
+    else if (chosen.value === 'reverse') { if (getUnoRoles(s.maxPlayers).length === 2) jump++; else s.direction *= -1; }
+    else if (chosen.value === 'draw2') s.drawStack += 2;
+    else if (chosen.value === 'draw4') s.drawStack += 4;
+
+    const played = { ...chosen };
+    if (chosen.color === 'wild') {
+      const counts = {};
+      hand.forEach(c => { if (c.color !== 'wild') counts[c.color] = (counts[c.color]||0)+1; });
+      const keys = Object.keys(counts);
+      played.chosenColor = keys.length ? keys.reduce((a,b) => counts[a] > counts[b] ? a : b) : 'merah';
+    }
+    s.currentCard = played; s.hands[botKey] = hand; s.hasDrawn = false;
+
+    if (hand.length === 1 || hand.length === 0) {
+      s.unoChallenge = { target: botKey, type: hand.length === 1 ? 'UNO' : 'UNO GAME', startTime: Date.now(), shouted: false };
+    } else s.unoChallenge = null;
+
+    const finished = s.finished || [];
+    if (hand.length === 0 && !finished.includes(botKey)) {
+      finished.push(botKey); s.finished = finished;
+      if (finished.length >= getUnoRoles(s.maxPlayers).length - 1) { s.phase = 'roundover'; return s; }
+    }
+    s.turn = nextUnoTurn(s, jump);
+    return s;
+  });
+}
+
+// ============================================================
+// 🃏 POKER (CAPSA) BOT (Tetap pakai Difficulty)
+// ============================================================
+function pokerCombinations(arr, k) {
+  const out = [];
+  if (k > arr.length) return out;
+  const n = arr.length;
+  const idx = [];
+  for (let i = 0; i < k; i++) idx.push(i);
+  while (true) {
+    out.push(idx.map(i => arr[i]));
+    let i = k - 1;
+    while (i >= 0 && idx[i] === n - k + i) i--;
+    if (i < 0) break;
+    idx[i]++;
+    for (let j = i + 1; j < k; j++) idx[j] = idx[j - 1] + 1;
   }
+  return out;
+}
 
-  pokerAttachPresence(); pokerAttachNames();
+function startPokerBot() {
+  const pokerRef = roomRef.child('poker');
+  if (pokerBotHandler) pokerRef.off('value', pokerBotHandler);
 
-  pokerRef.on('value', snap => { const data = snap.val(); if(data) pokerRender(data); });
-
-  document.getElementById('capsaBtnPass').onclick = () => { pokerGetAudio(); pokerDoPass(); };
-  document.getElementById('capsaBtnPlay').onclick = () => { pokerGetAudio(); pokerDoPlay(); };
-  document.getElementById('capsaBtnNext').onclick = () => {
-    if(myRole !== 'p1') return;
-    pokerRef.transaction(cur => (cur && cur.phase === 'roundover') ? pokerBuildNewGame(cur) : cur);
+  pokerBotHandler = (snap) => {
+    const data = snap.val();
+    if (!data || data.phase !== 'playing') return;
+    const botKey = data.turn;
+    if (!botActiveRoles.includes(botKey)) { if (botTimers.poker) { clearTimeout(botTimers.poker); botTimers.poker = null; } return; }
+    if (botTimers.poker) return;
+    botTimers.poker = setTimeout(() => { botTimers.poker = null; pokerBotMove(pokerRef, botKey); }, 900 + Math.random() * 500);
   };
+  pokerRef.on('value', pokerBotHandler);
+}
 
-  const editBtn = document.getElementById('capsaBtnEditName'); if(editBtn) editBtn.onclick = () => pokerOpenNameEditor();
-  const cancelBtn = document.getElementById('capsaNameCancel'); if(cancelBtn) cancelBtn.onclick = () => pokerCloseNameEditor();
-  const saveBtn = document.getElementById('capsaNameSave'); if(saveBtn) saveBtn.onclick = () => pokerSaveName();
-  const nameInput = document.getElementById('capsaNameInput'); if(nameInput) nameInput.addEventListener('keydown', e => { if(e.key === 'Enter') pokerSaveName(); });
+function pokerBotMove(pokerRef, botKey) {
+  pokerRef.transaction(cur => {
+    if (!cur || cur.phase !== 'playing' || cur.turn !== botKey) return cur;
+    const s = JSON.parse(JSON.stringify(cur));
+    
+    let hand = s.hands[botKey] || [];
+    if (!Array.isArray(hand)) hand = Object.values(hand); 
 
-  // hitung ulang kipas kartu kalau layar berubah ukuran / diputar
-  window.addEventListener('resize', () => { if(latestPokerData) pokerFanOverlap(document.getElementById('capsaHandMe')); });
+    if (s.isFirstPlay) {
+      const threeD = hand.find(c => c.rank === '03' && c.suit === 'd');
+      if (!threeD) {
+        if (hand.length > 0) {
+          const sorted = sortCards(hand);
+          const chosenCard = sorted[0];
+          const combo = detectCombo([chosenCard]);
+          s.hands[botKey] = removeCards(hand, [chosenCard]);
+          s.lastPlay = { by: botKey, cards: [chosenCard], combo };
+          s.lastPlayer = botKey; s.passCount = 0; s.isFirstPlay = false;
+          s.lastActionText = comboDisplayName(combo);
+          s.turn = nextActiveRole(botKey, s.finished || []);
+          return s;
+        }
+        return cur;
+      }
+      
+      const combo = detectCombo([threeD]);
+      s.hands[botKey] = removeCards(hand, [threeD]);
+      s.lastPlay = { by: botKey, cards: [threeD], combo };
+      s.lastPlayer = botKey; s.passCount = 0; s.isFirstPlay = false;
+      s.lastActionText = comboDisplayName(combo);
+      s.turn = nextActiveRole(botKey, s.finished || []);
+      return s;
+    }
+
+    let targetCount = s.lastPlay ? s.lastPlay.combo.count : 1;
+    let candidate = null;
+
+    if (!s.lastPlay) {
+      const sorted = sortCards(hand);
+      if (sorted.length) {
+        const combo = detectCombo([sorted[0]]);
+        candidate = { cards: [sorted[0]], combo };
+      }
+    } else {
+      const allCombos = pokerCombinations(hand, targetCount);
+      
+      let validMoves = [];
+      for (const cards of allCombos) {
+        const combo = detectCombo(cards);
+        if (!combo.valid) continue;
+        if (isBlockedBeat(s.lastPlay, combo, cards)) continue;
+        if (compareCombo(combo, s.lastPlay.combo) <= 0) continue;
+        validMoves.push({ cards, combo });
+      }
+
+      if (validMoves.length > 0) {
+        let blunderChance = 0;
+        if (window.botDifficulty === 'normal') blunderChance = 0.4;
+        if (window.botDifficulty === 'medium') blunderChance = 0.1;
+
+        if (Math.random() < blunderChance) {
+           candidate = validMoves[Math.floor(Math.random() * validMoves.length)];
+        } else {
+           let bestScore = Infinity;
+           for (const mv of validMoves) {
+             const sc = mv.combo.level * 1000 + (mv.combo.tiebreak[0] || 0);
+             if (sc < bestScore) { bestScore = sc; candidate = mv; }
+           }
+        }
+      }
+    }
+
+    if (!candidate) {
+      if (!s.lastPlay) return cur;
+      s.passCount = (s.passCount || 0) + 1;
+      s.lastActionText = 'pass';
+      const finished = s.finished || [];
+      const threshold = Math.max(4 - finished.length - 1, 1);
+      if (s.passCount >= threshold) {
+        s.lastPlay = null; s.passCount = 0;
+        let ret = s.lastPlayer || nextActiveRole(botKey, finished);
+        if (finished.includes(ret)) ret = nextActiveRole(ret, finished);
+        s.turn = ret;
+      } else {
+        s.turn = nextActiveRole(botKey, finished);
+      }
+      return s;
+    }
+
+    const remain = removeCards(hand, candidate.cards);
+    s.hands[botKey] = remain;
+    s.lastPlay = { by: botKey, cards: candidate.cards, combo: candidate.combo };
+    s.lastPlayer = botKey; s.passCount = 0;
+    s.lastActionText = comboDisplayName(candidate.combo);
+
+    const finished = s.finished || [];
+    if (remain.length === 0 && !finished.includes(botKey)) {
+      finished.push(botKey); s.finished = finished;
+      if (finished.length >= 3) {
+        s.phase = 'roundover'; s.loser = ROLES.find(r => !finished.includes(r)) || null; s.winner = finished[0];
+        return s;
+      }
+    }
+    s.turn = nextActiveRole(botKey, s.finished || []);
+    return s;
+  });
 }
