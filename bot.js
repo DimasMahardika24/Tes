@@ -11,10 +11,11 @@
 (function(){
   const BOT_ROLE = 'p2';
   const LEVEL_LABEL = { normal: 'Normal', hard: 'Hard' };
-  const GAME_LABEL  = { chess: '♟ Catur', ttt: '⭕ Tic-Tac-Toe' };
+  const GAME_LABEL  = { chess: '♟ Catur', ttt: '⭕ Tic-Tac-Toe', uno: '🎴 Uno', poker: '🃏 Poker Capsa' };
   const $ = (id) => document.getElementById(id);
 
   let botPendingGame = null;
+  let botPendingCount = 1;      // jumlah bot (khusus Uno)
   let botAgentStarted = false;
   let botCreating = false;
 
@@ -25,12 +26,29 @@
   document.querySelectorAll('#botGameScreen .btn-menu[data-bot-game]').forEach(btn => {
     btn.onclick = () => {
       botPendingGame = btn.dataset.botGame;
-      $('botLevelGameName').textContent = GAME_LABEL[botPendingGame] || '';
-      showScreen('botLevelScreen');
+      botPendingCount = botPendingGame === 'poker' ? 3 : 1;
+      if(botPendingGame === 'uno'){ showScreen('botCountScreen'); return; }
+      goBotLevel();
     };
   });
 
-  $('btnBotLevelBack').onclick = () => showScreen('botGameScreen');
+  function goBotLevel(){
+    let label = GAME_LABEL[botPendingGame] || '';
+    if(botPendingGame === 'poker') label += ' (kamu + 3 bot)';
+    if(botPendingGame === 'uno') label += ' (kamu + ' + botPendingCount + ' bot)';
+    $('botLevelGameName').textContent = label;
+    showScreen('botLevelScreen');
+  }
+
+  $('btnBotCountBack').onclick = () => showScreen('botGameScreen');
+  document.querySelectorAll('#botCountScreen .btn-menu[data-bot-count]').forEach(btn => {
+    btn.onclick = () => {
+      botPendingCount = parseInt(btn.dataset.botCount, 10) || 1;
+      goBotLevel();
+    };
+  });
+
+  $('btnBotLevelBack').onclick = () => showScreen(botPendingGame === 'uno' ? 'botCountScreen' : 'botGameScreen');
 
   document.querySelectorAll('#botLevelScreen .btn-menu[data-bot-level]').forEach(btn => {
     btn.onclick = () => startBotGame(btn.dataset.botLevel);
@@ -45,6 +63,12 @@
     myRole = 'p1';
     chessTimeControl = 0;           // lawan bot: tanpa jam catur
 
+    // peran yang dimainkan bot: p2 (1v1) / p2..p4 (Uno & Capsa banyak pemain)
+    const botCount = currentGame === 'poker' ? 3 : (currentGame === 'uno' ? botPendingCount : 1);
+    const botRoles = ['p2', 'p3', 'p4', 'p5', 'p6'].slice(0, botCount);
+    const totalPlayers = botCount + 1;
+    if(currentGame === 'uno') window.unoSelectedMaxPlayers = totalPlayers;
+
     function tryCreate(attemptsLeft){
       const roomId = Math.floor(100000 + Math.random() * 900000).toString();
       const candidateRef = dbRoot.ref('rooms/' + roomId);
@@ -55,8 +79,8 @@
           game: currentGame,
           mapSeed: Math.floor(Math.random() * 1e9),
           timeControl: 0,
-          maxPlayers: 2,
-          bot: { role: BOT_ROLE, level: level }
+          maxPlayers: totalPlayers,
+          bot: { role: botRoles[0], roles: botRoles, level: level }
         } : undefined),
         (err, committed) => {
           if(err || !committed){
@@ -93,28 +117,34 @@
       botAgentStarted = true;
       const level = cfg.level === 'hard' ? 'hard' : 'normal';
 
-      keepBotPresence();
+      const roles = (cfg.roles && cfg.roles.length) ? cfg.roles : [cfg.role || BOT_ROLE];
+
+      keepBotPresence(roles);
       labelBotUI(gameAtStart, level);
 
       if(gameAtStart === 'ttt')   startTTTBot(level);
       if(gameAtStart === 'chess') startChessBot(level);
+      if(gameAtStart === 'uno')   startUnoBot(level, roles);
+      if(gameAtStart === 'poker') startPokerBot(level, roles);
     }).catch(err => console.warn('[bot] gagal membaca konfigurasi bot:', err));
   }
 
   // Bot "online" selama host online (otomatis hilang kalau host putus)
-  function keepBotPresence(){
-    const pr = roomRef.child('presence/' + BOT_ROLE);
+  function keepBotPresence(roles){
     dbRoot.ref('.info/connected').on('value', (snap) => {
       if(snap.val() === true){
-        pr.onDisconnect().remove();
-        pr.set(true);
+        roles.forEach(r => {
+          const pr = roomRef.child('presence/' + r);
+          pr.onDisconnect().remove();
+          pr.set(true);
+        });
       }
     });
   }
 
   function labelBotUI(game, level){
-    const tagId = game === 'chess' ? 'chessRoleTag' : 'tttRoleTag';
-    const tag = $(tagId);
+    const tagId = { chess: 'chessRoleTag', ttt: 'tttRoleTag', uno: 'unoRoleTag', poker: 'pokerRoleTag' }[game];
+    const tag = tagId && $(tagId);
     if(tag) tag.textContent = tag.textContent + ' • vs 🤖 Bot ' + LEVEL_LABEL[level];
 
     if(game === 'chess'){
@@ -217,5 +247,109 @@
     // listener milik initChess sudah terpasang lebih dulu -> variabel global sudah terbarui
     roomRef.child('state').on('value', consider);
     consider();
+  }
+
+  // ---------------- BOT UNO ----------------
+  // Bot mengisi kursi p2..pN. Kamu (p1) selalu jalan duluan.
+  function startUnoBot(level, roles){
+    const uRef = roomRef.child('uno');
+    const busy = {};
+    const planned = new Set();
+    let latest = null;
+
+    roles.forEach((r, i) => uRef.child('names/' + r).transaction(cur => cur || ('🤖 Bot ' + (i + 1))));
+
+    function shout(ch, role){
+      uRef.transaction(cur => BotAI.unoApplyShout(cur, role, ch.startTime) || undefined);
+    }
+    function catchBy(role, ch){
+      uRef.transaction(cur => BotAI.unoApplyCatch(cur, role, ch.startTime) || undefined);
+    }
+
+    function act(role){
+      const d = latest;
+      const done = () => { busy[role] = false; handle(latest); };
+      if(!d || d.phase !== 'playing' || d.turn !== role){ done(); return; }
+
+      const hand = d.hands[role] || [];
+      const nextRole = nextUnoTurn(d, 1);
+      const choice = BotAI.unoChoose(hand, d.currentCard, d.drawStack || 0, level,
+        { nextHandSize: (d.hands[nextRole] || []).length });
+
+      let fn;
+      if(choice) fn = cur => BotAI.unoApplyPlay(cur, role, choice.cards, choice.color);
+      else if((d.drawStack || 0) > 0 || !d.hasDrawn) fn = cur => BotAI.unoApplyDraw(cur, role);
+      else fn = cur => BotAI.unoApplyPass(cur, role);
+
+      uRef.transaction(cur => fn(cur) || undefined, done, false);
+    }
+
+    function handle(d){
+      latest = d;
+      if(!d) return;
+
+      // Tantangan UNO: bot teriak sendiri (Normal kadang lupa) & bot bisa "DOR" pemain yang lupa
+      const ch = d.unoChallenge;
+      if(ch && !ch.shouted){
+        const ck = 'ch' + ch.startTime;
+        if(!planned.has(ck)){
+          planned.add(ck);
+          if(roles.includes(ch.target) && (level === 'hard' || Math.random() < 0.75)){
+            setTimeout(() => shout(ch, ch.target), 600 + Math.random() * 900);
+          }
+          const catcher = roles.find(r => r !== ch.target);
+          if(catcher && (level === 'hard' || Math.random() < 0.5)){
+            const wait = Math.max(0, ch.startTime + 2100 + Math.random() * 300 - Date.now());
+            setTimeout(() => catchBy(catcher, ch), wait);
+          }
+        }
+      }
+
+      if(d.phase === 'playing' && roles.includes(d.turn) && !busy[d.turn]){
+        const role = d.turn;
+        busy[role] = true;
+        setTimeout(() => act(role), 900 + Math.random() * 800);
+      }
+    }
+
+    uRef.on('value', snap => handle(snap.val()));
+  }
+
+  // ---------------- BOT POKER CAPSA ----------------
+  // Bot mengisi p2, p3, p4. Kamu (p1) host.
+  function startPokerBot(level, roles){
+    const pRef = roomRef.child('poker');
+    const busy = {};
+    let latest = null;
+
+    roles.forEach((r, i) => pRef.child('names/' + r).transaction(cur => cur || ('🤖 Bot ' + (i + 1))));
+
+    function act(role){
+      const d = latest;
+      const done = () => { busy[role] = false; handle(latest); };
+      if(!d || d.phase !== 'playing' || d.turn !== role){ done(); return; }
+
+      const hand = sortCards((d.hands && d.hands[role]) || []);
+      const finished = d.finished || [];
+      const opp = ROLES.filter(r => r !== role && !finished.includes(r))
+                       .map(r => ((d.hands && d.hands[r]) || []).length);
+      const cards = BotAI.capsaChoose(hand, d, level, { minOpp: opp.length ? Math.min.apply(null, opp) : 13 });
+
+      let fn;
+      if(cards) fn = cur => BotAI.capsaApplyPlay(cur, role, cards);
+      else      fn = cur => BotAI.capsaApplyPass(cur, role);
+
+      pRef.transaction(cur => fn(cur) || undefined, done, false);
+    }
+
+    function handle(d){
+      latest = d;
+      if(!d || d.phase !== 'playing' || !roles.includes(d.turn) || busy[d.turn]) return;
+      const role = d.turn;
+      busy[role] = true;
+      setTimeout(() => act(role), 1000 + Math.random() * 900);
+    }
+
+    pRef.on('value', snap => handle(snap.val()));
   }
 })();
