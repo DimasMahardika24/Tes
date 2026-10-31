@@ -15,7 +15,7 @@ let unoTimerCheck = null;
 let unoLastAnimatedHand = null;
 let unoHasRenderedOnce = false;
 
-let unoPrev = { init: false, topKey: null, counts: {}, turn: null, phase: null, challengeStart: null, text: null, finished: 0, handNumber: null };
+let unoPrev = { init: false, topKey: null, counts: {}, turn: null, phase: null, challengeStart: null, text: null, finished: 0, handNumber: null, drawStack: 0 };
 let unoAudio = null;
 let unoClearing = false;
 let unoOppEls = {};
@@ -108,6 +108,31 @@ unoStyleEl.innerHTML = `
     100% { transform: translate(-50%, -110%) scale(1); opacity: 0; }
   }
 
+  /* Bubble penalti / pass di kursi (seperti PASS di Poker) */
+  .uno-bubble {
+    position: absolute; left: 50%; top: -10px; z-index: 45; pointer-events: none; white-space: nowrap;
+    font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 800; color: #fff;
+    background: var(--red, #e4574f); padding: 4px 14px; border-radius: 20px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.55); animation: unoBubble 1.5s ease-out forwards;
+  }
+  .uno-bubble.take { background: var(--gold, #e8ac1f); color: #1a1a1a; }
+  .uno-bubble.pass { background: var(--blue, #3d6bf0); font-size: 13px; }
+  @keyframes unoBubble {
+    0%   { transform: translate(-50%, 10px) scale(.5); opacity: 0; }
+    18%  { transform: translate(-50%, -4px) scale(1.18); opacity: 1; }
+    70%  { transform: translate(-50%, -10px) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -26px) scale(1); opacity: 0; }
+  }
+
+  /* Preview gabungan kartu */
+  .uno-preview {
+    margin-top: 10px; padding: 9px 12px; border-radius: 12px; text-align: center; font-size: 13px; font-weight: 700; line-height: 1.4;
+    background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.12); color: var(--ink-dim, #aab);
+  }
+  .uno-preview.ok  { color: var(--green, #2bb673); border-color: rgba(43,182,115,.5); }
+  .uno-preview.bad { color: var(--red, #e4574f);   border-color: rgba(228,87,79,.5); }
+  .uno-preview .up-sub { display: block; font-size: 11px; font-weight: 600; opacity: .85; }
+
   /* Confetti */
   .uno-confetti-box { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 35; border-radius: 18px; }
   .uno-confetti-box i { position: absolute; top: -14px; width: 8px; height: 13px; border-radius: 2px; animation: unoConfetti linear forwards; }
@@ -120,7 +145,7 @@ unoStyleEl.innerHTML = `
   #unoChallengeBox .uno-chal-btn { animation: unoPulse .55s ease-in-out infinite alternate; }
 
   @media (prefers-reduced-motion: reduce) {
-    #unoScreen *, #unoScreen *::after, .uno-toast, .uno-confetti-box i { animation-duration: .01ms !important; animation-delay: 0s !important; }
+    #unoScreen *, #unoScreen *::after, .uno-toast, .uno-bubble, .uno-confetti-box i { animation-duration: .01ms !important; animation-delay: 0s !important; }
   }
 `;
 document.head.appendChild(unoStyleEl);
@@ -405,6 +430,18 @@ function unoToast(text, color) {
   setTimeout(() => t.remove(), 1150);
 }
 
+// Bubble di atas kursi pemain (kursiku = kotak bawah). kind: '' (penalti) | 'take' | 'pass'
+function unoBubble(role, text, kind) {
+  const seat = role === myRole
+    ? document.querySelector('#unoScreen .capsa-bottom')
+    : (unoOppEls[role] && unoOppEls[role].seat);
+  if (!seat) return;
+  const b = document.createElement('div');
+  b.className = 'uno-bubble' + (kind ? ' ' + kind : ''); b.textContent = text;
+  seat.appendChild(b);
+  setTimeout(() => b.remove(), 1500);
+}
+
 function unoConfetti() {
   const table = document.querySelector('#unoScreen .capsa-table'); if (!table) return;
   const colors = ['#e8ac1f', '#3d6bf0', '#2bb673', '#e4574f', '#ffffff', '#a855f7'];
@@ -447,6 +484,59 @@ function unoPaintHand(data) {
   });
   const playBtn = document.getElementById('unoBtnPlay');
   if (playBtn) playBtn.disabled = selectedUnoKeys.size === 0;
+  unoUpdatePreview(data);
+}
+
+function unoEnsurePreview() {
+  let el = document.getElementById('unoPreview');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'unoPreview'; el.className = 'uno-preview'; el.style.display = 'none';
+    const act = document.getElementById('unoActions');
+    if (act && act.parentNode) act.parentNode.insertBefore(el, act);
+  }
+  return el;
+}
+
+const UNO_VALUE_LABEL = { skip: '🚫 Skip', reverse: '🔄 Balik', draw2: '+2', draw4: '+4', wild: '🌈 Wild' };
+function unoCardLabel(c) {
+  const v = UNO_VALUE_LABEL[c.value] || String(c.value);
+  return (c.color === 'wild' ? '' : (UNO_COLOR_EMOJI[c.color] || '')) + ' ' + v;
+}
+
+// Pratinjau hasil: kartu yang dipilih (urutan ketukan) -> kartu meja & efeknya
+function unoUpdatePreview(data) {
+  const el = unoEnsurePreview();
+  const hand = ensureArray(data && data.hands && data.hands[myRole]);
+  const sel = Array.from(selectedUnoKeys).map(id => hand.find(c => c.id === id)).filter(Boolean);
+  const canPlay = !!data && data.phase === 'playing' && data.turn === myRole;
+  if (!canPlay || sel.length === 0) { el.style.display = 'none'; return; }
+
+  const sameValue = sel.every(c => String(c.value) === String(sel[0].value));
+  const anyOk = sel.some(c => unoIsPlayable(c, data));
+  el.style.display = 'block';
+
+  if (!sameValue) { el.className = 'uno-preview bad'; el.textContent = '❌ Kartu gabungan harus angka/fitur yang sama'; return; }
+  if (!anyOk) {
+    el.className = 'uno-preview bad';
+    el.textContent = data.drawStack > 0 ? `❌ Ada stacking +${data.drawStack}, balas dengan kartu penalti` : '❌ Tidak ada kartu yang cocok dengan meja';
+    return;
+  }
+
+  const last = sel[sel.length - 1];
+  let add = 0;
+  sel.forEach(c => { if (c.value === 'draw2') add += 2; else if (c.value === 'draw4') add += 4; });
+  const stack = (data.drawStack || 0) + add;
+  const lastTxt = last.color === 'wild' ? `${unoCardLabel(last)} (pilih warna saat buang)` : unoCardLabel(last);
+
+  let sub = '';
+  if (stack > 0) sub = `Penalti jadi +${stack} untuk lawan`;
+  else if (sel.some(c => c.value === 'skip')) sub = `Giliran lawan dilewati ×${sel.filter(c => c.value === 'skip').length}`;
+
+  el.className = 'uno-preview ok';
+  el.innerHTML = (sel.length > 1
+    ? `✅ ${sel.length} kartu → kartu meja jadi ${lastTxt}<span class="up-sub">Kartu terakhir yang kamu ketuk jadi warna meja${sub ? ' · ' + sub : ''}</span>`
+    : `✅ Kartu meja jadi ${lastTxt}${sub ? `<span class="up-sub">${sub}</span>` : ''}`);
 }
 
 function unoToggleCard(el) {
@@ -740,6 +830,24 @@ function renderUnoUICore(data) {
     const ch = data.unoChallenge;
     if (ch && ch.startTime !== unoPrev.challengeStart && !ch.shouted) { unoSfx('uno'); unoToast('📢 ' + (ch.type === 'UNO GAME' ? 'UNO GAME?' : 'UNO?'), '#e8ac1f'); }
 
+    // ---- Bubble penalti: +2 / +4 / +8 (akumulasi) di kursi yang harus menerima ----
+    if (data.handNumber === unoPrev.handNumber) {
+      const prevStack = unoPrev.drawStack || 0, curStack = data.drawStack || 0;
+      if (data.phase === 'playing' && curStack > prevStack) {
+        unoBubble(data.turn, '+' + curStack);
+        if (data.turn === myRole) { try { if (navigator.vibrate) navigator.vibrate([70, 40, 110]); } catch (e) {} }
+      } else if (prevStack > 0 && curStack === 0 && unoPrev.turn) {
+        // penalti diambil: tampilkan berapa kartu yang masuk ke tangan pemain itu
+        const c = data.hands && data.hands[unoPrev.turn] ? ensureArray(data.hands[unoPrev.turn]).length : 0;
+        const p = unoPrev.counts[unoPrev.turn];
+        if (p !== undefined && c > p) unoBubble(unoPrev.turn, '📥 +' + (c - p), 'take');
+      }
+      // ---- Bubble PASS ----
+      if (data.lastActionText !== unoPrev.text && data.lastActionText && data.lastActionText.indexOf('⏭️') === 0 && unoPrev.turn) {
+        unoBubble(unoPrev.turn, 'PASS', 'pass');
+      }
+    }
+
     if (data.lastActionText !== unoPrev.text && data.lastActionText && data.lastActionText.indexOf('💥') === 0) { unoSfx('dor'); unoToast('💥 DOR!', '#e8ac1f'); }
 
     if (finished.length > unoPrev.finished && data.phase === 'playing') {
@@ -763,6 +871,7 @@ function renderUnoUICore(data) {
   unoPrev.text = data.lastActionText || null;
   unoPrev.finished = finished.length;
   unoPrev.handNumber = data.handNumber;
+  unoPrev.drawStack = data.drawStack || 0;
   unoPrev.counts = {};
   activeRoles.forEach(r => { unoPrev.counts[r] = data.hands && data.hands[r] ? ensureArray(data.hands[r]).length : 0; });
 }

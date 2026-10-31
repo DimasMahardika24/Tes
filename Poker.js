@@ -146,6 +146,31 @@ pokerStyleEl.innerHTML = `
   @media (prefers-reduced-motion: reduce) {
     #pokerScreen *, #pokerScreen *::after, .poker-toast, .poker-bubble, .poker-confetti-box i { animation-duration: .01ms !important; animation-delay: 0s !important; }
   }
+
+  /* Riwayat putaran */
+  #pokerScreen .poker-hist-btn {
+    position: absolute; top: 8px; right: 8px; z-index: 30; width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 17px; cursor: pointer; padding: 0;
+    background: rgba(0,0,0,.5); color: var(--gold); border: 1px solid rgba(232,172,31,.7);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #pokerScreen .poker-hist-btn.on { background: var(--gold); color: #1a1a1a; }
+  #pokerScreen .poker-hist-panel {
+    position: absolute; top: 52px; left: 10px; right: 10px; max-height: 62%; overflow-y: auto; z-index: 50; display: none;
+    background: rgba(6,20,13,.97); border: 1px solid rgba(232,172,31,.6); border-radius: 12px; padding: 8px 10px;
+    box-shadow: 0 10px 26px rgba(0,0,0,.6); -webkit-overflow-scrolling: touch;
+  }
+  #pokerScreen .poker-hist-title { font-size: 12px; font-weight: 800; color: var(--gold); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  #pokerScreen .ph-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+  #pokerScreen .ph-who { flex: 0 0 44px; font-size: 12px; font-weight: 800; color: var(--ink-dim); }
+  #pokerScreen .ph-row.me .ph-who { color: var(--gold); }
+  #pokerScreen .ph-cards { display: flex; flex: 1; min-width: 0; }
+  #pokerScreen .ph-cards img { width: 26px; height: 37px; margin-left: -9px; border-radius: 3px; box-shadow: 0 1px 3px rgba(0,0,0,.6); background: #fff; }
+  #pokerScreen .ph-cards img:first-child { margin-left: 0; }
+  #pokerScreen .ph-name { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: #fff; opacity: .85; }
+  #pokerScreen .ph-pass { flex: 1; font-size: 12px; font-weight: 800; color: #7fa2ff; }
+  #pokerScreen .ph-sep { text-align: center; font-size: 10px; letter-spacing: .5px; color: var(--ink-dim); padding: 6px 0 2px; opacity: .8; }
+  #pokerScreen .ph-empty { font-size: 12px; color: var(--ink-dim); padding: 6px 0; }
 `;
 document.head.appendChild(pokerStyleEl);
 
@@ -830,11 +855,79 @@ function pokerUpdatePreview(data){
 // ======================================================
 // EVENT (suara & efek)
 // ======================================================
+// ======================================================
+// RIWAYAT PUTARAN (dicatat di sisi klien dari perubahan state; tidak mengubah data game)
+// ======================================================
+let pokerHistory = [];
+let pokerHistHand = null;
+let pokerHistOpen = false;
+
+function pokerHistEnsureUI(){
+  const table = document.querySelector('#pokerScreen .capsa-table'); if(!table) return null;
+  let btn = table.querySelector('.poker-hist-btn');
+  if(!btn){
+    btn = document.createElement('button'); btn.type = 'button'; btn.className = 'poker-hist-btn';
+    btn.textContent = '\uD83D\uDCDC'; btn.title = 'Riwayat putaran';
+    const panel = document.createElement('div'); panel.className = 'poker-hist-panel';
+    table.appendChild(btn); table.appendChild(panel);
+    btn.addEventListener('click', e => { e.stopPropagation(); pokerHistOpen = !pokerHistOpen; pokerHistRender(); });
+    panel.addEventListener('click', () => { pokerHistOpen = false; pokerHistRender(); });
+  }
+  return { btn, panel: table.querySelector('.poker-hist-panel') };
+}
+
+function pokerHistRender(){
+  const ui = pokerHistEnsureUI(); if(!ui) return;
+  ui.btn.classList.toggle('on', pokerHistOpen);
+  ui.panel.style.display = pokerHistOpen ? 'block' : 'none';
+  if(!pokerHistOpen) return;
+
+  const who = r => r === myRole ? 'Kamu' : displayName(r);
+  const list = pokerHistory.slice(-40).reverse();   // terbaru di atas
+  let html = '<div class="poker-hist-title"><span>\uD83D\uDCDC Riwayat putaran</span><span>ketuk untuk tutup</span></div>';
+  if(!list.length) html += '<div class="ph-empty">Belum ada kartu yang dimainkan.</div>';
+  list.forEach(h => {
+    if(h.type === 'sep') html += '<div class="ph-sep">\u2014 PUTARAN BARU \u2014</div>';
+    else if(h.type === 'pass') html += '<div class="ph-row' + (h.by === myRole ? ' me' : '') + '"><span class="ph-who">' + who(h.by) + '</span><span class="ph-pass">PASS</span></div>';
+    else html += '<div class="ph-row' + (h.by === myRole ? ' me' : '') + '"><span class="ph-who">' + who(h.by) + '</span><span class="ph-cards">' +
+      h.cards.map(c => '<img src="' + cardImg(c) + '" alt="' + c.rank + c.suit + '">').join('') + '</span><span class="ph-name">' + h.name + '</span></div>';
+  });
+  ui.panel.innerHTML = html;
+}
+
+function pokerHistPush(entry){
+  pokerHistory.push(entry);
+  if(pokerHistory.length > 80) pokerHistory.splice(0, pokerHistory.length - 80);
+}
+
+function pokerHistUpdate(data, first, playSig, passSig){
+  if(pokerHistHand !== data.handNumber){ pokerHistory = []; pokerHistHand = data.handNumber; }
+  const lp = data.lastPlay;
+  const sameHand = data.handNumber === pokerPrev.hand;
+
+  // pass (dicatat sebelum penanda putaran baru)
+  if(!first && sameHand && data.lastActionText === 'pass' && passSig !== pokerPrev.passSig && pokerPrev.turn && pokerPrev.turn !== data.turn){
+    pokerHistPush({ type: 'pass', by: pokerPrev.turn });
+  }
+  // kartu baru di meja
+  if(lp && playSig !== pokerPrev.playSig){
+    pokerHistPush({ type: 'play', by: lp.by, cards: ensureArray(lp.cards), name: comboDisplayName(lp.combo) });
+  }
+  // meja dikosongkan setelah semua pass -> putaran baru
+  if(!first && sameHand && !lp && pokerPrev.hadLP && data.phase === 'playing'){
+    pokerHistPush({ type: 'sep' });
+  }
+  pokerPrev.hadLP = !!lp;
+  pokerHistRender();
+}
+
 function pokerDetectEvents(data, first){
   const finished = ensureArray(data.finished);
   const lp = data.lastPlay;
   const playSig = lp ? (data.handNumber + '|' + lp.by + '|' + ensureArray(lp.cards).map(cardKey).join(',')) : '';
   const passSig = data.handNumber + '|' + data.turn + '|' + (data.passCount || 0) + '|' + (data.lastActionText || '');
+
+  pokerHistUpdate(data, first, playSig, passSig);
 
   if(!first && data.handNumber === pokerPrev.hand){
     if(lp && playSig !== pokerPrev.playSig){
