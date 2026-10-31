@@ -1,5 +1,5 @@
 // ======================================================
-// Catur.js — Modern & Professional Animation Engine (Fixed)
+// Catur.js — Total Overhaul (Smooth Diffing Engine + Pro FX)
 // ======================================================
 
 const pieceUnicode = {k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟',K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙'};
@@ -12,6 +12,49 @@ let chessPendingPromotion = null;
 
 let prevChessBoard = null; 
 let chessAudioCtx = null;
+
+// 🛠️ INJEKSI CSS ANIMASI PRO (Biar nggak perlu ubah index.html lagi)
+const styleEl = document.createElement('style');
+styleEl.innerHTML = `
+  .piece-wrapper { 
+    transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1.1); 
+  }
+  .piece-wrapper.selected {
+    z-index: 100;
+  }
+  .piece-wrapper.selected .piece {
+    transform: scale(1.15) translateY(-8px);
+    filter: drop-shadow(0 10px 15px rgba(0,0,0,0.7));
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .piece-wrapper.capturing .piece {
+    animation: pieceDestroy 0.4s cubic-bezier(0.5, 0, 0.8, 0.2) forwards;
+  }
+  @keyframes pieceDestroy {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2) rotate(15deg); opacity: 0.8; }
+    100% { transform: scale(0) rotate(90deg); opacity: 0; }
+  }
+  .capture-particle {
+    position: absolute; width: 8px; height: 8px; background: #e4574f; border-radius: 50%;
+    pointer-events: none; z-index: 20; box-shadow: 0 0 10px #e4574f;
+    animation: particleBurst 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  }
+  @keyframes particleBurst {
+    0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0); opacity: 0; }
+  }
+  .particle-ring {
+    position: absolute; inset: 0; border-radius: 50%; border: 3px solid #e4574f;
+    box-sizing: border-box; pointer-events: none; z-index: 20;
+    animation: explodeRing 0.5s ease-out forwards;
+  }
+  @keyframes explodeRing {
+    0% { transform: scale(0.5); opacity: 1; border-width: 6px; }
+    100% { transform: scale(1.5); opacity: 0; border-width: 1px; }
+  }
+`;
+document.head.appendChild(styleEl);
 
 const CHESS_REASON_TEXT = {
   checkmate: 'Skakmat', stalemate: 'Remis — Stalemate (buntu, tak ada langkah legal)',
@@ -97,7 +140,7 @@ function initChess(){
   chessBoardState = starting.board; chessTurn = starting.turn; chessCastling = starting.castling;
   chessEP = starting.ep; chessHalfmove = starting.halfmove; chessClocks = starting.clocks;
 
-  buildChessDOM(); // Bangun grid kotak sekali aja
+  buildChessDOM(); 
   chessDraw();
 
   if(typeof setupPresence === 'function') setupPresence('chessStatus', roomIdGlobal);
@@ -105,7 +148,15 @@ function initChess(){
   roomRef.child('state').on('value', (snap) => {
     const data = snap.val();
     if(!data) return;
-    chessBoardState = typeof data.board === 'string' ? JSON.parse(data.board) : data.board;
+    const newBoard = typeof data.board === 'string' ? JSON.parse(data.board) : data.board;
+    
+    // Jika update dari Firebase sama persis dengan layar sekarang (sisa dari optimistic update), abaikan
+    if (prevChessBoard && JSON.stringify(prevChessBoard) === JSON.stringify(newBoard)) {
+       chessTurn = data.turn; chessClocks = data.clocks || null; chessTurnStartAt = data.turnStartAt || null;
+       return;
+    }
+
+    chessBoardState = newBoard;
     chessTurn = data.turn; chessCastling = data.castling || { wK:false, wQ:false, bK:false, bQ:false };
     chessEP = data.ep || null; chessHalfmove = data.halfmove || 0; chessClocks = data.clocks || null; chessTurnStartAt = data.turnStartAt || null;
     chessSelected = null;
@@ -152,10 +203,10 @@ function buildChessDOM() {
   }
 }
 
-// --- MESIN ANIMASI RENDER (FIXED) ---
+// --- 🛠️ MESIN ANIMASI RENDER (SMOOTH DIFFING) ---
 function chessDraw(){
   if(!chessBoardState) return;
-  const piecesLayer = document.getElementById('chessPiecesLayer');
+  const layer = document.getElementById('chessPiecesLayer');
   const board = chessBoardState;
   
   const isCheck = chessIsInCheck(board, chessTurn);
@@ -164,7 +215,7 @@ function chessDraw(){
   
   const kingPos = isCheck ? chessFindKing(board, chessTurn) : null;
 
-  // 1. Update Highlight Kotak (Valid Moves, Check)
+  // 1. Update Highlight Kotak
   let validMoves = [];
   if(chessSelected) {
     validMoves = chessLegalMovesForSquare(board, {castling:chessCastling, ep:chessEP}, chessSelected.x, chessSelected.y);
@@ -178,7 +229,6 @@ function chessDraw(){
       if(!cell) continue;
       
       cell.className = 'cell ' + ((x + y) % 2 ? 'dark' : 'light');
-      
       if(chessSelected && chessSelected.x === bx && chessSelected.y === by) cell.classList.add('selected');
       if(kingPos && kingPos.x === bx && kingPos.y === by) cell.classList.add('king-check');
       
@@ -187,96 +237,117 @@ function chessDraw(){
     }
   }
 
-  // 2. Deteksi Bidak & Animasi DOM
-  const activePieces = Array.from(piecesLayer.querySelectorAll('.piece-wrapper'));
-  const existingPieces = new Map(); // Key: "x-y", Value: DOM Element
+  // 2. Render Bidak & Animasi
+  if (!prevChessBoard) {
+    // Initial Load
+    layer.innerHTML = '';
+    for(let y=0; y<8; y++) for(let x=0; x<8; x++) {
+      if(board[y][x]) layer.appendChild(createPieceElement(board[y][x], x, y));
+    }
+    prevChessBoard = board.map(r => r.slice());
+    updateSelectedClasses();
+    return;
+  }
+
+  const domPieces = Array.from(layer.querySelectorAll('.piece-wrapper'));
+  const existing = new Map(); 
   
-  activePieces.forEach(p => {
-    existingPieces.set(`${p.dataset.x}-${p.dataset.y}`, p);
+  domPieces.forEach(el => {
+    existing.set(`${el.dataset.x}-${el.dataset.y}`, { el, type: el.dataset.piece });
   });
 
-  let isBoardMoved = false;
-  let isCapture = false;
+  let moved = false, captured = false;
 
-  // Iterasi papan baru, cari yang gerak atau promosi
-  for(let by=0; by<8; by++){
-    for(let bx=0; bx<8; bx++){
-      const p = board[by][bx];
-      if(!p) continue;
+  for(let y=0; y<8; y++) {
+    for(let x=0; x<8; x++) {
+      const p = board[y][x];
+      if (!p) continue;
       
-      const oldP = prevChessBoard ? prevChessBoard[by][bx] : null;
+      const posKey = `${x}-${y}`;
+      let pieceObj = existing.get(posKey);
       
-      if(oldP === p) {
-        // Bidak tidak berubah
-        const el = existingPieces.get(`${bx}-${by}`);
-        if(el) {
-          existingPieces.delete(`${bx}-${by}`); // Anggap sudah di-handle
-        }
+      if (pieceObj && pieceObj.type === p) {
+        // Bidak diam di tempat
+        existing.delete(posKey); 
       } else {
-        // Bidak baru di sini (berarti ada yang gerak ke sini, atau promosi)
-        let el = existingPieces.get(`${bx}-${by}`); // Cek kalau posisi ini sebelumnya ada bidak (promosi)
-        
-        if(!el) {
-          // Cari bidak yang pindah dari tempat lain
-          for(const [posKey, oldEl] of existingPieces.entries()) {
-            const [ox, oy] = posKey.split('-').map(Number);
-            const oldPieceType = prevChessBoard[oy][ox];
-            
-            // Kalau jenis dan warnanya sama, ini dia bidak yang gerak
-            if(oldPieceType && chessColorOf(oldPieceType) === chessColorOf(p) && oldPieceType.toLowerCase() === p.toLowerCase()) {
-              el = oldEl;
-              existingPieces.delete(posKey); 
-              isBoardMoved = true;
-              break;
-            }
+        // Bidak baru di sini (gerak, promosi, atau spawn)
+        let movingObj = null;
+        for (const [oldKey, obj] of existing.entries()) {
+          const [ox, oy] = oldKey.split('-').map(Number);
+          const oldP = prevChessBoard[oy][ox];
+          
+          if (oldP === p) {
+            movingObj = obj;
+            existing.delete(oldKey); 
+            break;
+          }
+          
+          // Deteksi Promosi
+          const color = chessColorOf(p);
+          const pawn = color === 'w' ? 'P' : 'p';
+          if (oldP === pawn && p.toLowerCase() !== 'p' && chessColorOf(oldP) === color) {
+            movingObj = obj;
+            existing.delete(oldKey);
+            obj.el.dataset.piece = p;
+            obj.el.innerHTML = `<span class="piece ${color==='w'?'white':'black'}">${pieceUnicode[p]}</span>`;
+            break;
           }
         }
 
-        if(!el) {
-          // Bidak benar-benar baru (Promosi)
-          el = createPieceElement(p, bx, by);
-          piecesLayer.appendChild(el);
+        if (movingObj) {
+          // Pindahkan DOM (CSS Transition akan menghandle animasinya)
+          const el = movingObj.el;
+          el.dataset.x = x;
+          el.dataset.y = y;
+          el.style.transform = getTransformString(x, y);
+          moved = true;
         } else {
-          // Update posisi DOM (Ini yang memicu animasi CSS transition)
-          el.dataset.x = bx;
-          el.dataset.y = by;
-          updatePieceTransform(el, bx, by);
+          // Bidak benar-benar baru (Fallback)
+          layer.appendChild(createPieceElement(p, x, y));
         }
       }
     }
   }
 
-  // 3. Animasi Makan Bidak (Capture)
-  existingPieces.forEach((el, key) => {
-    // Sisa bidak di existingPieces yang tidak masuk ke papan baru berarti dimakan
-    isCapture = true;
-    el.classList.add('capturing'); // Animasi hancur via CSS
-    
-    const [x, y] = key.split('-').map(Number);
-    spawnCaptureParticles(x, y); // Ledakan merah
-    
-    setTimeout(() => { 
-        if(el.parentNode) el.remove(); 
-    }, 350);
+  // 3. Animasi Makan Bidak
+  existing.forEach(obj => {
+    if (obj.el.parentNode) {
+      captured = true;
+      obj.el.classList.add('capturing');
+      spawnCaptureParticles(parseInt(obj.el.dataset.x), parseInt(obj.el.dataset.y));
+      setTimeout(() => obj.el.remove(), 450);
+    }
   });
 
-  // 4. Efek Suara
-  if(isCapture) playChessSound('capture');
-  else if(isBoardMoved) playChessSound('move');
+  // 4. Sound FX
+  if (captured) playChessSound('capture');
+  else if (moved) playChessSound('move');
   
-  if(isCheck && (!prevChessBoard || !chessIsInCheck(prevChessBoard, chessTurn))) {
+  if (isCheck && (!prevChessBoard || !chessIsInCheck(prevChessBoard, chessTurn))) {
     playChessSound('check');
   }
 
-  // 5. Update Status
+  prevChessBoard = board.map(r => r.slice());
+  updateSelectedClasses();
+
+  // Status UI
   const myTurn = chessTurn === myChessColor && !chessGameOver;
   let statusTxt = chessGameOver ? 'Game selesai' : (myTurn ? '🟢 Giliranmu' : '⏳ Giliran lawan...');
   if(isCheck) statusTxt += (myTurn ? ' — Rajamu SKAK!' : ' — Raja lawan skak');
   const statusEl = document.getElementById('chessStatus');
   if(statusEl) statusEl.textContent = statusTxt;
+}
 
-  // Simpan state papan buat frame berikutnya
-  prevChessBoard = board.map(r => r.slice());
+function updateSelectedClasses() {
+  document.querySelectorAll('.piece-wrapper').forEach(el => {
+    const px = parseInt(el.dataset.x);
+    const py = parseInt(el.dataset.y);
+    if (chessSelected && chessSelected.x === px && chessSelected.y === py) {
+      el.classList.add('selected');
+    } else {
+      el.classList.remove('selected');
+    }
+  });
 }
 
 function createPieceElement(p, bx, by) {
@@ -284,13 +355,10 @@ function createPieceElement(p, bx, by) {
   el.className = 'piece-wrapper';
   el.dataset.x = bx;
   el.dataset.y = by;
+  el.dataset.piece = p;
   el.style.transform = getTransformString(bx, by);
   el.innerHTML = `<span class="piece ${chessColorOf(p)==='w'?'white':'black'}">${pieceUnicode[p]}</span>`;
   return el;
-}
-
-function updatePieceTransform(el, bx, by) {
-  el.style.transform = getTransformString(bx, by);
 }
 
 function getTransformString(bx, by) {
@@ -299,14 +367,37 @@ function getTransformString(bx, by) {
   return `translate(${dx * 100}%, ${dy * 100}%)`;
 }
 
-// --- ANIMASI PARTIKEL LEDAKAN ---
+// --- FX PARTIKEL LEDAKAN (LEBIH PRO) ---
 function spawnCaptureParticles(bx, by) {
-  const piecesLayer = document.getElementById('chessPiecesLayer');
+  const layer = document.getElementById('chessPiecesLayer');
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'absolute';
+  wrapper.style.width = '12.5%';
+  wrapper.style.height = '12.5%';
+  wrapper.style.left = `${(chessFlipped ? 7 - bx : bx) * 12.5}%`;
+  wrapper.style.top = `${(chessFlipped ? 7 - by : by) * 12.5}%`;
+  wrapper.style.pointerEvents = 'none';
+  layer.appendChild(wrapper);
+
+  // Ring Ledakan
   const ring = document.createElement('div');
   ring.className = 'particle-ring';
-  ring.style.transform = `translate(${(chessFlipped?7-bx:bx) * 100}%, ${(chessFlipped?7-by:by) * 100}%)`;
-  piecesLayer.appendChild(ring);
-  setTimeout(() => ring.remove(), 500);
+  wrapper.appendChild(ring);
+  
+  // Pecahan Partikel
+  for(let i=0; i<6; i++) {
+    const p = document.createElement('div');
+    p.className = 'capture-particle';
+    p.style.left = '50%';
+    p.style.top = '50%';
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 20 + Math.random() * 20;
+    p.style.setProperty('--dx', Math.cos(angle) * distance + 'px');
+    p.style.setProperty('--dy', Math.sin(angle) * distance + 'px');
+    wrapper.appendChild(p);
+  }
+  
+  setTimeout(() => wrapper.remove(), 600);
 }
 
 // --- LOGIKA LAINNYA ---
@@ -441,44 +532,84 @@ function chessPositionKey(board, turn, castling, ep){
   s += '_' + turn + '_' + (castling.wK?1:0)+(castling.wQ?1:0)+(castling.bK?1:0)+(castling.bQ?1:0) + '_' + (ep ? (ep.x+'-'+ep.y) : 'n');
   return 'k' + s;
 }
+
 function chessHandleClick(x, y){
   getChessAudioContext();
   if(chessGameOver || chessPendingPromotion || chessTurn !== myChessColor) return;
-  const board = chessBoardState || chessStartingState().board, p = board[y][x];
+  
+  const board = chessBoardState || chessStartingState().board;
+  const p = board[y][x];
+
+  // Jika klik bidak yang sama, batalkan pilihan
+  if(chessSelected && chessSelected.x === x && chessSelected.y === y) {
+    chessSelected = null;
+    chessDraw();
+    return;
+  }
+
   if(chessSelected){
     const legalMoves = chessLegalMovesForSquare(board, {castling:chessCastling, ep:chessEP}, chessSelected.x, chessSelected.y);
     const mv = legalMoves.find(m => m.x2 === x && m.y2 === y);
     if(mv){
-      const activeMove = mv; chessSelected = null;
-      if(activeMove.promotion){ chessPendingPromotion = activeMove; showChessPromoModal(myChessColor); }
-      else chessCommitMove(activeMove, null);
+      const activeMove = mv; 
+      chessSelected = null;
+      if(activeMove.promotion){ 
+        chessPendingPromotion = activeMove; 
+        showChessPromoModal(myChessColor); 
+      } else {
+        chessCommitMove(activeMove, null);
+      }
       return;
-    } else if(p && chessColorOf(p) === myChessColor) chessSelected = {x, y};
-    else chessSelected = null;
-  } else if(p && chessColorOf(p) === myChessColor) chessSelected = {x, y};
+    } else if(p && chessColorOf(p) === myChessColor){
+      chessSelected = {x, y};
+    } else {
+      chessSelected = null;
+    }
+  } else if(p && chessColorOf(p) === myChessColor){
+    chessSelected = {x, y};
+  }
   chessDraw();
 }
+
 function chessCommitMove(move, promoteTo){
   const state = { castling: chessCastling, ep: chessEP, halfmove: chessHalfmove };
   const result = chessApplyMove(chessBoardState, state, move, promoteTo);
   const nextTurn = chessTurn === 'w' ? 'b' : 'w';
   let newClocks = chessClocks, newTurnStartAt = chessTurnStartAt;
+  
   if(chessClocks){
     const elapsed = Date.now() - (chessTurnStartAt || Date.now());
     const moverColor = chessTurn;
     newClocks = Object.assign({}, chessClocks, { [moverColor]: Math.max(0, (chessClocks[moverColor]||0) - elapsed) });
     newTurnStartAt = Date.now();
   }
+
+  // 🛠️ OPTIMISTIC UPDATE (Langsung gambar di layar kita, biar gak nunggu Firebase)
+  chessBoardState = result.board;
+  chessTurn = nextTurn;
+  chessCastling = result.castling;
+  chessEP = result.ep;
+  chessHalfmove = result.halfmove;
+  chessSelected = null;
+  chessDraw();
+
+  // Kirim ke Firebase
   roomRef.child('state').set({
     board: JSON.stringify(result.board), turn: nextTurn, castling: result.castling, ep: result.ep, halfmove: result.halfmove, clocks: newClocks, turnStartAt: newTurnStartAt
   });
+
   const key = chessPositionKey(result.board, nextTurn, result.castling, result.ep);
   roomRef.child('posCounts/' + key).transaction(c => (c||0) + 1).then(res => { if(res.committed && res.snapshot.val() >= 3) chessDeclareResult('draw', 'threefold'); }).catch(()=>{});
+  
   const legalNext = chessAllLegalMoves(result.board, {castling: result.castling, ep: result.ep}, nextTurn);
-  if(legalNext.length === 0){ if(chessIsInCheck(result.board, nextTurn)) chessDeclareResult(myRole, 'checkmate'); else chessDeclareResult('draw', 'stalemate'); }
+  if(legalNext.length === 0){ 
+    if(chessIsInCheck(result.board, nextTurn)) chessDeclareResult(myRole, 'checkmate'); 
+    else chessDeclareResult('draw', 'stalemate'); 
+  }
   else if(result.halfmove >= 100) chessDeclareResult('draw', 'fifty');
   else if(chessIsInsufficientMaterial(result.board)) chessDeclareResult('draw', 'insufficient');
 }
+
 function chessDeclareResult(winner, reason){ roomRef.child('result').transaction(cur => cur || { winner, reason }); }
 function chessFormatClock(ms){
   if(ms < 0) ms = 0; const total = Math.ceil(ms/1000), m = Math.floor(total/60), s = total%60;
@@ -522,6 +653,15 @@ function chessResolvePromotion(choice){
   const mv = chessPendingPromotion; chessPendingPromotion = null; hideChessPromoModal();
   if(mv) chessCommitMove(mv, choice); chessDraw();
 }
-document.getElementById('btnChessFlip').onclick = () => { chessFlipped = !chessFlipped; chessDraw(); };
+
+// Event Listener Tombol
+document.getElementById('btnChessFlip').onclick = () => { 
+  chessFlipped = !chessFlipped; 
+  const pieces = document.querySelectorAll('.piece-wrapper');
+  pieces.forEach(p => {
+    p.style.transform = getTransformString(parseInt(p.dataset.x), parseInt(p.dataset.y));
+  });
+  chessDraw(); 
+};
 document.getElementById('btnChessBack').onclick = () => { if(chessClockInterval) clearInterval(chessClockInterval); if(activePresenceRef) activePresenceRef.remove(); clearSession(); location.reload(); };
 document.getElementById('btnChessMenu').onclick = () => { if(chessClockInterval) clearInterval(chessClockInterval); if(activePresenceRef) activePresenceRef.remove(); clearSession(); location.reload(); };
