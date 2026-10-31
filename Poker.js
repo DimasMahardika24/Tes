@@ -75,23 +75,15 @@ pokerStyleEl.innerHTML = `
   @media (hover: hover) {
     #pokerScreen .capsa-hand-me .capsa-card-img.myturn:not(.selected):hover { transform: translateY(calc(var(--dy, 0px) - 8px)) rotate(var(--rot, 0deg)); z-index: 59 !important; }
   }
-  /* Pembatas kelompok kiri | kanan */
-  #pokerScreen .poker-hand-divider {
-    position: absolute; width: 3px; border-radius: 3px; pointer-events: none; z-index: 70; display: none;
-    background: linear-gradient(to bottom, transparent, var(--gold) 20%, var(--gold) 80%, transparent);
-    box-shadow: 0 0 8px rgba(232,172,31,.55); opacity: .9;
-  }
-  /* Tombol kecil: pindah kelompok & gabung */
+  /* Tombol kecil: perbesar / kecilkan tangan */
   #pokerScreen .poker-hand-btn {
-    position: absolute; top: 4px; z-index: 80; width: 28px; height: 28px; padding: 0; border-radius: 50%;
+    position: absolute; top: 4px; left: 4px; z-index: 80; width: 30px; height: 30px; padding: 0; border-radius: 50%;
     display: flex; align-items: center; justify-content: center; font-size: 15px; line-height: 1; cursor: pointer;
     background: rgba(0,0,0,.5); color: var(--gold); border: 1px solid rgba(232,172,31,.7);
     -webkit-tap-highlight-color: transparent;
   }
   #pokerScreen .poker-hand-btn:active { transform: scale(.9); }
-  #pokerScreen .poker-hand-btn.move { left: 4px; }
-  #pokerScreen .poker-hand-btn.merge { right: 4px; display: none; }
-  #pokerScreen .poker-hand-btn.dim { opacity: .45; }
+  #pokerScreen .poker-hand-btn.on { background: var(--gold); color: #1a1a1a; }
 
   /* Kartu di tengah meja: terbang dari kursi pemain */
   #pokerScreen .capsa-lastplay .capsa-card-img.fly { animation: pokerFly .45s cubic-bezier(.2,.9,.3,1.1) backwards; }
@@ -538,109 +530,117 @@ function pokerRenderBackHand(container, count){
 // ======================================================
 // RENDER TANGAN SAYA (diff + kipas)
 // ======================================================
-// Kelompok kartu (hanya tampilan di sisi klien; tidak menyentuh data game):
-// kartu yang ada di pokerGroupR = kelompok kanan, sisanya kelompok kiri.
-const pokerGroupR = new Set();
-let pokerGroupHandNo = null;
+// Mode perbesar: kartu lebih besar, disusun 1-2 baris (tanpa kipas) supaya mudah ditekan.
+// Pilihan disimpan di perangkat. Default: besar.
+let pokerZoom = true;
+try { pokerZoom = localStorage.getItem('poker_hand_zoom') !== '0'; } catch(e){}
 
 function pokerEnsureHandTools(container){
   if(container._pokerTools) return;
   container._pokerTools = true;
 
-  const div = document.createElement('div'); div.className = 'poker-hand-divider';
-  const mv = document.createElement('button'); mv.type = 'button'; mv.className = 'poker-hand-btn move';
-  mv.textContent = '\u21C6'; mv.title = 'Pindahkan kartu terpilih ke kelompok seberang';
-  const mg = document.createElement('button'); mg.type = 'button'; mg.className = 'poker-hand-btn merge';
-  mg.textContent = '\u2715'; mg.title = 'Gabungkan semua kartu';
-  container.appendChild(div); container.appendChild(mv); container.appendChild(mg);
-
-  mv.addEventListener('click', e => { e.stopPropagation(); pokerMoveSelectedGroup(); });
-  mg.addEventListener('click', e => { e.stopPropagation(); pokerMergeGroups(); });
+  const zb = document.createElement('button'); zb.type = 'button'; zb.className = 'poker-hand-btn zoom';
+  zb.textContent = '\uD83D\uDD0D';
+  container.appendChild(zb);
+  zb.addEventListener('click', e => {
+    e.stopPropagation();
+    pokerZoom = !pokerZoom;
+    try { localStorage.setItem('poker_hand_zoom', pokerZoom ? '1' : '0'); } catch(err){}
+    pokerSfx('tick');
+    pokerFanOverlap(container);
+  });
 
   if(window.ResizeObserver){
     new ResizeObserver(() => pokerFanOverlap(container)).observe(container);
   }
 }
 
-function pokerMoveSelectedGroup(){
-  const container = document.getElementById('capsaHandMe');
-  const keys = Array.from(selectedKeys);
-  const mv = container.querySelector('.poker-hand-btn.move');
-  if(!keys.length){
-    if(mv){ pokerShakeCard(mv); }
-    pokerSfx('bad');
-    return;
-  }
-  // kalau semua yang dipilih sudah di kanan -> balik ke kiri; selain itu -> ke kanan
-  const toLeft = keys.every(k => pokerGroupR.has(k));
-  keys.forEach(k => { if(toLeft) pokerGroupR.delete(k); else pokerGroupR.add(k); });
-  pokerSfx('tick');
-  selectedKeys.clear();
-  pokerFanOverlap(container);
-  if(latestPokerData){ pokerPaintHand(latestPokerData); pokerUpdatePreview(latestPokerData); }
-}
-
-function pokerMergeGroups(){
-  const container = document.getElementById('capsaHandMe');
-  pokerGroupR.clear();
-  pokerSfx('tick');
-  pokerFanOverlap(container);
-}
-
-// Menyusun semua kartu sebagai kipas melengkung di dalam kotak tangan.
-// Ukuran & jarak kartu otomatis mengecil/merapat supaya tidak pernah keluar kotak.
+// Menyusun kartu di tangan. Dua mode:
+//  - besar (zoom): 1-2 baris, kartu besar, jarak tekan lebar
+//  - kipas: melengkung, muat di kotak tinggi 136px
+// Kedua mode memastikan kartu tidak keluar dari kotak.
 function pokerFanOverlap(container){
   if(!container) return;
   pokerEnsureHandTools(container);
-  const W = container.clientWidth, H = container.clientHeight;
-  if(!W || !H) return;
+  const zb = container.querySelector('.poker-hand-btn.zoom');
+  zb.classList.toggle('on', pokerZoom);
+  zb.title = pokerZoom ? 'Kecilkan (mode kipas)' : 'Perbesar kartu';
 
-  const all = Array.from(container.children).filter(el => el.classList.contains('capsa-card-img'));
-  const divider = container.querySelector('.poker-hand-divider');
-  const mergeBtn = container.querySelector('.poker-hand-btn.merge');
-  const moveBtn = container.querySelector('.poker-hand-btn.move');
-  const n = all.length;
-  if(!n){ divider.style.display = 'none'; mergeBtn.style.display = 'none'; return; }
-
-  // urutan: kelompok kiri dulu (terurut), lalu kelompok kanan (terurut)
-  const left = all.filter(el => !pokerGroupR.has(el.dataset.key));
-  const right = all.filter(el => pokerGroupR.has(el.dataset.key));
-  const split = left.length > 0 && right.length > 0;
-  const ordered = split ? left.concat(right) : all;
-  const nl = split ? left.length : 0;
+  const ordered = Array.from(container.children).filter(el => el.classList.contains('capsa-card-img'));
+  const n = ordered.length;
+  const W = container.clientWidth;
+  if(!W || !n) return;
 
   const BASE_W = 52, BASE_H = 74, LIFT = 18, PAD = 6;
-  const gapPx = split ? 16 : 0;
   const rad = d => d * Math.PI / 180;
+
+  if(pokerZoom){
+    // cari ukuran kartu terbesar yang masih muat dalam maksimal 2 baris
+    const sideGap = 6;
+    let cw = 50, perRow = 1, rows = n;
+    for(const tryW of [68, 64, 60, 56, 52, 48]){
+      const pr = Math.max(1, Math.floor((W - 2 * sideGap - tryW) / (tryW * 0.55)) + 1);
+      const r = Math.ceil(n / pr);
+      cw = tryW; perRow = pr; rows = r;
+      if(r <= 2) break;
+    }
+    const ch = cw * BASE_H / BASE_W;
+    const rowStep = ch * 0.56;                       // baris bawah menutup sebagian baris atas
+    const topPad = 48;                               // ruang tombol 🔍 + kartu terangkat
+    const H = Math.round(topPad + ch + (rows - 1) * rowStep + 10);
+    container.style.height = H + 'px';
+
+    // bagi rata jumlah kartu per baris
+    const base = Math.ceil(n / rows);
+    let idx = 0;
+    for(let r = 0; r < rows; r++){
+      const cnt = Math.min(base, n - idx);
+      const maxStep = cw * 0.78;
+      let step = cnt > 1 ? (W - 2 * sideGap - cw) / (cnt - 1) : 0;
+      step = Math.max(0, Math.min(maxStep, step));
+      const total = (cnt - 1) * step + cw;
+      const startX = (W - total) / 2;
+      for(let c = 0; c < cnt; c++, idx++){
+        const el = ordered[idx];
+        el.style.width = cw.toFixed(1) + 'px';
+        el.style.height = ch.toFixed(1) + 'px';
+        el.style.left = (startX + c * step).toFixed(1) + 'px';
+        el.style.top = (topPad + r * rowStep).toFixed(1) + 'px';
+        el.style.zIndex = String(idx + 1);
+        el.style.setProperty('--rot', '0deg');
+        el.style.setProperty('--dy', '0px');
+      }
+    }
+    return;
+  }
+
+  // ---- mode kipas (tinggi tetap 136px, sama seperti aslinya) ----
+  container.style.height = '';
+  const H = container.clientHeight;
+  if(!H) return;
 
   const thetaMax = Math.min(22, Math.max(0, (n - 1) * 3.2));
   const dropMax  = Math.min(14, Math.max(0, (n - 1) * 2.2));
-
-  // skala kartu: turun kalau banyak kartu, supaya jarak tetap terbaca
   const margin = s => (BASE_H * s) * Math.sin(rad(thetaMax)) + (BASE_W * s / 2) * Math.cos(rad(thetaMax)) + 3;
   const minStep = s => 0.36 * BASE_W * s;
   let s = 1;
   if(n > 1){
-    // butuh: W - 2*margin(s) - gap >= (n-1) * minStep(s)
-    const m1 = margin(1) , k = (n - 1) * minStep(1);
-    s = Math.min(1, (W - gapPx) / (2 * m1 + k));
-    s = Math.max(0.6, s);
+    const m1 = margin(1), k = (n - 1) * minStep(1);
+    s = Math.max(0.6, Math.min(1, W / (2 * m1 + k)));
   }
-  const cw = BASE_W * s, ch = BASE_H * s;
-  const m = margin(s);
-  let step = n > 1 ? (W - 2 * m - gapPx) / (n - 1) : 0;
-  step = Math.max(0, Math.min(cw * 0.78, step));   // sedikit kartu -> tidak terlalu renggang
-  const total = (n - 1) * step + gapPx;
+  const cw = BASE_W * s, ch = BASE_H * s, m = margin(s);
+  let step = n > 1 ? (W - 2 * m) / (n - 1) : 0;
+  step = Math.max(0, Math.min(cw * 0.78, step));
+  const total = (n - 1) * step;
   const startX = W / 2 - total / 2;
 
-  // posisi vertikal: tepi paling bawah (kartu pinggir yang miring) tetap di dalam kotak
   const sideLow = (cw / 2) * Math.sin(rad(thetaMax));
-  const yBase = H - PAD - dropMax - sideLow;        // dasar kartu tengah
+  const yBase = H - PAD - dropMax - sideLow;
   const topY = yBase - ch;
 
   ordered.forEach((el, i) => {
-    const x = startX + i * step + (split && i >= nl ? gapPx : 0);
-    const t = total ? (x - W / 2) / (total / 2) : 0;   // -1..1
+    const x = startX + i * step;
+    const t = total ? (x - W / 2) / (total / 2) : 0;
     el.style.width = cw.toFixed(1) + 'px';
     el.style.height = ch.toFixed(1) + 'px';
     el.style.left = (x - cw / 2).toFixed(1) + 'px';
@@ -649,18 +649,6 @@ function pokerFanOverlap(container){
     el.style.setProperty('--rot', (t * thetaMax).toFixed(2) + 'deg');
     el.style.setProperty('--dy', (t * t * dropMax).toFixed(2) + 'px');
   });
-
-  if(split){
-    const dx = startX + (nl - 1) * step + step / 2 + gapPx / 2;   // tepat di celah kedua kelompok
-    const dh = ch * 0.8;
-    divider.style.display = 'block';
-    divider.style.height = dh.toFixed(0) + 'px';
-    divider.style.left = (dx - 1.5).toFixed(1) + 'px';
-    divider.style.top = (yBase - dh - 4).toFixed(0) + 'px';
-  } else divider.style.display = 'none';
-
-  mergeBtn.style.display = split ? 'flex' : 'none';
-  moveBtn.classList.toggle('dim', selectedKeys.size === 0);
 }
 
 function pokerPaintHand(data){
@@ -669,8 +657,6 @@ function pokerPaintHand(data){
     el.classList.toggle('selected', selectedKeys.has(el.dataset.key));
     el.classList.toggle('myturn', canSelect);
   });
-  const mvb = document.querySelector('#capsaHandMe .poker-hand-btn.move');
-  if(mvb) mvb.classList.toggle('dim', selectedKeys.size === 0);
 }
 
 function pokerToggleCard(el){
@@ -688,9 +674,6 @@ function pokerSyncMyHand(data, animateNew){
   const container = document.getElementById('capsaHandMe');
   const hand = sortCards(data.hands && data.hands[myRole]);
   pokerEnsureHandTools(container);
-
-  // ronde baru -> kelompok direset
-  if(pokerGroupHandNo !== data.handNumber){ pokerGroupR.clear(); pokerGroupHandNo = data.handNumber; }
 
   const existing = new Map();
   Array.from(container.children).forEach(el => { if(el.classList.contains('capsa-card-img')) existing.set(el.dataset.key, el); });
@@ -716,13 +699,11 @@ function pokerSyncMyHand(data, animateNew){
     el._card = c;
     idx++;
   });
-  existing.forEach((el, k) => { if(!keep.has(k)){ el.remove(); pokerGroupR.delete(k); } });
+  existing.forEach((el, k) => { if(!keep.has(k)) el.remove(); });
 
   // urutan DOM mengikuti urutan kartu (z-order & aksesibilitas); posisi visual diatur pokerFanOverlap
   hand.forEach(c => { const el = existing.get(cardKey(c)) || container.querySelector('[data-key="' + cardKey(c) + '"]'); if(el) container.appendChild(el); });
-  ['poker-hand-divider', 'poker-hand-btn move', 'poker-hand-btn merge'].forEach(cls => {
-    const t = container.querySelector('.' + cls.split(' ').join('.')); if(t) container.appendChild(t);
-  });
+  const zbtn = container.querySelector('.poker-hand-btn.zoom'); if(zbtn) container.appendChild(zbtn);
 
   pokerFanOverlap(container);
   pokerPaintHand(data);
