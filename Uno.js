@@ -337,6 +337,14 @@ function unoAnimateDeal(done) {
   }, totalDuration);
 }
 
+let unoHandSig = '';
+let unoOppSig = '';
+function syncUnoHandSelection() {
+  document.querySelectorAll('#unoHandMe img').forEach(img => {
+    img.classList.toggle('selected', selectedUnoKeys.has(img._unoCardId));
+  });
+}
+
 function renderUnoUICore(data) {
   latestUnoData = data;
   if (data.turn !== myRole || data.phase !== 'playing') selectedUnoKeys.clear();
@@ -362,45 +370,64 @@ function renderUnoUICore(data) {
     statusEl.textContent = '🏁 Permainan Selesai!';
   }
 
-  document.getElementById('unoTopCardImg').src = getUnoCardImgUrl(data.currentCard);
+  const topImg = document.getElementById('unoTopCardImg');
+  const topUrl = getUnoCardImgUrl(data.currentCard);
+  if (topImg.getAttribute('src') !== topUrl) topImg.src = topUrl;
+
   const myHandContainer = document.getElementById('unoHandMe');
-  myHandContainer.innerHTML = '';
   const myHand = data.hands ? (data.hands[myRole] || []) : [];
   const canPlay = data.phase === 'playing' && data.turn === myRole;
 
-  myHand.forEach(card => {
-    const img = document.createElement('img');
-    img.className = 'capsa-card-img' + (selectedUnoKeys.has(card.id) ? ' selected' : '');
-    img.src = getUnoCardImgUrl(card);
-    if (canPlay) {
-      img.onclick = () => {
-        if (selectedUnoKeys.has(card.id)) selectedUnoKeys.delete(card.id);
-        else selectedUnoKeys.add(card.id);
-        renderUnoUICore(latestUnoData);
-      };
-    }
-    myHandContainer.appendChild(img);
-  });
+  // Bangun ulang kartu HANYA kalau isi tangan / hak main berubah.
+  // Kalau cuma pilih kartu (selected), cukup ganti class -> tidak kedap-kedip.
+  const handSig = (canPlay ? '1' : '0') + '|' + myHand.map(c => c.id).join(',');
+  if (handSig !== unoHandSig || (myHand.length && !myHandContainer.children.length)) {
+    unoHandSig = handSig;
+    myHandContainer.innerHTML = '';
+    myHand.forEach(card => {
+      const img = document.createElement('img');
+      img.className = 'capsa-card-img';
+      img.src = getUnoCardImgUrl(card);
+      img._unoCardId = card.id;
+      if (canPlay) {
+        img.onclick = () => {
+          if (selectedUnoKeys.has(card.id)) selectedUnoKeys.delete(card.id);
+          else selectedUnoKeys.add(card.id);
+          syncUnoHandSelection();
+        };
+      }
+      myHandContainer.appendChild(img);
+    });
+  }
+  syncUnoHandSelection();
 
+  // Lawan: juga hanya digambar ulang kalau datanya berubah
   const opponentsContainer = document.getElementById('unoOpponentsWrap');
-  opponentsContainer.innerHTML = '';
-  activeRoles.forEach(role => {
-    if (role === myRole) return;
-    const cardCount = data.hands && data.hands[role] ? data.hands[role].length : 0;
-    const pName = (unoNames && unoNames[role]) || role.toUpperCase();
-    const isTurn = data.turn === role && data.phase === 'playing';
+  const oppSig = activeRoles.filter(r => r !== myRole).map(role => {
+    const n = data.hands && data.hands[role] ? data.hands[role].length : 0;
+    return role + ':' + n + ':' + (data.turn === role && data.phase === 'playing' ? 1 : 0) + ':' + (unoPresence[role] ? 1 : 0) + ':' + ((unoNames && unoNames[role]) || '');
+  }).join('|');
+  if (oppSig !== unoOppSig || !opponentsContainer.children.length) {
+    unoOppSig = oppSig;
+    opponentsContainer.innerHTML = '';
+    activeRoles.forEach(role => {
+      if (role === myRole) return;
+      const cardCount = data.hands && data.hands[role] ? data.hands[role].length : 0;
+      const pName = (unoNames && unoNames[role]) || role.toUpperCase();
+      const isTurn = data.turn === role && data.phase === 'playing';
 
-    const div = document.createElement('div');
-    div.className = `capsa-seat ${isTurn ? 'active-turn' : ''}`;
-    div.innerHTML = `
-      <div class="capsa-seat-info">${pName} ${unoPresence[role] ? '🟢' : '🔴'}</div>
-      <div class="capsa-card-back-wrap">
-        <img class="capsa-card-back" src="${UNO_CARD_URLS.back}">
-        <span class="capsa-card-back-count">${cardCount}</span>
-      </div>
-    `;
-    opponentsContainer.appendChild(div);
-  });
+      const div = document.createElement('div');
+      div.className = `capsa-seat ${isTurn ? 'active-turn' : ''}`;
+      div.innerHTML = `
+        <div class="capsa-seat-info">${pName} ${unoPresence[role] ? '🟢' : '🔴'}</div>
+        <div class="capsa-card-back-wrap">
+          <img class="capsa-card-back" src="${UNO_CARD_URLS.back}">
+          <span class="capsa-card-back-count">${cardCount}</span>
+        </div>
+      `;
+      opponentsContainer.appendChild(div);
+    });
+  }
 
   const actBox = document.getElementById('unoActions');
   actBox.style.display = canPlay ? 'grid' : 'none';
@@ -462,49 +489,59 @@ function handleUnoDorButtons(data) {
       actEl.parentNode.insertBefore(unoContainer, actEl);
     }
   }
-  unoContainer.innerHTML = '';
 
-  if (!data.unoChallenge) return;
+  const clearBox = () => { if (unoContainer.firstChild) unoContainer.innerHTML = ''; };
+
+  if (!data.unoChallenge) return clearBox();
 
   const elapsed = (Date.now() - data.unoChallenge.startTime) / 1000;
 
   // Batas waktu tantangan: 3 Detik Total
   if (elapsed > 3) {
     if (myRole === 'p1') unoRef.child('unoChallenge').remove();
-    return;
+    return clearBox();
   }
+
+  const typeLabel = data.unoChallenge.type === 'UNO GAME' ? 'UNO GAME' : 'UNO';
+  let mode = null, label = '';
 
   // 1. Tombol Teriak UNO / UNO GAME (Durasi 3 detik penuh di layar pemain)
   if (data.unoChallenge.target === myRole && !data.unoChallenge.shouted) {
-    const btnShout = document.createElement('button');
-    btnShout.className = 'capsa-act play';
-    btnShout.style.background = '#e4574f';
-    btnShout.style.color = '#fff';
-    btnShout.style.width = '100%';
-    const typeLabel = data.unoChallenge.type === 'UNO GAME' ? 'UNO GAME' : 'UNO';
-    btnShout.textContent = `🔥 TERIAK ${typeLabel}! (${(3 - elapsed).toFixed(1)}s)`;
-    btnShout.onclick = () => unoShout();
-    unoContainer.appendChild(btnShout);
+    mode = 'shout';
+    label = `🔥 TERIAK ${typeLabel}! (${(3 - elapsed).toFixed(1)}s)`;
+  }
+  // 2. Tombol DOR! untuk Lawan (Baru Muncul di detik ke-2 / setelah 2.0s)
+  else if (data.unoChallenge.target !== myRole && !data.unoChallenge.shouted && elapsed >= 2.0) {
+    mode = 'catch';
+    label = `💥 DOR! (Lupa Teriak ${typeLabel})`;
   }
 
-  // 2. Tombol DOR! untuk Lawan (Baru Muncul di detik ke-2 / setelah 2.0s)
-  if (data.unoChallenge.target !== myRole && !data.unoChallenge.shouted && elapsed >= 2.0) {
-    const btnCatch = document.createElement('button');
-    btnCatch.className = 'capsa-act play';
-    btnCatch.style.background = '#e8ac1f';
-    btnCatch.style.color = '#000';
-    btnCatch.style.width = '100%';
-    const typeLabel = data.unoChallenge.type === 'UNO GAME' ? 'UNO GAME' : 'UNO';
-    btnCatch.textContent = `💥 DOR! (Lupa Teriak ${typeLabel})`;
-    btnCatch.onclick = () => unoCatch();
-    unoContainer.appendChild(btnCatch);
+  if (!mode) return clearBox();
+
+  // Tombol dipertahankan; hanya teksnya yang diperbarui (supaya klik tidak meleset)
+  let btn = unoContainer.firstChild;
+  if (!btn || btn.dataset.mode !== mode) {
+    unoContainer.innerHTML = '';
+    btn = document.createElement('button');
+    btn.className = 'capsa-act play';
+    btn.dataset.mode = mode;
+    btn.style.width = '100%';
+    if (mode === 'shout') {
+      btn.style.background = '#e4574f'; btn.style.color = '#fff';
+      btn.onclick = () => unoShout();
+    } else {
+      btn.style.background = '#e8ac1f'; btn.style.color = '#000';
+      btn.onclick = () => unoCatch();
+    }
+    unoContainer.appendChild(btn);
   }
+  if (btn.textContent !== label) btn.textContent = label;
 }
 
 if (unoTimerCheck) clearInterval(unoTimerCheck);
 unoTimerCheck = setInterval(() => {
   if (latestUnoData && latestUnoData.unoChallenge) {
-    renderUnoUICore(latestUnoData);
+    handleUnoDorButtons(latestUnoData);
   }
 }, 200);
 

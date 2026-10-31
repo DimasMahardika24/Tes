@@ -340,25 +340,41 @@ function pokerRenderBackHand(container, count){
   container.appendChild(wrap);
 }
 
+let pokerHandSig = '';
+function pokerSyncSelection(){
+  document.querySelectorAll('#capsaHandMe img').forEach(img => {
+    img.classList.toggle('selected', selectedKeys.has(img._cardKey));
+  });
+}
+
 function pokerRenderMyHand(data){
   const container = document.getElementById('capsaHandMe');
-  container.innerHTML = '';
   const hand = sortCards((data.hands && data.hands[myRole]) || []);
   const canSelect = data.phase === 'playing' && data.turn === myRole;
-  hand.forEach(c => {
-    const img = document.createElement('img');
-    img.className = 'capsa-card-img' + (selectedKeys.has(cardKey(c)) ? ' selected' : '');
-    img.src = cardImg(c);
-    img.alt = c.rank + c.suit;
-    if(canSelect){
-      img.onclick = () => {
-        const k = cardKey(c);
-        if(selectedKeys.has(k)) selectedKeys.delete(k); else selectedKeys.add(k);
-        pokerRenderMyHand(latestPokerData);
-      };
-    }
-    container.appendChild(img);
-  });
+
+  // Bangun ulang kartu hanya kalau isi tangan / hak pilih berubah.
+  // Saat cuma memilih kartu, ganti class saja -> tidak kedap-kedip.
+  const sig = (canSelect ? '1' : '0') + '|' + hand.map(cardKey).join(',');
+  if(sig !== pokerHandSig || (hand.length && !container.children.length)){
+    pokerHandSig = sig;
+    container.innerHTML = '';
+    hand.forEach(c => {
+      const img = document.createElement('img');
+      img.className = 'capsa-card-img';
+      img.src = cardImg(c);
+      img.alt = c.rank + c.suit;
+      img._cardKey = cardKey(c);
+      if(canSelect){
+        img.onclick = () => {
+          const k = cardKey(c);
+          if(selectedKeys.has(k)) selectedKeys.delete(k); else selectedKeys.add(k);
+          pokerSyncSelection();
+        };
+      }
+      container.appendChild(img);
+    });
+  }
+  pokerSyncSelection();
 }
 
 function pokerRenderCenter(data){
