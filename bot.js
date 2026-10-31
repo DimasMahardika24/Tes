@@ -23,6 +23,7 @@ function cleanupBotListeners() {
     if (dominoBotHandler && roomRef) roomRef.child('domino').off('value', dominoBotHandler);
   } catch(e) {}
   
+  chessEngineReq++; chessBotThinking = false;
   chessBotHandler = null; tttBotHandler = null; snakeBotHandler = null; unoBotHandler = null; pokerBotHandler = null; dominoBotHandler = null;
 
   Object.keys(botTimers).forEach(k => {
@@ -124,6 +125,7 @@ function chessBotMinimax(board, state, depth, side, alpha, beta) {
 }
 
 function startChessBot() {
+  chessBotHistory = []; chessBotThinking = false;
   const stateRef = roomRef.child('state');
   if (chessBotHandler) stateRef.off('value', chessBotHandler);
 
@@ -131,9 +133,16 @@ function startChessBot() {
     const data = snap.val();
     if (!data || data.turn !== 'b') { if (botTimers.chess) { clearTimeout(botTimers.chess); botTimers.chess = null; } return; }
     if (botTimers.chess) return;
-    botTimers.chess = setTimeout(() => { botTimers.chess = null; makeChessBotMove(data); }, 700 + Math.random() * 500);
+    botTimers.chess = setTimeout(() => { botTimers.chess = null; makeChessBotMove(data); }, window.botDifficulty === 'impossible' ? 250 : 700 + Math.random() * 500);
   };
   stateRef.on('value', chessBotHandler);
+}
+
+let chessBotHistory = [];           // posisi-posisi sebelumnya (untuk deteksi pengulangan oleh mesin)
+let chessBotThinking = false;
+
+function chessBotSnapshot(board, turn, st) {
+  return { board: board.map(r => r.slice()), turn, castling: Object.assign({}, st.castling), ep: st.ep || null, halfmove: st.halfmove || 0 };
 }
 
 function makeChessBotMove(data) {
@@ -141,6 +150,9 @@ function makeChessBotMove(data) {
   const state = { castling: data.castling || { wK:false, wQ:false, bK:false, bQ:false }, ep: data.ep || null, halfmove: data.halfmove || 0 };
   const moves = chessAllLegalMoves(board, state, 'b');
   if (moves.length === 0) return;
+
+  // 💀 IMPOSSIBLE: mesin alpha-beta penuh (Web Worker)
+  if (window.botDifficulty === 'impossible') { chessBotImpossibleMove(data, board, state, moves); return; }
 
   let depth = 1; 
   let blunderChance = 0;
@@ -171,12 +183,16 @@ function makeChessBotMove(data) {
   }
 
   if (!bestMove) bestMove = moves[0];
-  const res = chessApplyMove(board, state, bestMove, bestMove.promotion ? 'q' : null);
+  chessBotCommit(board, state, bestMove, 'q');
+}
 
+function chessBotCommit(board, state, move, promoteTo) {
+  const res = chessApplyMove(board, state, move, move.promotion ? (promoteTo || 'q') : null);
+  chessBotHistory.push(chessBotSnapshot(board, 'b', state));
+  chessBotHistory.push(chessBotSnapshot(res.board, 'w', res));
   roomRef.child('state').set({
     board: JSON.stringify(res.board), turn: 'w', castling: res.castling, ep: res.ep, halfmove: res.halfmove, clocks: null, turnStartAt: null
   });
-
   chessBotPostMoveCheck(res.board, res);
 }
 
@@ -188,7 +204,553 @@ function chessBotPostMoveCheck(board, res) {
     return;
   }
   if ((res.halfmove || 0) >= 100) roomRef.child('result').transaction(cur => cur || { winner: 'draw', reason: 'fifty' });
+  else if (chessIsInsufficientMaterial(board)) roomRef.child('result').transaction(cur => cur || { winner: 'draw', reason: 'insufficient' });
 }
+
+// ------------------------------------------------------------
+// 💀 Mode IMPOSSIBLE — jalankan mesin di Web Worker (fallback: thread utama)
+// ------------------------------------------------------------
+let chessEngineWorker = null, chessEngineMain = null, chessEngineReq = 0;
+const chessEngineCbs = {};
+
+function chessEngineRun(payload, cb) {
+  const id = ++chessEngineReq;
+  chessEngineCbs[id] = cb;
+  const runMain = () => {
+    if (!chessEngineMain) chessEngineMain = chessEngineBuild();
+    const p = Object.assign({}, payload, { movetime: Math.min(payload.movetime || 2000, 1800) });
+    setTimeout(() => {
+      let r = null;
+      try { r = chessEngineMain.run(p); } catch (e) { r = null; }
+      const f = chessEngineCbs[id]; delete chessEngineCbs[id]; if (f) f(r);
+    }, 60);
+  };
+  try {
+    if (chessEngineWorker === null && !window.__chessNoWorker) {
+      const src = 'var E=(' + chessEngineBuild.toString() + ')();' +
+        'onmessage=function(e){var r=null;try{r=E.run(e.data.payload);}catch(err){r=null;}postMessage({id:e.data.id,result:r});};';
+      chessEngineWorker = new Worker(URL.createObjectURL(new Blob([src], { type: 'application/javascript' })));
+      chessEngineWorker.onmessage = (e) => {
+        const f = chessEngineCbs[e.data.id]; delete chessEngineCbs[e.data.id];
+        if (f) f(e.data.result);
+      };
+      chessEngineWorker.onerror = () => {
+        window.__chessNoWorker = true;
+        try { chessEngineWorker.terminate(); } catch (err) {}
+        chessEngineWorker = null;
+        const pending = Object.keys(chessEngineCbs);
+        if (pending.length) { const last = pending[pending.length - 1]; const f = chessEngineCbs[last]; delete chessEngineCbs[last]; chessEngineRun(payload, f); }
+      };
+    }
+    if (chessEngineWorker) chessEngineWorker.postMessage({ id, payload });
+    else runMain();
+  } catch (e) {
+    window.__chessNoWorker = true; chessEngineWorker = null; runMain();
+  }
+}
+
+function chessBotImpossibleMove(data, board, state, moves) {
+  if (chessBotThinking) return;
+  chessBotThinking = true;
+  const stEl = document.getElementById('chessStatus');
+  if (stEl) stEl.textContent = '🤖 Bot sedang menghitung...';
+
+  const payload = {
+    board, turn: 'b', castling: state.castling, ep: state.ep, halfmove: state.halfmove,
+    history: chessBotHistory.slice(-150), movetime: 2800
+  };
+  const sig = typeof data.board === 'string' ? data.board : JSON.stringify(data.board);
+
+  chessEngineRun(payload, (r) => {
+    chessBotThinking = false;
+    if (!roomRef || chessGameOver) return;
+    // pastikan posisi belum berubah selagi bot berpikir
+    roomRef.child('state').once('value').then(snap => {
+      const cur = snap.val();
+      if (!cur || cur.turn !== 'b') return;
+      const curSig = typeof cur.board === 'string' ? cur.board : JSON.stringify(cur.board);
+      if (curSig !== sig) return;
+
+      let mv = null;
+      if (r) mv = moves.find(m => m.x1 === r.x1 && m.y1 === r.y1 && m.x2 === r.x2 && m.y2 === r.y2);
+      if (!mv) {   // cadangan: minimax dalam
+        let bs = Infinity;
+        moves.forEach(m => {
+          const rs = chessApplyMove(board, state, m, m.promotion ? 'q' : null);
+          const sc = chessBotMinimax(rs.board, { castling: rs.castling, ep: rs.ep, halfmove: rs.halfmove }, 2, 'w', -Infinity, Infinity);
+          if (sc < bs) { bs = sc; mv = m; }
+        });
+      }
+      chessBotCommit(board, state, mv || moves[0], (r && r.promo) || 'q');
+    });
+  });
+}
+
+// ============================================================
+// 💀 MESIN CATUR "IMPOSSIBLE" (berjalan di Web Worker)
+// Alpha-beta + PVS, iterative deepening, transposition table, quiescence,
+// null-move, LMR, killer/history, deteksi pengulangan. Mandiri (tanpa dependensi).
+// ============================================================
+function chessEngineBuild() {
+  'use strict';
+  var P = 1, N = 2, B = 3, R = 4, Q = 5, K = 6;
+  var MATE = 30000, INF = 32000, MAXPLY = 100;
+  var board = new Int8Array(64);
+  var side = 1, castle = 0, ep = -1, half = 0;
+  var hLo = 0, hHi = 0;
+  var kSq = new Int8Array(2);
+  var nodes = 0, stopFlag = false, tStart = 0, tLimit = 0, rootBest = 0;
+  var VAL = [0, 100, 320, 330, 500, 900, 0];
+  var VV = [0, 100, 320, 330, 500, 900, 20000];
+
+  // ---------- Zobrist ----------
+  var seed = 0x2545F491;
+  function rnd() { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return seed | 0; }
+  var zLo = new Int32Array(13 * 64), zHi = new Int32Array(13 * 64), i, j;
+  for (i = 0; i < 13 * 64; i++) { zLo[i] = rnd(); zHi[i] = rnd(); }
+  var zSLo = rnd(), zSHi = rnd();
+  var zCLo = new Int32Array(16), zCHi = new Int32Array(16);
+  for (i = 0; i < 16; i++) { zCLo[i] = rnd(); zCHi[i] = rnd(); }
+
+  // ---------- Geometri ----------
+  var KN = [], KG = [], PAW = [], PAB = [], RB = [], RR = [];
+  var knD = [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]];
+  var bD = [[1,1],[1,-1],[-1,1],[-1,-1]], rD = [[1,0],[-1,0],[0,1],[0,-1]];
+  (function () {
+    for (var sq = 0; sq < 64; sq++) {
+      var y = sq >> 3, x = sq & 7, kn = [], kg = [], paw = [], pab = [];
+      knD.forEach(function (d) { var nx = x + d[0], ny = y + d[1]; if (nx >= 0 && nx < 8 && ny >= 0 && ny < 8) kn.push(ny * 8 + nx); });
+      for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        var nx = x + dx, ny = y + dy; if (nx >= 0 && nx < 8 && ny >= 0 && ny < 8) kg.push(ny * 8 + nx);
+      }
+      [-1, 1].forEach(function (d) {
+        var nx = x + d; if (nx < 0 || nx > 7) return;
+        if (y - 1 >= 0) paw.push((y - 1) * 8 + nx);
+        if (y + 1 < 8) pab.push((y + 1) * 8 + nx);
+      });
+      var mk = function (ds) {
+        return ds.map(function (d) {
+          var r = [], cx = x + d[0], cy = y + d[1];
+          while (cx >= 0 && cx < 8 && cy >= 0 && cy < 8) { r.push(cy * 8 + cx); cx += d[0]; cy += d[1]; }
+          return r;
+        });
+      };
+      KN[sq] = kn; KG[sq] = kg; PAW[sq] = paw; PAB[sq] = pab; RB[sq] = mk(bD); RR[sq] = mk(rD);
+    }
+  })();
+  var CM = new Int8Array(64); for (i = 0; i < 64; i++) CM[i] = 15;
+  CM[60] = 12; CM[63] = 14; CM[56] = 13; CM[4] = 3; CM[7] = 11; CM[0] = 7;
+
+  // ---------- Tabel nilai posisi (sudut pandang putih, baris 0 = rank 8) ----------
+  var PST = [null,
+    [0,0,0,0,0,0,0,0, 50,50,50,50,50,50,50,50, 10,10,20,30,30,20,10,10, 5,5,10,25,25,10,5,5, 0,0,0,20,20,0,0,0, 5,-5,-10,0,0,-10,-5,5, 5,10,10,-20,-20,10,10,5, 0,0,0,0,0,0,0,0],
+    [-50,-40,-30,-30,-30,-30,-40,-50, -40,-20,0,0,0,0,-20,-40, -30,0,10,15,15,10,0,-30, -30,5,15,20,20,15,5,-30, -30,0,15,20,20,15,0,-30, -30,5,10,15,15,10,5,-30, -40,-20,0,5,5,0,-20,-40, -50,-40,-30,-30,-30,-30,-40,-50],
+    [-20,-10,-10,-10,-10,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,10,10,5,0,-10, -10,5,5,10,10,5,5,-10, -10,0,10,10,10,10,0,-10, -10,10,10,10,10,10,10,-10, -10,5,0,0,0,0,5,-10, -20,-10,-10,-10,-10,-10,-10,-20],
+    [0,0,0,0,0,0,0,0, 5,10,10,10,10,10,10,5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, 0,0,0,5,5,0,0,0],
+    [-20,-10,-10,-5,-5,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,5,5,5,0,-10, -5,0,5,5,5,5,0,-5, 0,0,5,5,5,5,0,-5, -10,5,5,5,5,5,0,-10, -10,0,5,0,0,0,0,-10, -20,-10,-10,-5,-5,-10,-10,-20]
+  ];
+  var KM = [-30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -20,-30,-30,-40,-40,-30,-30,-20, -10,-20,-20,-20,-20,-20,-20,-10, 20,20,0,0,0,0,20,20, 20,30,10,0,0,10,30,20];
+  var KE = [-50,-40,-30,-20,-20,-30,-40,-50, -30,-20,-10,0,0,-10,-20,-30, -30,-10,20,30,30,20,-10,-30, -30,-10,30,40,40,30,-10,-30, -30,-10,30,40,40,30,-10,-30, -30,-10,20,30,30,20,-10,-30, -30,-30,0,0,0,0,-30,-30, -50,-30,-30,-30,-30,-30,-30,-50];
+  var PASSED = [0, 5, 10, 20, 35, 60, 100, 0];
+
+  // ---------- Buffer ----------
+  var MV = new Int32Array((MAXPLY + 4) * 256), SC = new Int32Array((MAXPLY + 4) * 256);
+  var sUC = new Int8Array(1024), sCa = new Int8Array(1024), sEp = new Int16Array(1024), sHf = new Int16Array(1024);
+  var sLo = new Int32Array(1024), sHi = new Int32Array(1024), sP = new Int8Array(1024), sp = 0;
+  var hsLo = new Int32Array(4096), hsHi = new Int32Array(4096), histN = 0;
+  var K1 = new Int32Array(MAXPLY + 4), K2 = new Int32Array(MAXPLY + 4), HIST = new Int32Array(8192);
+  var TTBITS = 20, TTSIZE = 1 << TTBITS, TTMASK = TTSIZE - 1;
+  var ttK = new Int32Array(TTSIZE), ttD = new Int8Array(TTSIZE), ttF = new Int8Array(TTSIZE), ttS = new Int16Array(TTSIZE), ttM = new Int32Array(TTSIZE);
+  ttD.fill(-1);
+
+  function attacked(sq, by) {
+    var a = by > 0 ? PAB[sq] : PAW[sq], k, l, p, r;
+    for (k = 0; k < a.length; k++) if (board[a[k]] === by * P) return true;
+    a = KN[sq]; for (k = 0; k < a.length; k++) if (board[a[k]] === by * N) return true;
+    a = KG[sq]; for (k = 0; k < a.length; k++) if (board[a[k]] === by * K) return true;
+    r = RB[sq];
+    for (k = 0; k < 4; k++) { a = r[k]; for (l = 0; l < a.length; l++) { p = board[a[l]]; if (p !== 0) { if (p === by * B || p === by * Q) return true; break; } } }
+    r = RR[sq];
+    for (k = 0; k < 4; k++) { a = r[k]; for (l = 0; l < a.length; l++) { p = board[a[l]]; if (p !== 0) { if (p === by * R || p === by * Q) return true; break; } } }
+    return false;
+  }
+
+  function gen(ply, caps) {
+    var off = ply * 256, n = off, us = side, sq, p, a, k, l, t, c, r, y, x;
+    for (sq = 0; sq < 64; sq++) {
+      p = board[sq] * us;
+      if (p <= 0) continue;
+      if (p === P) {
+        y = sq >> 3;
+        var dir = us > 0 ? -8 : 8, promoRow = us > 0 ? 0 : 7, startRow = us > 0 ? 6 : 1;
+        var to = sq + dir, ty = y + (us > 0 ? -1 : 1);
+        if (board[to] === 0) {
+          if (ty === promoRow) { MV[n++] = sq | (to << 6) | (Q << 12); if (!caps) MV[n++] = sq | (to << 6) | (N << 12); }
+          else if (!caps) {
+            MV[n++] = sq | (to << 6);
+            if (y === startRow && board[to + dir] === 0) MV[n++] = sq | ((to + dir) << 6) | (4 << 15);
+          }
+        }
+        a = us > 0 ? PAW[sq] : PAB[sq];
+        for (k = 0; k < a.length; k++) {
+          t = a[k]; c = board[t] * us;
+          if (c < 0) {
+            if (ty === promoRow) { MV[n++] = sq | (t << 6) | (Q << 12); if (!caps) MV[n++] = sq | (t << 6) | (N << 12); }
+            else MV[n++] = sq | (t << 6);
+          } else if (c === 0 && t === ep) MV[n++] = sq | (t << 6) | (1 << 15);
+        }
+      } else if (p === N) {
+        a = KN[sq];
+        for (k = 0; k < a.length; k++) { t = a[k]; c = board[t] * us; if (c < 0 || (c === 0 && !caps)) MV[n++] = sq | (t << 6); }
+      } else if (p === K) {
+        a = KG[sq];
+        for (k = 0; k < a.length; k++) { t = a[k]; c = board[t] * us; if (c < 0 || (c === 0 && !caps)) MV[n++] = sq | (t << 6); }
+        if (!caps) {
+          if (us > 0 && sq === 60) {
+            if ((castle & 1) && board[61] === 0 && board[62] === 0 && board[63] === R && !attacked(60, -1) && !attacked(61, -1) && !attacked(62, -1)) MV[n++] = 60 | (62 << 6) | (2 << 15);
+            if ((castle & 2) && board[59] === 0 && board[58] === 0 && board[57] === 0 && board[56] === R && !attacked(60, -1) && !attacked(59, -1) && !attacked(58, -1)) MV[n++] = 60 | (58 << 6) | (3 << 15);
+          } else if (us < 0 && sq === 4) {
+            if ((castle & 4) && board[5] === 0 && board[6] === 0 && board[7] === -R && !attacked(4, 1) && !attacked(5, 1) && !attacked(6, 1)) MV[n++] = 4 | (6 << 6) | (2 << 15);
+            if ((castle & 8) && board[3] === 0 && board[2] === 0 && board[1] === 0 && board[0] === -R && !attacked(4, 1) && !attacked(3, 1) && !attacked(2, 1)) MV[n++] = 4 | (2 << 6) | (3 << 15);
+          }
+        }
+      } else {
+        for (r = 0; r < 2; r++) {
+          if (r === 0 && p === R) continue;        // rook: hanya lurus
+          if (r === 1 && p === B) continue;        // bishop: hanya diagonal
+          var rays = r === 0 ? RB[sq] : RR[sq];
+          for (k = 0; k < 4; k++) {
+            a = rays[k];
+            for (l = 0; l < a.length; l++) {
+              t = a[l]; c = board[t] * us;
+              if (c === 0) { if (!caps) MV[n++] = sq | (t << 6); }
+              else { if (c < 0) MV[n++] = sq | (t << 6); break; }
+            }
+          }
+        }
+      }
+    }
+    return n;
+  }
+
+  function make(m) {
+    var from = m & 63, to = (m >> 6) & 63, pr = (m >> 12) & 7, fl = (m >> 15) & 7;
+    var p = board[from], cap = board[to], us = p > 0 ? 1 : -1, placed = p, ci;
+    sUC[sp] = cap; sCa[sp] = castle; sEp[sp] = ep; sHf[sp] = half; sLo[sp] = hLo; sHi[sp] = hHi; sP[sp] = p; sp++;
+    hsLo[histN] = hLo; hsHi[histN] = hHi; histN++;
+    ci = (p + 6) * 64 + from; hLo ^= zLo[ci]; hHi ^= zHi[ci];
+    if (cap !== 0) { ci = (cap + 6) * 64 + to; hLo ^= zLo[ci]; hHi ^= zHi[ci]; }
+    if (pr) placed = us * pr;
+    board[from] = 0; board[to] = placed;
+    ci = (placed + 6) * 64 + to; hLo ^= zLo[ci]; hHi ^= zHi[ci];
+    if (fl === 1) {
+      var cs = (from & 56) | (to & 7), cp = -us * P;
+      board[cs] = 0; ci = (cp + 6) * 64 + cs; hLo ^= zLo[ci]; hHi ^= zHi[ci];
+    } else if (fl === 2 || fl === 3) {
+      var rf = fl === 2 ? from + 3 : from - 4, rt = fl === 2 ? from + 1 : from - 1, rk = us * R;
+      board[rf] = 0; board[rt] = rk;
+      ci = (rk + 6) * 64 + rf; hLo ^= zLo[ci]; hHi ^= zHi[ci];
+      ci = (rk + 6) * 64 + rt; hLo ^= zLo[ci]; hHi ^= zHi[ci];
+    }
+    if (p === K || p === -K) kSq[us > 0 ? 0 : 1] = to;
+    var nc = castle & CM[from] & CM[to];
+    if (nc !== castle) { hLo ^= zCLo[castle] ^ zCLo[nc]; hHi ^= zCHi[castle] ^ zCHi[nc]; castle = nc; }
+    ep = fl === 4 ? (from + to) >> 1 : -1;
+    side = -side; hLo ^= zSLo; hHi ^= zSHi;
+    half = (p === P || p === -P || cap !== 0 || fl === 1) ? 0 : half + 1;
+  }
+
+  function unmake(m) {
+    var from = m & 63, to = (m >> 6) & 63, fl = (m >> 15) & 7;
+    sp--; histN--;
+    var p = sP[sp], cap = sUC[sp], us = p > 0 ? 1 : -1;
+    board[from] = p; board[to] = cap;
+    if (fl === 1) { board[to] = 0; board[(from & 56) | (to & 7)] = -us * P; }
+    else if (fl === 2) { board[from + 3] = us * R; board[from + 1] = 0; }
+    else if (fl === 3) { board[from - 4] = us * R; board[from - 1] = 0; }
+    if (p === K || p === -K) kSq[us > 0 ? 0 : 1] = from;
+    castle = sCa[sp]; ep = sEp[sp]; half = sHf[sp]; hLo = sLo[sp]; hHi = sHi[sp]; side = -side;
+  }
+
+  function makeNull() {
+    sEp[sp] = ep; sHf[sp] = half; sLo[sp] = hLo; sHi[sp] = hHi; sp++;
+    hsLo[histN] = hLo; hsHi[histN] = hHi; histN++;
+    ep = -1; half++; side = -side; hLo ^= zSLo; hHi ^= zSHi;
+  }
+  function unmakeNull() {
+    sp--; histN--; ep = sEp[sp]; half = sHf[sp]; hLo = sLo[sp]; hHi = sHi[sp]; side = -side;
+  }
+
+  // ---------- Evaluasi (sudut pandang pihak yang jalan) ----------
+  var cntW = new Int8Array(8), cntB = new Int8Array(8), bMinY = new Int8Array(8), wMaxY = new Int8Array(8);
+  var pw = new Int8Array(16), pb = new Int8Array(16), rw = new Int8Array(4), rb = new Int8Array(4);
+  function evaluate() {
+    var s = 0, np = 0, nW = 0, nB = 0, wBi = 0, bBi = 0, nrw = 0, nrb = 0, sq, p, a;
+    for (sq = 0; sq < 8; sq++) { cntW[sq] = 0; cntB[sq] = 0; bMinY[sq] = 8; wMaxY[sq] = -1; }
+    for (sq = 0; sq < 64; sq++) {
+      p = board[sq]; if (!p) continue;
+      if (p > 0) {
+        if (p === K) continue;
+        s += VAL[p] + PST[p][sq];
+        if (p === P) { var x = sq & 7, y = sq >> 3; cntW[x]++; if (y > wMaxY[x]) wMaxY[x] = y; if (nW < 16) pw[nW++] = sq; }
+        else { np += VAL[p]; if (p === B) wBi++; else if (p === R && nrw < 4) rw[nrw++] = sq; }
+      } else {
+        a = -p; if (a === K) continue;
+        s -= VAL[a] + PST[a][sq ^ 56];
+        if (a === P) { var x2 = sq & 7, y2 = sq >> 3; cntB[x2]++; if (y2 < bMinY[x2]) bMinY[x2] = y2; if (nB < 16) pb[nB++] = sq; }
+        else { np += VAL[a]; if (a === B) bBi++; else if (a === R && nrb < 4) rb[nrb++] = sq; }
+      }
+    }
+    if (nW === 0 && nB === 0 && np <= 330) return 0;              // materi tidak cukup
+    var i2, f;
+    if (wBi >= 2) s += 30; if (bBi >= 2) s -= 30;
+    for (i2 = 0; i2 < nW; i2++) {
+      sq = pw[i2]; var fx = sq & 7, fy = sq >> 3, passed = true;
+      for (f = (fx > 0 ? fx - 1 : 0); f <= (fx < 7 ? fx + 1 : 7); f++) if (bMinY[f] < fy) { passed = false; break; }
+      if (passed) s += PASSED[6 - fy];
+      if (cntW[fx] > 1) s -= 8;
+      if ((fx === 0 || cntW[fx - 1] === 0) && (fx === 7 || cntW[fx + 1] === 0)) s -= 12;
+    }
+    for (i2 = 0; i2 < nB; i2++) {
+      sq = pb[i2]; var gx = sq & 7, gy = sq >> 3, passedB = true;
+      for (f = (gx > 0 ? gx - 1 : 0); f <= (gx < 7 ? gx + 1 : 7); f++) if (wMaxY[f] > gy) { passedB = false; break; }
+      if (passedB) s -= PASSED[gy - 1];
+      if (cntB[gx] > 1) s += 8;
+      if ((gx === 0 || cntB[gx - 1] === 0) && (gx === 7 || cntB[gx + 1] === 0)) s += 12;
+    }
+    for (i2 = 0; i2 < nrw; i2++) { f = rw[i2] & 7; if (cntW[f] === 0) s += (cntB[f] === 0 ? 20 : 10); }
+    for (i2 = 0; i2 < nrb; i2++) { f = rb[i2] & 7; if (cntB[f] === 0) s -= (cntW[f] === 0 ? 20 : 10); }
+    var ph = np >= 6400 ? 1 : np / 6400;
+    var wk = kSq[0], bk = kSq[1];
+    s += Math.round(KM[wk] * ph + KE[wk] * (1 - ph)) - Math.round(KM[bk ^ 56] * ph + KE[bk ^ 56] * (1 - ph));
+    if (ph > 0.3) {                                                  // perisai pion di depan raja
+      var sh = 0, kx = wk & 7, ky = wk >> 3, z;
+      if (ky >= 6) for (z = (kx > 0 ? kx - 1 : 0); z <= (kx < 7 ? kx + 1 : 7); z++) { if (board[(ky - 1) * 8 + z] === P) sh += 10; else if (ky >= 2 && board[(ky - 2) * 8 + z] === P) sh += 5; }
+      var sb = 0; kx = bk & 7; ky = bk >> 3;
+      if (ky <= 1) for (z = (kx > 0 ? kx - 1 : 0); z <= (kx < 7 ? kx + 1 : 7); z++) { if (board[(ky + 1) * 8 + z] === -P) sb += 10; else if (ky <= 5 && board[(ky + 2) * 8 + z] === -P) sb += 5; }
+      s += Math.round((sh - sb) * ph);
+    }
+    return (side > 0 ? s : -s) + 10;
+  }
+
+  function hasPieces(us) {
+    for (var sq = 0; sq < 64; sq++) { var p = board[sq] * us; if (p >= N && p <= Q) return true; }
+    return false;
+  }
+
+  function qsearch(alpha, beta, ply) {
+    if ((++nodes & 2047) === 0 && Date.now() - tStart > tLimit) stopFlag = true;
+    if (stopFlag) return 0;
+    if (ply >= MAXPLY - 2) return evaluate();
+    var se = evaluate();
+    if (se >= beta) return se;
+    if (se > alpha) alpha = se;
+    var off = ply * 256, n = gen(ply, true), k, m, j2, to, cap, v;
+    for (k = off; k < n; k++) {
+      m = MV[k]; to = (m >> 6) & 63; cap = board[to]; v = cap ? (cap > 0 ? cap : -cap) : P;
+      SC[k] = VV[v] * 16 - ((board[m & 63] > 0 ? board[m & 63] : -board[m & 63])) + (((m >> 12) & 7) ? 5000 : 0);
+    }
+    for (k = off; k < n; k++) {
+      var bi = k, bs = SC[k];
+      for (j2 = k + 1; j2 < n; j2++) if (SC[j2] > bs) { bs = SC[j2]; bi = j2; }
+      if (bi !== k) { var tm = MV[k]; MV[k] = MV[bi]; MV[bi] = tm; var ts = SC[k]; SC[k] = SC[bi]; SC[bi] = ts; }
+      m = MV[k]; to = (m >> 6) & 63; cap = board[to];
+      if (!((m >> 12) & 7) && se + (cap ? VV[cap > 0 ? cap : -cap] : 100) + 200 < alpha) continue;   // delta pruning
+      make(m);
+      if (attacked(kSq[side > 0 ? 1 : 0], side)) { unmake(m); continue; }
+      var score = -qsearch(-beta, -alpha, ply + 1);
+      unmake(m);
+      if (stopFlag) return 0;
+      if (score > alpha) { alpha = score; if (alpha >= beta) return alpha; }
+    }
+    return alpha;
+  }
+
+  function search(depth, alpha, beta, ply, doNull) {
+    if ((++nodes & 2047) === 0 && Date.now() - tStart > tLimit) stopFlag = true;
+    if (stopFlag) return 0;
+    var pv = (beta - alpha) > 1, k, j2, m;
+    if (ply > 0) {
+      if (half >= 100) return 0;
+      var lim = histN - half; if (lim < 0) lim = 0;
+      for (var r = histN - 2; r >= lim; r -= 2) if (hsLo[r] === hLo && hsHi[r] === hHi) return 0;
+      if (alpha < -MATE + ply) alpha = -MATE + ply;
+      if (beta > MATE - ply - 1) beta = MATE - ply - 1;
+      if (alpha >= beta) return alpha;
+    }
+    if (ply >= MAXPLY - 2) return evaluate();
+    var us = side, inCheck = attacked(kSq[us > 0 ? 0 : 1], -us);
+    if (inCheck) depth++;
+    if (depth <= 0) return qsearch(alpha, beta, ply);
+
+    var ti = hLo & TTMASK, ttm = 0;
+    if (ttK[ti] === hHi && ttD[ti] >= 0) {
+      ttm = ttM[ti];
+      if (!pv && ply > 0 && ttD[ti] >= depth) {
+        var tsc = ttS[ti]; if (tsc > MATE - 200) tsc -= ply; else if (tsc < -MATE + 200) tsc += ply;
+        var tf = ttF[ti];
+        if (tf === 0) return tsc;
+        if (tf === 1 && tsc >= beta) return tsc;
+        if (tf === 2 && tsc <= alpha) return tsc;
+      }
+    }
+
+    var se = 0;
+    if (!pv && !inCheck) {
+      se = evaluate();
+      if (depth <= 3 && se - 110 * depth >= beta && beta > -MATE + 200 && beta < MATE - 200) return se - 110 * depth;
+      if (doNull && depth >= 3 && se >= beta && hasPieces(us)) {
+        makeNull();
+        var ns = -search(depth - 1 - (depth > 6 ? 3 : 2), -beta, -beta + 1, ply + 1, false);
+        unmakeNull();
+        if (stopFlag) return 0;
+        if (ns >= beta) return ns > MATE - 200 ? beta : ns;
+      }
+    }
+
+    var off = ply * 256, n = gen(ply, false), hi = us > 0 ? 0 : 4096;
+    for (k = off; k < n; k++) {
+      m = MV[k];
+      if (m === ttm) { SC[k] = 2000000; continue; }
+      var to = (m >> 6) & 63, cp = board[to], fl = (m >> 15) & 7;
+      if (cp !== 0 || fl === 1) {
+        var vv = cp ? (cp > 0 ? cp : -cp) : P, mover = board[m & 63]; if (mover < 0) mover = -mover;
+        SC[k] = 1000000 + VV[vv] * 16 - mover;
+      } else if ((m >> 12) & 7) SC[k] = 950000;
+      else if (m === K1[ply]) SC[k] = 900000;
+      else if (m === K2[ply]) SC[k] = 890000;
+      else SC[k] = HIST[hi + (m & 4095)];
+    }
+
+    var best = -INF, bestM = 0, legal = 0, origAlpha = alpha;
+    for (k = off; k < n; k++) {
+      var bi = k, bs = SC[k];
+      for (j2 = k + 1; j2 < n; j2++) if (SC[j2] > bs) { bs = SC[j2]; bi = j2; }
+      if (bi !== k) { var t1 = MV[k]; MV[k] = MV[bi]; MV[bi] = t1; var t2 = SC[k]; SC[k] = SC[bi]; SC[bi] = t2; }
+      m = MV[k];
+      var mto = (m >> 6) & 63, isCap = board[mto] !== 0 || ((m >> 15) & 7) === 1, isPromo = ((m >> 12) & 7) !== 0;
+      make(m);
+      if (attacked(kSq[side > 0 ? 1 : 0], side)) { unmake(m); continue; }
+      legal++;
+      var score;
+      if (legal === 1) score = -search(depth - 1, -beta, -alpha, ply + 1, true);
+      else {
+        var red = 0;
+        if (depth >= 3 && legal >= 4 && !inCheck && !isCap && !isPromo) {
+          red = 1 + (legal >= 10 ? 1 : 0) + (depth >= 8 ? 1 : 0);
+          if (red > depth - 2) red = depth - 2;
+          if (red < 0) red = 0;
+        }
+        score = -search(depth - 1 - red, -alpha - 1, -alpha, ply + 1, true);
+        if (score > alpha && red > 0) score = -search(depth - 1, -alpha - 1, -alpha, ply + 1, true);
+        if (score > alpha && score < beta) score = -search(depth - 1, -beta, -alpha, ply + 1, true);
+      }
+      unmake(m);
+      if (stopFlag) return 0;
+      if (score > best) {
+        best = score; bestM = m;
+        if (score > alpha) {
+          alpha = score;
+          if (ply === 0) rootBest = m;
+          if (alpha >= beta) {
+            if (!isCap && !isPromo) {
+              if (K1[ply] !== m) { K2[ply] = K1[ply]; K1[ply] = m; }
+              var hv = HIST[hi + (m & 4095)] + depth * depth; HIST[hi + (m & 4095)] = hv > 800000 ? 800000 : hv;
+            }
+            break;
+          }
+        }
+      }
+    }
+    if (legal === 0) return inCheck ? -MATE + ply : 0;
+
+    var flag = best <= origAlpha ? 2 : (best >= beta ? 1 : 0);
+    var ss = best; if (ss > MATE - 200) ss += ply; else if (ss < -MATE + 200) ss -= ply;
+    if (ttK[ti] !== hHi || ttD[ti] < 0 || ttD[ti] <= depth) {
+      ttK[ti] = hHi; ttD[ti] = depth > 120 ? 120 : depth; ttF[ti] = flag; ttS[ti] = ss; ttM[ti] = bestM;
+    }
+    return best;
+  }
+
+  function computeHash() {
+    hLo = 0; hHi = 0;
+    for (var sq = 0; sq < 64; sq++) if (board[sq]) { var ci = (board[sq] + 6) * 64 + sq; hLo ^= zLo[ci]; hHi ^= zHi[ci]; }
+    hLo ^= zCLo[castle]; hHi ^= zCHi[castle];
+    if (side < 0) { hLo ^= zSLo; hHi ^= zSHi; }
+  }
+
+  function setPos(p) {
+    board.fill(0);
+    var map = { p: 1, n: 2, b: 3, r: 4, q: 5, k: 6 }, y, x, c;
+    for (y = 0; y < 8; y++) for (x = 0; x < 8; x++) {
+      c = p.board[y][x];
+      if (c) {
+        var t = map[c.toLowerCase()], white = c === c.toUpperCase();
+        board[y * 8 + x] = white ? t : -t;
+        if (t === 6) kSq[white ? 0 : 1] = y * 8 + x;
+      }
+    }
+    side = p.turn === 'w' ? 1 : -1;
+    castle = 0; var cr = p.castling || {};
+    if (cr.wK) castle |= 1; if (cr.wQ) castle |= 2; if (cr.bK) castle |= 4; if (cr.bQ) castle |= 8;
+    ep = p.ep ? p.ep.y * 8 + p.ep.x : -1;
+    half = p.halfmove || 0;
+    computeHash();
+  }
+
+  function fmt(m, score, depth) {
+    var from = m & 63, to = (m >> 6) & 63, pr = (m >> 12) & 7;
+    return { x1: from & 7, y1: from >> 3, x2: to & 7, y2: to >> 3, promo: pr ? (pr === Q ? 'q' : 'n') : null, score: score, depth: depth, nodes: nodes };
+  }
+
+  function think(opts) {
+    tStart = Date.now(); tLimit = opts.movetime || 2000; stopFlag = false; nodes = 0; rootBest = 0;
+    K1.fill(0); K2.fill(0); HIST.fill(0);
+    var n = gen(0, false), legalList = [], k, m;
+    for (k = 0; k < n; k++) {
+      m = MV[k]; make(m);
+      if (!attacked(kSq[side > 0 ? 1 : 0], side)) legalList.push(m);
+      unmake(m);
+    }
+    if (!legalList.length) return null;
+    if (legalList.length === 1) return fmt(legalList[0], 0, 0);
+    var best = legalList[0], bestScore = 0, doneD = 0, maxD = opts.maxDepth || 40;
+    for (var d = 1; d <= maxD; d++) {
+      rootBest = 0;
+      var sc = search(d, -INF, INF, 0, true);
+      if (stopFlag) { if (rootBest) best = rootBest; break; }
+      if (rootBest) best = rootBest;
+      bestScore = sc; doneD = d;
+      if (sc > MATE - 100) break;
+      if (Date.now() - tStart > tLimit * 0.55) break;
+    }
+    return fmt(best, bestScore, doneD);
+  }
+
+  function run(opts) {
+    sp = 0; histN = 0;
+    var hist = opts.history || [];
+    for (var i3 = 0; i3 < hist.length; i3++) { setPos(hist[i3]); hsLo[histN] = hLo; hsHi[histN] = hHi; histN++; }
+    setPos(opts);
+    return think(opts);
+  }
+
+  function perft(d, ply) {
+    if (d === 0) return 1;
+    var n = gen(ply, false), c = 0;
+    for (var k = ply * 256; k < n; k++) {
+      var m = MV[k]; make(m);
+      if (!attacked(kSq[side > 0 ? 1 : 0], side)) c += perft(d - 1, ply + 1);
+      unmake(m);
+    }
+    return c;
+  }
+  function perftRun(pos, d) { sp = 0; histN = 0; setPos(pos); return perft(d, 0); }
+
+  return { run: run, perft: perftRun };
+}
+// ===END ENGINE===
 
 // ============================================================
 // ⭕ TTT BOT

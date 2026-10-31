@@ -14,6 +14,8 @@ let chessPendingPromotion = null;
 let prevChessBoard = null;
 let chessLastMove = null;
 let chessAudioCtx = null;
+let chessHistory = [];
+let chessHistOpen = false;
 
 // ======================================================
 // CSS ANIMASI & EFEK (diinjeksi, menimpa rule lama di index.html)
@@ -129,6 +131,29 @@ styleEl.innerHTML = `
     100% { transform: scale(1.5); opacity: 0; }
   }
 
+  /* ---------- Riwayat langkah ---------- */
+  #chessScreen .chess-hist-btn.on { background: var(--gold); color: #1a1a1a; }
+  #chessScreen .chess-hist-panel {
+    position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; z-index: 45; display: none; overflow-y: auto;
+    background: rgba(20,14,12,.97); border: 1px solid rgba(232,172,31,.6); border-radius: 12px; padding: 8px 10px;
+    box-shadow: 0 10px 26px rgba(0,0,0,.6); -webkit-overflow-scrolling: touch;
+  }
+  #chessScreen .ch-title { font-size: 12px; font-weight: 800; color: var(--gold); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  #chessScreen .ch-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+  #chessScreen .ch-no { flex: 0 0 26px; font-size: 11px; color: var(--ink-dim); text-align: right; }
+  #chessScreen .ch-who { flex: 0 0 48px; font-size: 12px; font-weight: 800; color: var(--ink-dim); }
+  #chessScreen .ch-row.me .ch-who { color: var(--gold); }
+  #chessScreen .ch-piece { flex: 0 0 26px; font-size: 22px; line-height: 1; text-align: center; }
+  #chessScreen .ch-piece.white { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+  #chessScreen .ch-piece.black { color: #222; text-shadow: 0 0 2px rgba(255,255,255,.55); }
+  #chessScreen .ch-mv { flex: 1; font-size: 13px; font-weight: 700; color: #fff; }
+  #chessScreen .ch-tag { font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 8px; margin-left: 4px; }
+  #chessScreen .ch-tag.cap { background: #e4574f; color: #fff; }
+  #chessScreen .ch-tag.chk { background: #ffb02e; color: #1a1a1a; }
+  #chessScreen .ch-tag.mate { background: #ff3b30; color: #fff; }
+  #chessScreen .ch-tag.sp { background: #3d6bf0; color: #fff; }
+  #chessScreen .ch-empty { font-size: 12px; color: var(--ink-dim); padding: 6px 0; }
+
   #chessWrapper.shake { animation: boardShake 0.3s ease-in-out; }
   @keyframes boardShake {
     0%, 100% { transform: translate(0, 0); }
@@ -221,6 +246,7 @@ function initChess(){
   chessFlipped = myChessColor === 'b';
   chessSelected = null; chessGameOver = false; chessPendingPromotion = null;
   prevChessBoard = null; chessLastMove = null;
+  chessHistory = []; chessHistOpen = false;
 
   document.getElementById('chessWinOverlay').style.display = 'none';
   hideChessPromoModal();
@@ -291,6 +317,94 @@ function buildChessDOM() {
     }
   }
   getChessFxLayer();
+  chessHistEnsureUI();
+  chessHistRender();
+}
+
+// ======================================================
+// RIWAYAT LANGKAH (dicatat di sisi klien dari perubahan papan; tidak mengubah data game)
+// ======================================================
+function chessSqName(x, y){ return 'abcdefgh'[x] + (8 - y); }
+
+function chessHistEnsureUI(){
+  const wrapper = document.getElementById('chessWrapper');
+  const controls = document.querySelector('#chessScreen .chess-controls');
+  if(!wrapper || !controls) return null;
+  let btn = document.getElementById('btnChessHist');
+  if(!btn){
+    btn = document.createElement('button'); btn.type = 'button'; btn.id = 'btnChessHist';
+    btn.className = 'btn-flip chess-hist-btn'; btn.textContent = '\uD83D\uDCDC Riwayat';
+    controls.insertBefore(btn, document.getElementById('btnChessBack'));
+    btn.addEventListener('click', e => { e.stopPropagation(); chessHistOpen = !chessHistOpen; chessHistRender(); });
+  }
+  let panel = document.getElementById('chessHistPanel');
+  if(!panel){
+    panel = document.createElement('div'); panel.id = 'chessHistPanel'; panel.className = 'chess-hist-panel';
+    wrapper.appendChild(panel);
+    panel.addEventListener('click', () => { chessHistOpen = false; chessHistRender(); });
+  }
+  return { btn, panel };
+}
+
+function chessHistRender(){
+  const ui = chessHistEnsureUI(); if(!ui) return;
+  ui.btn.classList.toggle('on', chessHistOpen);
+  ui.panel.style.display = chessHistOpen ? 'block' : 'none';
+  if(!chessHistOpen) return;
+
+  const oppName = (typeof window !== 'undefined' && window.isBotMode) ? 'Bot' : 'Lawan';
+  let html = '<div class="ch-title"><span>\uD83D\uDCDC Riwayat langkah</span><span>ketuk untuk tutup</span></div>';
+  if(!chessHistory.length) html += '<div class="ch-empty">Belum ada langkah.</div>';
+  chessHistory.slice(-80).reverse().forEach(h => {
+    const mine = h.by === myChessColor;
+    let mvTxt;
+    if(h.castle) mvTxt = h.castle === 'K' ? 'O-O (Rokade pendek)' : 'O-O-O (Rokade panjang)';
+    else mvTxt = h.from + ' \u2192 ' + h.to;
+    let tags = '';
+    if(h.capture) tags += '<span class="ch-tag cap">MAKAN</span>';
+    if(h.promo) tags += '<span class="ch-tag sp">PROMOSI ' + pieceUnicode[h.promo] + '</span>';
+    if(h.mate) tags += '<span class="ch-tag mate">SKAKMAT</span>';
+    else if(h.check) tags += '<span class="ch-tag chk">SKAK</span>';
+    html += '<div class="ch-row' + (mine ? ' me' : '') + '"><span class="ch-no">' + h.no + '.</span>' +
+      '<span class="ch-who">' + (mine ? 'Kamu' : oppName) + '</span>' +
+      '<span class="ch-piece ' + (h.by === 'w' ? 'white' : 'black') + '">' + pieceUnicode[h.piece] + '</span>' +
+      '<span class="ch-mv">' + mvTxt + tags + '</span></div>';
+  });
+  ui.panel.innerHTML = html;
+}
+
+// Menyimpulkan langkah dari selisih papan sebelum & sesudah (dipanggil dari chessDraw saat ada 1 langkah)
+function chessHistRecord(prev, board){
+  try {
+    const mover = chessTurn === 'w' ? 'b' : 'w';          // chessTurn sudah giliran berikutnya
+    const diffs = [];
+    for(let y=0;y<8;y++) for(let x=0;x<8;x++) if(prev[y][x] !== board[y][x]) diffs.push({x,y,a:prev[y][x],b:board[y][x]});
+    const from = diffs.filter(d => d.a && chessColorOf(d.a) === mover);
+    const to = diffs.filter(d => d.b && chessColorOf(d.b) === mover);
+    if(!from.length || !to.length) return;
+
+    let f, t, castle = null;
+    const kf = from.find(d => d.a.toLowerCase() === 'k'), kt = to.find(d => d.b.toLowerCase() === 'k');
+    if(kf && kt && Math.abs(kt.x - kf.x) === 2){ f = kf; t = kt; castle = kt.x > kf.x ? 'K' : 'Q'; }
+    else {
+      t = to[0];
+      f = from.find(d => d.a === t.b) || from.find(d => d.a.toLowerCase() === 'p') || from[0];
+    }
+    const opp = mover === 'w' ? 'b' : 'w';
+    const count = (b, col) => b.reduce((n, r) => n + r.filter(p => p && chessColorOf(p) === col).length, 0);
+    const capture = count(board, opp) < count(prev, opp);
+    const promo = f.a.toLowerCase() === 'p' && t.b !== f.a ? t.b : null;
+
+    const check = chessIsInCheck(board, chessTurn);
+    const mate = check && chessAllLegalMoves(board, { castling: chessCastling, ep: chessEP }, chessTurn).length === 0;
+
+    chessHistory.push({
+      no: chessHistory.length + 1, by: mover, piece: f.a, from: chessSqName(f.x, f.y), to: chessSqName(t.x, t.y),
+      capture, castle, promo, check, mate
+    });
+    if(chessHistory.length > 200) chessHistory.splice(0, chessHistory.length - 200);
+    chessHistRender();
+  } catch(e) {}
 }
 
 // ======================================================
@@ -502,6 +616,7 @@ function chessDraw(){
         chessLastMove = null;
         boardChanged = false;
       } else {
+        chessHistRecord(prevChessBoard, board);
         chessAnimateDiff(layer, prevChessBoard, board);
       }
     }

@@ -191,6 +191,9 @@ function proceedCreateRoom(){
       executeCreateRoom();
       return;
     }
+    // Mode IMPOSSIBLE hanya tersedia untuk Catur
+    const impBtn = document.getElementById('btnDiffImpossible');
+    if (impBtn) impBtn.style.display = (currentGame === 'chess') ? 'block' : 'none';
     document.getElementById('botDifficultyOverlay').style.display = 'flex';
     return;
   }
@@ -581,3 +584,22 @@ function setupPresence(statusElId, roomLabel, onPresenceChange) {
     if (onPresenceChange) onPresenceChange(presenceData);
   });
 }
+
+// ======================================================
+// 🛡️ KONFIRMASI "‹ Menu Utama" (anti kepencet)
+// Dipasang di fase capture: tombol asli baru jalan setelah pemain menekan "Ya".
+// ======================================================
+(function(){
+  const GUARDED = ['btnChessBack','btnTttBack','btnPokerBack','btnDominoBack','btnUnoBack','btnSnakeBack'];
+  let bypass = false;
+  document.addEventListener('click', function(e){
+    const btn = e.target && e.target.closest ? e.target.closest('button') : null;
+    if(!btn || GUARDED.indexOf(btn.id) === -1 || bypass) return;
+    e.stopPropagation(); e.preventDefault();
+    showCustomConfirm(
+      'Keluar dari permainan dan kembali ke Menu Utama? Permainan yang sedang berjalan akan ditinggalkan.',
+      function(){ bypass = true; try { btn.click(); } finally { bypass = false; } },
+      '🏠 Kembali ke Menu Utama?'
+    );
+  }, true);
+})();

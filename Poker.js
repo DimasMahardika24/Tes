@@ -208,6 +208,12 @@ function pokerSfx(kind) {
     else if (kind === 'pass') pokerTone(330, 0, .12, 'sine', .1, 220);
     else if (kind === 'turn') { pokerTone(660, 0, .1, 'sine', .12); pokerTone(880, .1, .12, 'sine', .12); }
     else if (kind === 'deal') pokerTone(700, 0, .04, 'square', .05, 500);
+    else if (kind === 'dealall') {   // satu efek "wuuush" + kocokan kartu cepat
+      pokerTone(260, 0, .34, 'sawtooth', .07, 1400);
+      pokerTone(180, 0, .30, 'triangle', .10, 700);
+      for (let i = 0; i < 14; i++) pokerTone(760 - (i % 3) * 90, .03 + i * .022, .035, 'square', .05, 480);
+      pokerTone(520, .38, .08, 'sine', .12, 300);
+    }
     else if (kind === 'finish') [523, 659, 784].forEach((f, i) => pokerTone(f, i * .08, .15, 'sine', .14));
     else if (kind === 'win') [523, 659, 784, 1047, 1319].forEach((f, i) => pokerTone(f, i * .09, .2, 'sine', .15));
     else if (kind === 'lose') [392, 330, 262].forEach((f, i) => pokerTone(f, i * .13, .24, 'triangle', .15));
@@ -1085,19 +1091,21 @@ function pokerAnimateDeal(done){
   const table = document.querySelector('#pokerScreen .capsa-table');
   if(!table){ done(); return; }
   const overlay = document.createElement('div'); overlay.className = 'capsa-deal-overlay'; table.appendChild(overlay);
-  const dealTargets = ['bottom', 'right', 'top', 'left'], cardsPerPlayer = 5, perCardDelay = 300, animDuration = 550;
-  let cardIndex = 0;
+  // Semua kartu keluar SEKALIGUS dari tengah meja ke keempat pemain (tanpa jeda satu-satu)
+  const dealTargets = ['bottom', 'right', 'top', 'left'], cardsPerPlayer = 6;
   dealTargets.forEach(dir => {
     for(let c = 0; c < cardsPerPlayer; c++){
       const img = document.createElement('img');
-      img.src = CARD_BACK_IMG; img.className = 'capsa-deal-card deal-' + dir; img.style.animationDelay = (cardIndex * perCardDelay) + 'ms';
+      img.src = CARD_BACK_IMG; img.className = 'capsa-deal-card deal-' + dir;
+      const spread = (c - (cardsPerPlayer - 1) / 2);
+      img.style.setProperty('--ox', (spread * 14) + 'px');
+      img.style.setProperty('--oy', (spread * 11) + 'px');
+      img.style.setProperty('--rot', (spread * 6) + 'deg');
       overlay.appendChild(img);
-      setTimeout(() => pokerSfx('deal'), cardIndex * perCardDelay);
-      cardIndex++;
     }
   });
-  const totalDuration = (cardIndex - 1) * perCardDelay + animDuration + 150;
-  setTimeout(() => { overlay.remove(); done(); }, totalDuration);
+  pokerSfx('dealall');
+  setTimeout(() => { overlay.remove(); done(); }, 720);
 }
 
 function pokerRender(data){

@@ -206,11 +206,11 @@ canvas { width: 100%; height: 100%; display: block; }
 .capsa-name-btn.cancel { background: var(--panel-3); color: var(--ink); } .capsa-name-btn.save { background: var(--gold); color: var(--gold-ink); }
 .capsa-deal-overlay { position: absolute; inset: 0; z-index: 30; pointer-events: none; display: flex; align-items: center; justify-content: center; }
 .capsa-deal-card { position: absolute; top: 50%; left: 50%; width: 44px; height: 62px; object-fit: contain; border-radius: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); opacity: 0; transform: translate(-50%, -50%) scale(.6); }
-.capsa-deal-card.deal-top { animation: dealToTop .6s ease-out forwards; } .capsa-deal-card.deal-bottom { animation: dealToBottom .6s ease-out forwards; } .capsa-deal-card.deal-left { animation: dealToLeft .6s ease-out forwards; } .capsa-deal-card.deal-right { animation: dealToRight .6s ease-out forwards; }
-@keyframes dealToTop { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(-50%,-230%) scale(.9); } }
-@keyframes dealToBottom { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(-50%,190%) scale(.9); } }
-@keyframes dealToLeft { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(-190%,-50%) scale(.9); } }
-@keyframes dealToRight { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(190%,-50%) scale(.9); } }
+.capsa-deal-card.deal-top { animation: dealToTop .62s cubic-bezier(.2,.8,.3,1) forwards; } .capsa-deal-card.deal-bottom { animation: dealToBottom .62s cubic-bezier(.2,.8,.3,1) forwards; } .capsa-deal-card.deal-left { animation: dealToLeft .62s cubic-bezier(.2,.8,.3,1) forwards; } .capsa-deal-card.deal-right { animation: dealToRight .62s cubic-bezier(.2,.8,.3,1) forwards; }
+@keyframes dealToTop { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6) rotate(0deg); } 15%{ opacity:1; } 80%{ opacity:1; } 100%{ opacity:0; transform: translate(calc(-50% + var(--ox,0px)),-230%) scale(.9) rotate(var(--rot,0deg)); } }
+@keyframes dealToBottom { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6) rotate(0deg); } 15%{ opacity:1; } 80%{ opacity:1; } 100%{ opacity:0; transform: translate(calc(-50% + var(--ox,0px)),190%) scale(.9) rotate(var(--rot,0deg)); } }
+@keyframes dealToLeft { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6) rotate(0deg); } 15%{ opacity:1; } 80%{ opacity:1; } 100%{ opacity:0; transform: translate(-190%,calc(-50% + var(--oy,0px))) scale(.9) rotate(var(--rot,0deg)); } }
+@keyframes dealToRight { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6) rotate(0deg); } 15%{ opacity:1; } 80%{ opacity:1; } 100%{ opacity:0; transform: translate(190%,calc(-50% + var(--oy,0px))) scale(.9) rotate(var(--rot,0deg)); } }
 #unoTopCardImg { width: 64px !important; height: 90px !important; }
 </style>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -257,6 +257,7 @@ canvas { width: 100%; height: 100%; display: block; }
         <button class="capsa-name-btn save bot-diff-btn" data-diff="normal" style="background:#3d6bf0; color:#fff; padding:15px;">🟢 Normal (Santai)</button>
         <button class="capsa-name-btn save bot-diff-btn" data-diff="medium" style="background:#e8ac1f; color:#000; padding:15px;">🟡 Medium (Menantang)</button>
         <button class="capsa-name-btn save bot-diff-btn" data-diff="hard" style="background:#e4574f; color:#fff; padding:15px;">🔴 Hard (Sulit)</button>
+        <button class="capsa-name-btn save bot-diff-btn" id="btnDiffImpossible" data-diff="impossible" style="display:none; background:linear-gradient(135deg,#1a1a1a,#5b0f1a); color:#ff6b6b; border:1px solid #ff3b30; padding:15px; text-shadow:0 0 8px rgba(255,59,48,.7);">💀 IMPOSSIBLE (Grandmaster)</button>
       </div>
       <button class="capsa-name-btn cancel" id="btnBotDiffCancel" style="width:100%; margin-top:14px;">Batal</button>
     </div>
