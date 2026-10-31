@@ -1,5 +1,5 @@
 // ======================================================
-// Poker.js — Capsa Banting 4 Pemain (Anti-Freeze Version)
+// Poker.js — Capsa Banting 4 Pemain (Fix Urutan Angka 100%)
 // ======================================================
 
 let pokerRef = null;
@@ -16,14 +16,14 @@ const ROLES = ['p1', 'p2', 'p3', 'p4'];
 const CARD_IMG_BASE = 'https://deckofcardsapi.com/static/img/';
 const CARD_BACK_IMG = CARD_IMG_BASE + 'back.png';
 
+// Urutan murni dari terkecil (3) sampai terbesar (2)
 const RANKS = ['03','04','05','06','07','08','09','10','J','Q','K','A','02'];
 const SUITS = ['c','d','h','s'];
 const RANK_TO_API = { '03':'3','04':'4','05':'5','06':'6','07':'7','08':'8','09':'9','10':'0','J':'J','Q':'Q','K':'K','A':'A','02':'2' };
 const SUIT_TO_API = { c:'C', d:'D', h:'H', s:'S' };
 const RANK_ORDER = { '03':0,'04':1,'05':2,'06':3,'07':4,'08':5,'09':6,'10':7,'J':8,'Q':9,'K':10,'A':11,'02':12 };
-const SUIT_ORDER = { c:0, d:1, h:2, s:3 };
+const SUIT_ORDER = { c:0, d:1, h:2, s:3 }; // Cuma buat sort di tangan biar rapi
 
-// 🛠️ FIX: Konversi Firebase Object jadi Array
 function ensureArray(val) {
   if (!val) return [];
   if (Array.isArray(val)) return val;
@@ -44,16 +44,18 @@ function shuffleDeck(deck){
   return d;
 }
 function cardImg(c){ return CARD_IMG_BASE + RANK_TO_API[c.rank] + SUIT_TO_API[c.suit] + '.png'; }
-function cardValue(c){ return RANK_ORDER[c.rank] * 4 + SUIT_ORDER[c.suit]; }
+
 function cardKey(c){ return c.rank + '|' + c.suit; }
 
+// 🛠️ FIX: Sorting di tangan tetep pake Suit biar rapi, 
+// tapi kalkulasi menang/kalah HANYA pake RANK_ORDER.
 function sortCards(hand){
-  hand = ensureArray(hand); // 🛠️ FIX: Konversi
+  hand = ensureArray(hand);
   return hand.slice().sort((a, b) => RANK_ORDER[a.rank] - RANK_ORDER[b.rank] || SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit]);
 }
 
 function nextActiveRole(current, finished){
-  finished = ensureArray(finished); // 🛠️ FIX: Konversi
+  finished = ensureArray(finished);
   let idx = ROLES.indexOf(current);
   for(let i = 0; i < 4; i++){
     idx = (idx + 1) % 4;
@@ -63,7 +65,7 @@ function nextActiveRole(current, finished){
 }
 
 function removeCards(hand, selected){
-  hand = ensureArray(hand); // 🛠️ FIX: Konversi
+  hand = ensureArray(hand);
   const remaining = selected.map(cardKey);
   return hand.filter(c => {
     const k = cardKey(c);
@@ -78,30 +80,52 @@ function displayName(role){
   return (n && n.trim()) ? n.trim() : role.toUpperCase();
 }
 
+// 🛠️ FIX: TIEBREAK CUMA PAKE ANGKA (TANPA SUIT)
 function detectCombo(cards){
   const n = cards.length;
-  if(n === 1) return { valid: true, type: 'single', count: 1, level: 0, tiebreak: [cardValue(cards[0])] };
+  
+  // 1 Kartu (Single)
+  if(n === 1) {
+    return { valid: true, type: 'single', count: 1, level: 0, tiebreak: [RANK_ORDER[cards[0].rank]] };
+  }
+  
+  // 2 Kartu (Pair)
   if(n === 2){
     if(cards[0].rank !== cards[1].rank) return { valid: false };
-    return { valid: true, type: 'pair', count: 2, level: 0, tiebreak: [Math.max(cardValue(cards[0]), cardValue(cards[1]))] };
+    return { valid: true, type: 'pair', count: 2, level: 0, tiebreak: [RANK_ORDER[cards[0].rank]] };
   }
+  
+  // 3 Kartu (Triss atau Bom Seri 3)
   if(n === 3){
-    if(cards.every(c => c.rank === cards[0].rank)) return { valid: true, type: 'triple', count: 3, level: 1, tiebreak: [Math.max(...cards.map(cardValue))] };
+    if(cards.every(c => c.rank === cards[0].rank)) {
+      return { valid: true, type: 'triple', count: 3, level: 1, tiebreak: [RANK_ORDER[cards[0].rank]] };
+    }
     const sorted = cards.slice().sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
     const idxs = sorted.map(c => RANK_ORDER[c.rank]);
     const uniq = [...new Set(idxs)];
-    if(uniq.length === 3 && (uniq[0] - uniq[2] === 2)) return { valid: true, type: 'run3', count: 3, level: 0, tiebreak: [idxs[0], SUIT_ORDER[sorted[0].suit]] };
+    if(uniq.length === 3 && (uniq[0] - uniq[2] === 2)) {
+      return { valid: true, type: 'run3', count: 3, level: 0, tiebreak: [idxs[0]] };
+    }
     return { valid: false };
   }
+  
+  // 4 Kartu (Bom 4 Angka Sama atau Bom Seri 4)
   if(n === 4){
-    if(cards.every(c => c.rank === cards[0].rank)) return { valid: true, type: 'four_pure', count: 4, level: 2, tiebreak: [RANK_ORDER[cards[0].rank]] };
+    if(cards.every(c => c.rank === cards[0].rank)) {
+      return { valid: true, type: 'four_pure', count: 4, level: 2, tiebreak: [RANK_ORDER[cards[0].rank]] };
+    }
     const sorted = cards.slice().sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
     const idxs = sorted.map(c => RANK_ORDER[c.rank]);
     const uniq = [...new Set(idxs)];
-    if(uniq.length === 4 && (uniq[0] - uniq[3] === 3)) return { valid: true, type: 'run4', count: 4, level: 1, tiebreak: [idxs[0], SUIT_ORDER[sorted[0].suit]] };
+    if(uniq.length === 4 && (uniq[0] - uniq[3] === 3)) {
+      return { valid: true, type: 'run4', count: 4, level: 1, tiebreak: [idxs[0]] };
+    }
     return { valid: false };
   }
+  
+  // 5 Kartu
   if(n === 5) return detectFiveCombo(cards);
+  
   return { valid: false };
 }
 
@@ -115,9 +139,9 @@ function detectFiveCombo(cards){
   idxs.forEach(i => counts[i] = (counts[i] || 0) + 1);
   const groups = Object.entries(counts).map(([i, c]) => ({ i: +i, c })).sort((a, b) => b.c - a.c || b.i - a.i);
 
-  if(isStraight && isFlush) return { valid: true, type: 'straightflush', count: 5, level: 6, tiebreak: [idxs[0], SUIT_ORDER[sorted[0].suit]] };
+  if(isStraight && isFlush) return { valid: true, type: 'straightflush', count: 5, level: 6, tiebreak: [idxs[0]] };
   if(groups[0].c === 4) return { valid: true, type: 'four', count: 5, level: 5, tiebreak: [groups[0].i] };
-  if(isFlush) return { valid: true, type: 'flush', count: 5, level: 3, tiebreak: [...idxs, SUIT_ORDER[sorted[0].suit]] };
+  if(isFlush) return { valid: true, type: 'flush', count: 5, level: 3, tiebreak: [...idxs] }; // Cuma urutan angka
   if(groups[0].c === 3 && groups[1] && groups[1].c === 2) return { valid: true, type: 'fullhouse', count: 5, level: 4, tiebreak: [groups[0].i] };
   if(groups.length === 4 && groups[0].c === 2 && groups.slice(1).every(g => g.c === 1)){
     const singleRanks = groups.slice(1).map(g => g.i).sort((a, b) => a - b);
@@ -135,7 +159,7 @@ function compareCombo(a, b){
     const av = a.tiebreak[i] || 0, bv = b.tiebreak[i] || 0;
     if(av !== bv) return av - bv;
   }
-  return 0;
+  return 0; // 0 Artinya SAMA KUAT (Gak bisa bantai)
 }
 
 function comboDisplayName(combo){
@@ -144,17 +168,15 @@ function comboDisplayName(combo){
   return map[combo.type] || '-';
 }
 
+// Fungsi ini udah gak terlalu kepake karena compareCombo udah otomatis nolak
+// Tapi dibiarin aja buat jaga-jaga
 function isPureAceCombo(cards){ return cards.length > 0 && cards.every(c => c.rank === 'A'); }
 function isBlockedBeat(lastPlay, newCombo, newCards){
   if(!lastPlay) return false;
-  if(lastPlay.combo.count <= 3 && newCombo.count === lastPlay.combo.count){
-    if(isPureAceCombo(lastPlay.cards) && isPureAceCombo(newCards)) return 'ace';
-  }
   if((lastPlay.combo.type === 'four' || lastPlay.combo.type === 'four_pure') && (newCombo.type === 'four' || newCombo.type === 'four_pure')) return 'poker';
   return false;
 }
 function blockedBeatMessage(reason){
-  if(reason === 'ace') return 'As gak bisa dibantai dengan As lagi! (Cuma kartu 2 yang bisa ngelewatin As)';
   if(reason === 'poker') return 'Bom 4 Angka Sama gak bisa dibantai sesama Bom 4 Angka Sama!';
   return 'Kombinasi tidak diperbolehkan.';
 }
@@ -181,17 +203,28 @@ function pokerDoPlay(){
   const combo = detectCombo(selected);
   if(!combo.valid){ showCustomAlert('Kombinasi kartu tidak valid.'); return; }
   if(data.isFirstPlay && !selected.some(c => c.rank === '03' && c.suit === 'd')){ showCustomAlert('Wajib jalan dengan kartu 3♦ (3 Wajik) di kartu pertama!'); return; }
+  
   if(!data.isFirstPlay && data.lastPlay){
-    if(combo.count !== data.lastPlay.combo.count){ showCustomAlert('Jumlah kartu harus sama dengan yang di meja (' + data.lastPlay.combo.count + ' kartu).'); return; }
-    if(isBlockedBeat(data.lastPlay, combo, selected)){ showCustomAlert(blockedBeatMessage(isBlockedBeat(data.lastPlay, combo, selected))); return; }
-    if(compareCombo(combo, data.lastPlay.combo) <= 0){ showCustomAlert('Kombinasi kamu harus lebih tinggi dari kartu terakhir di meja.'); return; }
+    if(combo.count !== data.lastPlay.combo.count){ 
+      showCustomAlert('Jumlah kartu harus sama dengan yang di meja (' + data.lastPlay.combo.count + ' kartu).'); 
+      return; 
+    }
+    if(isBlockedBeat(data.lastPlay, combo, selected)){ 
+      showCustomAlert(blockedBeatMessage(isBlockedBeat(data.lastPlay, combo, selected))); 
+      return; 
+    }
+    // 🛠️ FIX: Harus LEBIH BESAR (> 0), kalau sama (0) ditolak
+    if(compareCombo(combo, data.lastPlay.combo) <= 0){ 
+      showCustomAlert('Kombinasi kamu harus LEBIH TINGGI dari kartu terakhir di meja.'); 
+      return; 
+    }
   }
 
   pokerRef.transaction(cur => {
     if(!cur || cur.phase !== 'playing' || cur.turn !== myRole) return cur;
     const state = JSON.parse(JSON.stringify(cur));
     
-    const curHand = ensureArray(state.hands[myRole]); // 🛠️ FIX: Konversi
+    const curHand = ensureArray(state.hands[myRole]);
     const remain = removeCards(curHand, selected);
     if(remain.length !== curHand.length - selected.length) return cur;
 
@@ -207,7 +240,7 @@ function pokerDoPlay(){
     state.lastPlayer = myRole; state.passCount = 0; state.isFirstPlay = false;
     state.lastActionText = comboDisplayName(c2);
 
-    const finished = ensureArray(state.finished); // 🛠️ FIX: Konversi
+    const finished = ensureArray(state.finished);
     if(remain.length === 0 && !finished.includes(myRole)){
       finished.push(myRole); state.finished = finished;
       if(finished.length >= 3){
@@ -224,7 +257,7 @@ function pokerDoPass(){
   pokerRef.transaction(cur => {
     if(!cur || cur.phase !== 'playing' || cur.turn !== myRole || !cur.lastPlay) return cur;
     const state = JSON.parse(JSON.stringify(cur));
-    const finished = ensureArray(state.finished); // 🛠️ FIX: Konversi
+    const finished = ensureArray(state.finished);
     
     state.passCount = (state.passCount || 0) + 1;
     state.lastActionText = 'pass';
@@ -262,7 +295,7 @@ function pokerRenderBackHand(container, count){
 function pokerRenderMyHand(data){
   const container = document.getElementById('capsaHandMe');
   container.innerHTML = '';
-  const hand = sortCards(data.hands && data.hands[myRole]); // 🛠️ sortCards sudah handle object
+  const hand = sortCards(data.hands && data.hands[myRole]);
   const canSelect = data.phase === 'playing' && data.turn === myRole;
   
   hand.forEach(c => {
@@ -318,7 +351,7 @@ function pokerRenderStatus(data){
 function pokerRenderRankBar(data){
   const el = document.getElementById('capsaRankBar');
   if(!el) return;
-  const finished = ensureArray(data.finished); // 🛠️ FIX: Konversi
+  const finished = ensureArray(data.finished);
   if(finished.length === 0 || data.phase === 'waiting'){ el.style.display = 'none'; el.innerHTML = ''; return; }
   
   const medals = ['🥇', '🥈', '🥉'];
@@ -347,7 +380,7 @@ function pokerRenderCore(data){
     bottom: { seat: document.getElementById('capsaSeatBottom') }
   };
 
-  const finished = ensureArray(data.finished); // 🛠️ FIX: Konversi
+  const finished = ensureArray(data.finished);
   ROLES.forEach(role => {
     const pos = seatPosFor(role), el = posEls[pos];
     const count = (data.hands && data.hands[role]) ? ensureArray(data.hands[role]).length : 0;

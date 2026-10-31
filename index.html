@@ -77,8 +77,6 @@ body {
 #createdScreen .status, #resumeScreen .status { font-size: 14px; color: var(--ink-dim); margin: 4px 0 16px; font-weight: 500; text-align: center; background: var(--void); padding: 20px 16px; border-radius: 14px; border: 1px solid var(--line); line-height: 1.7; width: 100%; min-height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 #createdScreen .status .code-big, #resumeScreen .status .code-big { display: block; font-family: 'Space Grotesk', monospace; font-size: 34px; font-weight: 700; letter-spacing: 8px; color: var(--gold); margin: 10px 0; }
 #createdScreen .status .game-name, #resumeScreen .status .game-name { color: var(--ink); font-weight: 700; }
-
-/* 🛠️ FIX: Tombol copy code dibuat global biar tombol Main Lagi warnanya bener */
 .btn-copy-code { background: var(--blue); color: #fff; width: 100%; text-align: center; justify-content: center; margin-bottom: 10px; }
 
 .btn-join-mode { background: var(--blue); color: #fff; border-bottom: 3px solid #1f3f9e; margin-top: 6px; }
@@ -121,7 +119,9 @@ canvas { width: 100%; height: 100%; display: block; }
 #chessScreen .cell.light { background-color: #f0d9b5; }
 #chessScreen .cell.dark { background-color: #b58863; }
 #chessScreen .pieces-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
-.piece-wrapper { position: absolute; width: 12.5%; height: 12.5%; display: flex; align-items: center; justify-content: center; will-change: transform; transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1.1); pointer-events: auto; cursor: pointer; }
+
+/* 🛠️ FIX: pointer-events diubah jadi none biar klik tembus ke papan */
+.piece-wrapper { position: absolute; width: 12.5%; height: 12.5%; display: flex; align-items: center; justify-content: center; will-change: transform; transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1.1); pointer-events: none; cursor: pointer; }
 .piece-wrapper.selected .piece { transform: scale(1.15) translateY(-5px); filter: drop-shadow(0 8px 8px rgba(0,0,0,0.5)); }
 .piece-wrapper.capturing { animation: pieceDestroy 0.35s cubic-bezier(0.5, 0, 0.8, 0.2) forwards; z-index: 15; pointer-events: none; }
 @keyframes pieceDestroy { 0% { transform: scale(1) rotate(0deg); opacity: 1; } 100% { transform: scale(0.2) rotate(45deg); opacity: 0; } }
@@ -422,7 +422,6 @@ canvas { width: 100%; height: 100%; display: block; }
       <button class="capsa-act play" id="capsaBtnPlay">🔥 Banting!</button>
     </div>
     <div class="capsa-result" id="capsaResult" style="display:none"></div>
-    <!-- 🛠️ FIX: Tombol Main Lagi warna biru -->
     <button class="btn-menu btn-copy-code" id="capsaBtnNext" style="display:none; justify-content:center; text-align:center; margin-top:10px;">▶ Main Lagi</button>
     <button class="btn-menu btn-back" id="btnPokerBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
   </div>
@@ -461,7 +460,6 @@ canvas { width: 100%; height: 100%; display: block; }
       </div>
     </div>
     <div class="capsa-result" id="unoResult" style="display:none;"></div>
-    <!-- 🛠️ FIX: Tombol Main Lagi warna biru -->
     <button class="btn-menu btn-copy-code" id="unoBtnNext" style="display:none; margin-top:12px; justify-content:center;">▶ Main Lagi</button>
     <button class="btn-menu btn-back" id="btnUnoBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
   </div>
