@@ -247,14 +247,32 @@ function sortCards(hand){
   return hand.slice().sort((a, b) => RANK_ORDER[a.rank] - RANK_ORDER[b.rank] || SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit]);
 }
 
-function nextActiveRole(current, finished){
+// Daftar pemain yang ikut ronde ini (2-4). Data lama tanpa `players` dianggap 4 pemain.
+function pokerPlayers(data){
+  const list = ensureArray(data && data.players).filter(r => ROLES.includes(r));
+  return list.length ? list : ROLES.slice();
+}
+
+function nextActiveRole(current, finished, players){
   finished = ensureArray(finished);
+  players = (players && players.length) ? ensureArray(players) : ROLES;
   let idx = ROLES.indexOf(current);
   for(let i = 0; i < 4; i++){
     idx = (idx + 1) % 4;
-    if(!finished.includes(ROLES[idx])) return ROLES[idx];
+    const r = ROLES[idx];
+    if(players.includes(r) && !finished.includes(r)) return r;
   }
   return current;
+}
+
+// Berapa kali PASS beruntun supaya meja bersih.
+// Kalau pemain yang terakhir main sudah habis kartu, SEMUA pemain aktif harus pass
+// (sebelumnya kurang 1, jadi pemain terakhir tidak sempat membalas).
+function pokerPassThreshold(state){
+  const players = pokerPlayers(state), finished = ensureArray(state.finished);
+  const active = players.filter(r => !finished.includes(r));
+  const lastStillIn = !!state.lastPlayer && active.includes(state.lastPlayer);
+  return Math.max(lastStillIn ? active.length - 1 : active.length, 1);
 }
 
 function removeCards(hand, selected){
@@ -374,13 +392,26 @@ function blockedBeatMessage(reason){
   return 'Kombinasi tidak diperbolehkan.';
 }
 
-function pokerBuildNewGame(prev){
+function pokerBuildNewGame(prev, presence){
+  presence = presence || pokerPresence || {};
+  let players = ROLES.filter(r => presence[r]);
+  if(players.length < 2) players = ROLES.slice(0, 2);
   const deck = shuffleDeck(makeDeck());
-  const hands = { p1: deck.slice(0, 13), p2: deck.slice(13, 26), p3: deck.slice(26, 39), p4: deck.slice(39, 52) };
-  let starter = 'p1';
-  ROLES.forEach(r => { if(hands[r].some(c => c.rank === '03' && c.suit === 'd')) starter = r; });
+
+  // Kalau pemain < 4, pastikan 3♦ ikut terbagi (bukan di sisa dek) supaya ada yang bisa memulai
+  const dealCount = players.length * 13;
+  const idx3d = deck.findIndex(c => c.rank === '03' && c.suit === 'd');
+  if(idx3d >= dealCount){
+    const j = Math.floor(Math.random() * dealCount);
+    [deck[idx3d], deck[j]] = [deck[j], deck[idx3d]];
+  }
+
+  const hands = {};
+  players.forEach((r, i) => { hands[r] = deck.slice(i * 13, i * 13 + 13); });
+  let starter = players[0];
+  players.forEach(r => { if(hands[r].some(c => c.rank === '03' && c.suit === 'd')) starter = r; });
   return {
-    phase: 'playing', hands, turn: starter, starter, isFirstPlay: true, lastPlay: null, lastPlayer: null, passCount: 0,
+    phase: 'playing', players, hands, turn: starter, starter, isFirstPlay: true, lastPlay: null, lastPlayer: null, passCount: 0,
     finished: [], loser: null, winner: null, lastActionText: null, handNumber: ((prev && prev.handNumber) || 0) + 1, names: (prev && prev.names) || {}
   };
 }
@@ -442,12 +473,13 @@ function pokerDoPlay(){
     const finished = ensureArray(state.finished);
     if(remain.length === 0 && !finished.includes(myRole)){
       finished.push(myRole); state.finished = finished;
-      if(finished.length >= 3){
-        state.phase = 'roundover'; state.loser = ROLES.find(r => !finished.includes(r)) || null; state.winner = finished[0];
+      const pl = pokerPlayers(state);
+      if(finished.length >= pl.length - 1){
+        state.phase = 'roundover'; state.loser = pl.find(r => !finished.includes(r)) || null; state.winner = finished[0];
         return state;
       }
     }
-    state.turn = nextActiveRole(myRole, state.finished || []);
+    state.turn = nextActiveRole(myRole, state.finished || [], pokerPlayers(state));
     return state;
   }, () => { selectedKeys.clear(); });
 }
@@ -460,15 +492,15 @@ function pokerDoPass(){
 
     state.passCount = (state.passCount || 0) + 1;
     state.lastActionText = 'pass';
-    const activeCount = 4 - finished.length, threshold = Math.max(activeCount - 1, 1);
+    const pl = pokerPlayers(state), threshold = pokerPassThreshold(state);
 
     if(state.passCount >= threshold){
       state.lastPlay = null; state.passCount = 0;
-      let returnee = state.lastPlayer || nextActiveRole(myRole, finished);
-      if(finished.includes(returnee)) returnee = nextActiveRole(returnee, finished);
+      let returnee = state.lastPlayer || nextActiveRole(myRole, finished, pl);
+      if(finished.includes(returnee)) returnee = nextActiveRole(returnee, finished, pl);
       state.turn = returnee;
     } else {
-      state.turn = nextActiveRole(myRole, finished);
+      state.turn = nextActiveRole(myRole, finished, pl);
     }
     return state;
   }, () => { selectedKeys.clear(); });
@@ -476,6 +508,8 @@ function pokerDoPass(){
 
 function seatPosFor(role){
   const my = ROLES.indexOf(myRole), r = ROLES.indexOf(role);
+  const pl = latestPokerData && latestPokerData.phase !== 'waiting' ? pokerPlayers(latestPokerData) : null;
+  if(pl && pl.length === 2 && pl.includes(myRole) && pl.includes(role) && role !== myRole) return 'top'; // 2 pemain: berhadapan
   return ['bottom', 'right', 'top', 'left'][(r - my + 4) % 4];
 }
 
@@ -772,9 +806,10 @@ function pokerRenderStatus(data){
   const statusEl = document.getElementById('pokerStatus');
   if(data.phase === 'waiting'){
     const onlineCount = ROLES.filter(r => pokerPresence[r]).length;
-    statusEl.textContent = '🟡 Menunggu pemain bergabung (' + onlineCount + '/4)...';
+    statusEl.textContent = '🟡 Pemain terhubung: ' + onlineCount + '/4' + (myRole === 'p1' ? (onlineCount >= 2 ? ' — tekan Mulai kapan saja' : ' — butuh minimal 2 pemain') : ' — menunggu host memulai...');
   } else if(data.phase === 'playing'){
-    if(data.turn === myRole) statusEl.textContent = data.isFirstPlay ? '🟢 Giliranmu! Wajib jalan dengan 3♦ (3 Wajik).' : '🟢 Giliranmu!';
+    if(!pokerPlayers(data).includes(myRole)) statusEl.textContent = '👀 Ronde berjalan — kamu ikut di ronde berikutnya.';
+    else if(data.turn === myRole) statusEl.textContent = data.isFirstPlay ? '🟢 Giliranmu! Wajib jalan dengan 3♦ (3 Wajik).' : '🟢 Giliranmu!';
     else statusEl.textContent = '🟡 Menunggu ' + displayName(data.turn) + '...';
   } else if(data.phase === 'roundover'){
     statusEl.textContent = '🏁 Ronde selesai.';
@@ -987,8 +1022,20 @@ function pokerRenderCore(data){
   Array.from(selectedKeys).forEach(k => { if(!myKeys.has(k)) selectedKeys.delete(k); });
 
   const finished = ensureArray(data.finished);
+  const inPlay = data.phase === 'waiting' ? ROLES : pokerPlayers(data);
   ROLES.forEach(role => {
     const pos = seatPosFor(role), el = posEls[pos];
+    if(!inPlay.includes(role) && role !== myRole){
+      if(pos !== 'bottom'){
+        const on = !!pokerPresence[role];
+        el.seat.style.opacity = '0.45';
+        el.name.textContent = on ? (displayName(role) + ' 🟢 · menonton') : 'Kosong';
+        pokerRenderBackHand(el.hand, 0);
+      }
+      el.seat.classList.remove('active-turn', 'capsa-seat-done');
+      return;
+    }
+    if(pos !== 'bottom') el.seat.style.opacity = '';
     const count = (data.hands && data.hands[role]) ? ensureArray(data.hands[role]).length : 0;
     const online = !!pokerPresence[role], isFinished = finished.includes(role);
     el.seat.classList.toggle('active-turn', data.turn === role && data.phase === 'playing');
@@ -1020,6 +1067,12 @@ function pokerRenderCore(data){
     resultEl.innerHTML = html; resultEl.style.display = 'block';
     nextBtn.style.display = 'block'; nextBtn.textContent = myRole === 'p1' ? '▶ Main Lagi' : '⏳ Menunggu host mulai lagi';
     nextBtn.disabled = myRole !== 'p1';
+  } else if(data.phase === 'waiting'){
+    const n = ROLES.filter(r => pokerPresence[r]).length;
+    resultEl.style.display = 'none';
+    nextBtn.style.display = 'block';
+    nextBtn.textContent = myRole === 'p1' ? ('▶ Mulai (' + n + ' pemain)') : '⏳ Menunggu host memulai';
+    nextBtn.disabled = myRole !== 'p1' || n < 2;
   } else {
     resultEl.style.display = 'none'; nextBtn.style.display = 'none';
   }
@@ -1073,7 +1126,7 @@ function pokerAttachPresence(){
     pokerPresence = snap.val() || {};
     if(latestPokerData) pokerRenderCore(latestPokerData);
     if(myRole === 'p1' && latestPokerData && latestPokerData.phase === 'waiting'){
-      if(ROLES.every(s => pokerPresence[s])) pokerRef.transaction(cur => (cur && cur.phase === 'waiting') ? pokerBuildNewGame(cur) : cur);
+      if(ROLES.every(s => pokerPresence[s])) pokerRef.transaction(cur => (cur && cur.phase === 'waiting') ? pokerBuildNewGame(cur, pokerPresence) : cur);
     }
   });
 }
@@ -1132,7 +1185,8 @@ function initPoker(){
   document.getElementById('capsaBtnPlay').onclick = () => { pokerGetAudio(); pokerDoPlay(); };
   document.getElementById('capsaBtnNext').onclick = () => {
     if(myRole !== 'p1') return;
-    pokerRef.transaction(cur => (cur && cur.phase === 'roundover') ? pokerBuildNewGame(cur) : cur);
+    if(ROLES.filter(r => pokerPresence[r]).length < 2){ showCustomAlert('Butuh minimal 2 pemain untuk mulai.'); return; }
+    pokerRef.transaction(cur => (cur && (cur.phase === 'roundover' || cur.phase === 'waiting')) ? pokerBuildNewGame(cur, pokerPresence) : cur);
   };
 
   const editBtn = document.getElementById('capsaBtnEditName'); if(editBtn) editBtn.onclick = () => pokerOpenNameEditor();

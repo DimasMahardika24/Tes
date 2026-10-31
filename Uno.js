@@ -208,10 +208,10 @@ function getUnoCardImgUrl(card) {
 
 function unoName(role) { return (unoNames && unoNames[role]) || role.toUpperCase(); }
 
-function createUnoDeck() {
+function createUnoDeck(startId = 1) {
   const colors = ["merah", "kuning", "hijau", "biru"];
   const values = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "skip", "reverse", "draw2"];
-  let deck = [], idCounter = 1;
+  let deck = [], idCounter = startId;
   colors.forEach(color => values.forEach(value => {
     deck.push({ id: idCounter++, color, value });
     if (value !== "0") deck.push({ id: idCounter++, color, value });
@@ -228,11 +228,52 @@ function createUnoDeck() {
   return deck;
 }
 
+function unoShuffle(arr) {
+  const d = arr.slice();
+  for (let i = d.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [d[i], d[j]] = [d[j], d[i]];
+  }
+  return d;
+}
+
+// Id kosong berikutnya (dipakai kalau semua kartu ada di tangan & tumpukan buangan kosong)
+function unoNextFreeId(game) {
+  let max = 0;
+  const seen = c => { if (c && typeof c.id === 'number' && c.id > max) max = c.id; };
+  ensureArray(game.deck).forEach(seen);
+  ensureArray(game.discard).forEach(seen);
+  seen(game.currentCard);
+  Object.values(game.hands || {}).forEach(h => ensureArray(h).forEach(seen));
+  return max + 1;
+}
+
+// Kartu yang sudah dimainkan masuk tumpukan buangan (warna pilihan Wild dibuang)
+function unoPushDiscard(game, cards) {
+  const list = ensureArray(game.discard);
+  (Array.isArray(cards) ? cards : [cards]).forEach(c => {
+    if (!c) return;
+    const clean = { id: c.id, color: c.color, value: c.value };
+    list.push(clean);
+  });
+  game.discard = list;
+}
+
 function drawUnoCards(game, count) {
   let drawn = [];
   game.deck = ensureArray(game.deck);
+  game.discard = ensureArray(game.discard);
   for (let i = 0; i < count; i++) {
-    if (game.deck.length === 0) game.deck = createUnoDeck();
+    if (game.deck.length === 0) {
+      if (game.discard.length > 0) {
+        // kocok ulang tumpukan buangan (kartu meja teratas tetap di meja)
+        game.deck = unoShuffle(game.discard);
+        game.discard = [];
+      } else {
+        // semua kartu ada di tangan pemain: tambah dek baru dengan id yang belum dipakai
+        game.deck = createUnoDeck(unoNextFreeId(game));
+      }
+    }
     drawn.push(game.deck.pop());
   }
   return drawn;
@@ -240,16 +281,25 @@ function drawUnoCards(game, count) {
 
 function getUnoRoles(maxPlayers) { return ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].slice(0, maxPlayers); }
 
+// Maju `jump` langkah, hanya menghitung pemain yang BELUM selesai
+// (jadi Skip benar-benar melewati pemain aktif berikutnya).
 function nextUnoTurn(game, jump = 1) {
-  const activeRoles = getUnoRoles(game.maxPlayers), total = activeRoles.length;
-  let curIdx = activeRoles.indexOf(game.turn);
-  let nextIdx = (curIdx + (game.direction * jump) % total + total) % total;
-  let loopCount = 0;
+  const roles = getUnoRoles(game.maxPlayers), total = roles.length;
   const finished = ensureArray(game.finished);
-  while (finished.includes(activeRoles[nextIdx]) && loopCount < total) {
-    nextIdx = (nextIdx + (game.direction * 1) % total + total) % total; loopCount++;
+  const dir = game.direction === -1 ? -1 : 1;
+  let idx = roles.indexOf(game.turn);
+  for (let s = 0; s < Math.max(1, jump); s++) {
+    let guard = 0;
+    do { idx = (idx + dir + total) % total; guard++; }
+    while (finished.includes(roles[idx]) && guard <= total);
   }
-  return activeRoles[nextIdx];
+  return roles[idx];
+}
+
+// Reverse berlaku seperti Skip kalau pemain yang masih main tinggal 2 (termasuk si pemain)
+function unoReverseActsAsSkip(game, who) {
+  const alive = getUnoRoles(game.maxPlayers).filter(r => !ensureArray(game.finished).includes(r));
+  return alive.length === 2 && alive.includes(who);
 }
 
 function buildNewUnoGame(maxPlayers, prev) {
@@ -261,7 +311,7 @@ function buildNewUnoGame(maxPlayers, prev) {
 
   return {
     phase: 'playing', maxPlayers, deck, hands, turn: 'p1', direction: 1, currentCard: firstCard,
-    drawStack: 0, hasDrawn: false, unoChallenge: null, finished: [], lastActionText: 'Ronde Baru Dimulai!',
+    drawStack: 0, hasDrawn: false, unoChallenge: null, finished: [], discard: [], lastActionText: 'Ronde Baru Dimulai!',
     handNumber: ((prev && prev.handNumber) || 0) + 1, names: (prev && prev.names) || {}
   };
 }
@@ -311,26 +361,41 @@ function unoDoPlay(chosenColor = null) {
   const lastSel = selected[selected.length - 1];
   if (lastSel.color === 'wild' && !chosenColor) { document.getElementById('unoColorPickerOverlay').style.display = 'flex'; return; }
 
+  const pickedIds = selected.map(c => c.id);
   unoRef.transaction(cur => {
     if (!cur || cur.phase !== 'playing' || cur.turn !== myRole) return cur;
     const state = JSON.parse(JSON.stringify(cur));
     let curHand = ensureArray(state.hands[myRole]);
 
-    selected.forEach(card => {
-      const idx = curHand.findIndex(c => c.id === card.id);
-      if (idx !== -1) curHand.splice(idx, 1);
-    });
+    // ---- Validasi di sisi data (jangan percaya client) ----
+    if (new Set(pickedIds).size !== pickedIds.length) return cur;
+    const picked = [];
+    for (const id of pickedIds) {
+      const found = curHand.find(c => c.id === id);
+      if (!found) return cur;                       // kartu tidak ada di tangan
+      picked.push(found);                           // pakai data kartu asli dari server
+    }
+    if (picked.length === 0) return cur;
+    if (!picked.every(c => String(c.value) === String(picked[0].value))) return cur;
+    if (!picked.some(c => unoIsPlayable(c, state))) return cur;   // minimal satu cocok dengan meja
+    const topPicked = picked[picked.length - 1];
+    if (topPicked.color === 'wild' && !Object.keys(UNO_COLOR_EN).includes(chosenColor)) return cur;
+
+    curHand = curHand.filter(c => !pickedIds.includes(c.id));
 
     let jump = 1;
-    selected.forEach(card => {
+    picked.forEach(card => {
       if (card.value === 'skip') jump++;
-      else if (card.value === 'reverse') { if (getUnoRoles(state.maxPlayers).length === 2) jump++; else state.direction *= -1; }
+      else if (card.value === 'reverse') { if (unoReverseActsAsSkip(state, myRole)) jump++; else state.direction *= -1; }
       else if (card.value === 'draw2') state.drawStack += 2;
       else if (card.value === 'draw4') state.drawStack += 4;
     });
 
-    let lastCardPlayed = { ...selected[selected.length - 1] };
-    if (lastCardPlayed.color === 'wild' && chosenColor) lastCardPlayed.chosenColor = chosenColor;
+    // kartu meja lama + kartu gabungan (selain yang teratas) masuk tumpukan buangan
+    unoPushDiscard(state, [state.currentCard, ...picked.slice(0, -1)]);
+
+    let lastCardPlayed = { ...topPicked };
+    if (lastCardPlayed.color === 'wild') lastCardPlayed.chosenColor = chosenColor;
 
     state.currentCard = lastCardPlayed; state.hands[myRole] = curHand; state.hasDrawn = false;
 

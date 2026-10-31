@@ -11,6 +11,7 @@ let tttBotHandler = null;
 let snakeBotHandler = null;
 let unoBotHandler = null;
 let pokerBotHandler = null;
+let dominoBotHandler = null;
 
 function cleanupBotListeners() {
   try {
@@ -19,9 +20,10 @@ function cleanupBotListeners() {
     if (snakeBotHandler && roomRef) roomRef.child('snake').off('value', snakeBotHandler);
     if (unoBotHandler && roomRef) roomRef.child('uno').off('value', unoBotHandler);
     if (pokerBotHandler && roomRef) roomRef.child('poker').off('value', pokerBotHandler);
+    if (dominoBotHandler && roomRef) roomRef.child('domino').off('value', dominoBotHandler);
   } catch(e) {}
   
-  chessBotHandler = null; tttBotHandler = null; snakeBotHandler = null; unoBotHandler = null; pokerBotHandler = null;
+  chessBotHandler = null; tttBotHandler = null; snakeBotHandler = null; unoBotHandler = null; pokerBotHandler = null; dominoBotHandler = null;
 
   Object.keys(botTimers).forEach(k => {
     if (botTimers[k]) { clearTimeout(botTimers[k]); botTimers[k] = null; }
@@ -34,7 +36,7 @@ function startBotForCurrentGame() {
   let botRoles = [];
 
   if (game === 'chess' || game === 'ttt') botRoles = ['p2'];
-  else if (game === 'poker') botRoles = ['p2', 'p3', 'p4'];
+  else if (game === 'poker' || game === 'domino') botRoles = ['p2', 'p3', 'p4'];
   else if (game === 'uno') {
     const maxP = window.unoSelectedMaxPlayers || 4;
     botRoles = ['p2','p3','p4','p5','p6'].slice(0, maxP - 1);
@@ -59,6 +61,7 @@ function startBotForCurrentGame() {
     if (game === 'snake') startSnakeBot();
     if (game === 'uno')   startUnoBot();
     if (game === 'poker') startPokerBot();
+    if (game === 'domino') startDominoBot();
   }, 500);
 }
 
@@ -389,7 +392,7 @@ function unoBotMove(unoRef, botKey) {
 
     let jump = 1;
     if (chosen.value === 'skip') jump++;
-    else if (chosen.value === 'reverse') { if (getUnoRoles(s.maxPlayers).length === 2) jump++; else s.direction *= -1; }
+    else if (chosen.value === 'reverse') { if (unoReverseActsAsSkip(s, botKey)) jump++; else s.direction *= -1; }
     else if (chosen.value === 'draw2') s.drawStack += 2;
     else if (chosen.value === 'draw4') s.drawStack += 4;
 
@@ -400,6 +403,7 @@ function unoBotMove(unoRef, botKey) {
       const keys = Object.keys(counts);
       played.chosenColor = keys.length ? keys.reduce((a,b) => counts[a] > counts[b] ? a : b) : 'merah';
     }
+    unoPushDiscard(s, s.currentCard);
     s.currentCard = played; s.hands[botKey] = hand; s.hasDrawn = false;
 
     if (hand.length === 1 || hand.length === 0) {
@@ -451,6 +455,27 @@ function startPokerBot() {
   pokerRef.on('value', pokerBotHandler);
 }
 
+// Mode HARD: bot boleh MEMBUKA ronde dengan kombo (5/4/3/2 kartu), tidak harus menunggu player.
+// Prioritas: kombo terbanyak kartu, lalu yang paling lemah (biar kartu kuat disimpan).
+// mustHave3d = true saat langkah pertama ronde (wajib memuat 3♦).
+function pokerBotPickLead(hand, mustHave3d) {
+  const has3d = c => c.rank === '03' && c.suit === 'd';
+  for (const k of [5, 4, 3, 2]) {
+    if (hand.length < k) continue;
+    let best = null;
+    for (const cards of pokerCombinations(hand, k)) {
+      if (mustHave3d && !cards.some(has3d)) continue;
+      const combo = detectCombo(cards);
+      if (!combo.valid) continue;
+      if (!best || compareCombo(combo, best.combo) < 0) best = { cards, combo };
+    }
+    if (best) return best;
+  }
+  // tidak ada kombo: single terkecil (atau 3♦ kalau wajib)
+  const single = mustHave3d ? hand.find(has3d) : sortCards(hand)[0];
+  return single ? { cards: [single], combo: detectCombo([single]) } : null;
+}
+
 function pokerBotMove(pokerRef, botKey) {
   pokerRef.transaction(cur => {
     if (!cur || cur.phase !== 'playing' || cur.turn !== botKey) return cur;
@@ -470,18 +495,23 @@ function pokerBotMove(pokerRef, botKey) {
           s.lastPlay = { by: botKey, cards: [chosenCard], combo };
           s.lastPlayer = botKey; s.passCount = 0; s.isFirstPlay = false;
           s.lastActionText = comboDisplayName(combo);
-          s.turn = nextActiveRole(botKey, s.finished || []);
+          s.turn = nextActiveRole(botKey, s.finished || [], pokerPlayers(s));
           return s;
         }
         return cur;
       }
       
-      const combo = detectCombo([threeD]);
-      s.hands[botKey] = removeCards(hand, [threeD]);
-      s.lastPlay = { by: botKey, cards: [threeD], combo };
+      let firstCards = [threeD];
+      if (window.botDifficulty === 'hard') {
+        const pick = pokerBotPickLead(hand, true);
+        if (pick) firstCards = pick.cards;
+      }
+      const combo = detectCombo(firstCards);
+      s.hands[botKey] = removeCards(hand, firstCards);
+      s.lastPlay = { by: botKey, cards: firstCards, combo };
       s.lastPlayer = botKey; s.passCount = 0; s.isFirstPlay = false;
       s.lastActionText = comboDisplayName(combo);
-      s.turn = nextActiveRole(botKey, s.finished || []);
+      s.turn = nextActiveRole(botKey, s.finished || [], pokerPlayers(s));
       return s;
     }
 
@@ -490,7 +520,9 @@ function pokerBotMove(pokerRef, botKey) {
 
     if (!s.lastPlay) {
       const sorted = sortCards(hand);
-      if (sorted.length) {
+      if (window.botDifficulty === 'hard') {
+        candidate = pokerBotPickLead(hand, false);
+      } else if (sorted.length) {
         const combo = detectCombo([sorted[0]]);
         candidate = { cards: [sorted[0]], combo };
       }
@@ -528,14 +560,14 @@ function pokerBotMove(pokerRef, botKey) {
       s.passCount = (s.passCount || 0) + 1;
       s.lastActionText = 'pass';
       const finished = s.finished || [];
-      const threshold = Math.max(4 - finished.length - 1, 1);
+      const pl = pokerPlayers(s), threshold = pokerPassThreshold(s);
       if (s.passCount >= threshold) {
         s.lastPlay = null; s.passCount = 0;
-        let ret = s.lastPlayer || nextActiveRole(botKey, finished);
-        if (finished.includes(ret)) ret = nextActiveRole(ret, finished);
+        let ret = s.lastPlayer || nextActiveRole(botKey, finished, pl);
+        if (finished.includes(ret)) ret = nextActiveRole(ret, finished, pl);
         s.turn = ret;
       } else {
-        s.turn = nextActiveRole(botKey, finished);
+        s.turn = nextActiveRole(botKey, finished, pl);
       }
       return s;
     }
@@ -549,12 +581,69 @@ function pokerBotMove(pokerRef, botKey) {
     const finished = s.finished || [];
     if (remain.length === 0 && !finished.includes(botKey)) {
       finished.push(botKey); s.finished = finished;
-      if (finished.length >= 3) {
-        s.phase = 'roundover'; s.loser = ROLES.find(r => !finished.includes(r)) || null; s.winner = finished[0];
+      const pl = pokerPlayers(s);
+      if (finished.length >= pl.length - 1) {
+        s.phase = 'roundover'; s.loser = pl.find(r => !finished.includes(r)) || null; s.winner = finished[0];
         return s;
       }
     }
-    s.turn = nextActiveRole(botKey, s.finished || []);
+    s.turn = nextActiveRole(botKey, s.finished || [], pokerPlayers(s));
     return s;
+  });
+}
+
+// ============================================================
+// 🁣 DOMINO GAPLE BOT (pakai Difficulty)
+//  normal: acak (kadang salah pilih) | medium: buang kartu terberat dulu
+//  hard  : buang kartu berat + jaga agar ujung papan cocok dengan sisa kartu sendiri
+// ============================================================
+function startDominoBot() {
+  const dRef = roomRef.child('domino');
+  if (dominoBotHandler) dRef.off('value', dominoBotHandler);
+
+  dominoBotHandler = (snap) => {
+    const data = snap.val();
+    if (!data || data.phase !== 'playing') return;
+    const botKey = data.turn;
+    if (!botActiveRoles.includes(botKey)) { if (botTimers.domino) { clearTimeout(botTimers.domino); botTimers.domino = null; } return; }
+    if (botTimers.domino) return;
+    botTimers.domino = setTimeout(() => { botTimers.domino = null; dominoBotMove(dRef, botKey); }, 900 + Math.random() * 600);
+  };
+  dRef.on('value', dominoBotHandler);
+}
+
+function dominoBotChoose(moves, hand, board) {
+  const diff = window.botDifficulty;
+  if (diff === 'normal') return moves[Math.floor(Math.random() * moves.length)];
+  const ends = dominoEnds(board);
+  let best = null, bestScore = -Infinity;
+  moves.forEach(m => {
+    const t = m.tile;
+    let score = dominoPips(t) + (t.a === t.b ? 3 : 0);          // buang kartu berat & balak dulu
+    if (diff === 'hard') {
+      // ujung papan setelah langkah ini
+      let nl = ends ? ends.l : t.a, nr = ends ? ends.r : t.b;
+      if (!ends) { nl = t.a; nr = t.b; }
+      else if (m.side === 'l') nl = t.a === ends.l ? t.b : t.a;
+      else nr = t.a === ends.r ? t.b : t.a;
+      const rest = hand.filter(h => h.id !== t.id);
+      const own = v => rest.filter(h => h.a === v || h.b === v).length;
+      score += 2.5 * (own(nl) + (nr !== nl ? own(nr) : 0));    // ujung yang masih bisa kita lanjutkan
+    }
+    score += Math.random() * 0.5;
+    if (score > bestScore) { bestScore = score; best = m; }
+  });
+  return best;
+}
+
+function dominoBotMove(dRef, botKey) {
+  dRef.transaction(cur => {
+    if (!cur || cur.phase !== 'playing' || cur.turn !== botKey) return cur;
+    const s = JSON.parse(JSON.stringify(cur));
+    const hand = dmArr(s.hands[botKey]);
+    const moves = dominoMoves(hand, s.board, s);
+    if (moves.length === 0) return dominoApplyPass(s, botKey) ? s : cur;
+    const m = dominoBotChoose(moves, hand, s.board) || moves[0];
+    return dominoApplyPlay(s, botKey, m.tile.id, m.side) ? s : cur;
   });
 }

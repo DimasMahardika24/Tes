@@ -124,14 +124,14 @@ const gameMeta = {
   chess:    { title: '♟ Catur 2P Online', screen: 'chessScreen' },
   ttt:      { title: '⭕ Tic-Tac-Toe 2P', screen: 'tttScreen' },
   poker:    { title: '🃏 Poker Capsa', screen: 'pokerScreen' },
+  domino:   { title: '🁣 Domino Gaple', screen: 'dominoScreen' },
   uno:      { title: '🎴 Uno Battle Arena', screen: 'unoScreen' },
-  monopoli: { title: '🎩 Monopoli Klasik', screen: 'monopoliScreen' },
   snake:    { title: '🐍 Ular Tangga Board', screen: 'snakeScreen' }
 };
 
 document.querySelectorAll('#gamePickScreen .btn-menu[data-game]').forEach(btn => {
   btn.onclick = () => {
-    if(btn.classList.contains('disabled') || btn.dataset.game === 'monopoli'){
+    if(btn.classList.contains('disabled')){
       showCustomAlert('Game ini sedang dalam pemeliharaan.', '🔒 Maintenance');
       return;
     }
@@ -218,7 +218,7 @@ function executeCreateRoom(){
     const candidateRef = dbRoot.ref('rooms/' + roomId);
 
     let maxP = 2;
-    if(currentGame === 'poker') maxP = 4;
+    if(currentGame === 'poker' || currentGame === 'domino') maxP = 4;
     if(currentGame === 'uno') maxP = window.unoSelectedMaxPlayers || 4;
     if(currentGame === 'snake') maxP = window.snakeSelectedMaxPlayers || 2;
 
@@ -386,9 +386,9 @@ function connectToRoomGlobal(targetId) {
     roomIdGlobal = targetId;
     roomRef = dbRoot.ref('rooms/' + targetId);
 
-    if(currentGame === 'poker'){
+    if(currentGame === 'poker' || currentGame === 'domino'){
       const trySeat = (seats, i) => {
-        if(i >= seats.length){ showCustomAlert('Room Capsa Banting ini sudah penuh (4 pemain).'); return; }
+        if(i >= seats.length){ showCustomAlert('Room ini sudah penuh (4 pemain).'); return; }
         roomRef.child('presence/' + seats[i]).transaction(
           (current) => (current === null ? true : undefined),
           (err, committed) => {
@@ -462,6 +462,7 @@ function enterGame(){
     if(currentGame === 'chess') initChess();
     if(currentGame === 'ttt') initTTT();
     if(currentGame === 'poker') initPoker();
+    if(currentGame === 'domino') initDomino();
     if(currentGame === 'uno') initUno();
     if(currentGame === 'snake') initSnake();
 
