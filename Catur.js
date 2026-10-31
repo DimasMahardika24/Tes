@@ -1,5 +1,5 @@
 // ======================================================
-// Catur.js — Modern & Professional Animation Engine
+// Catur.js — Modern & Professional Animation Engine (Fixed)
 // ======================================================
 
 const pieceUnicode = {k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟',K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙'};
@@ -10,7 +10,7 @@ let chessTurnStartAt = null;
 let chessClockInterval = null;
 let chessPendingPromotion = null;
 
-let prevChessBoard = null; // Untuk mendeteksi gerakan
+let prevChessBoard = null; 
 let chessAudioCtx = null;
 
 const CHESS_REASON_TEXT = {
@@ -36,21 +36,18 @@ function playChessSound(type) {
     const osc = ctx.createOscillator(), gain = ctx.createGain();
     
     if (type === 'move') {
-      // Suara geser kayu (Tuk)
       osc.type = 'sine';
       osc.frequency.setValueAtTime(320, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.08);
       gain.gain.setValueAtTime(0.2, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
     } else if (type === 'capture') {
-      // Suara benturan + ledakan (Dor)
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(150, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.2);
       gain.gain.setValueAtTime(0.3, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
     } else if (type === 'check') {
-      // Suara sirine skak (Wew)
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(500, ctx.currentTime);
       osc.frequency.linearRampToValueAtTime(700, ctx.currentTime + 0.1);
@@ -136,7 +133,6 @@ function initChess(){
   chessClockInterval = setInterval(chessUpdateClockUI, 250);
 }
 
-// --- BUAT KOTAK PAPAN (Hanya sekali) ---
 function buildChessDOM() {
   const sqLayer = document.getElementById('chessSquares');
   sqLayer.innerHTML = '';
@@ -156,7 +152,7 @@ function buildChessDOM() {
   }
 }
 
-// --- MESIN ANIMASI RENDER ---
+// --- MESIN ANIMASI RENDER (FIXED) ---
 function chessDraw(){
   if(!chessBoardState) return;
   const piecesLayer = document.getElementById('chessPiecesLayer');
@@ -168,7 +164,7 @@ function chessDraw(){
   
   const kingPos = isCheck ? chessFindKing(board, chessTurn) : null;
 
-  // 1. Update Highlight Kotak (Valid Moves, Trail, Check)
+  // 1. Update Highlight Kotak (Valid Moves, Check)
   let validMoves = [];
   if(chessSelected) {
     validMoves = chessLegalMovesForSquare(board, {castling:chessCastling, ep:chessEP}, chessSelected.x, chessSelected.y);
@@ -191,20 +187,18 @@ function chessDraw(){
     }
   }
 
-  // 2. Deteksi Perbedaan Papan & Animasi Bidak
-  const activePieces = piecesLayer.querySelectorAll('.piece-wrapper');
-  const existingPieces = new Map(); // Map untuk cari bidak yang sudah ada
+  // 2. Deteksi Bidak & Animasi DOM
+  const activePieces = Array.from(piecesLayer.querySelectorAll('.piece-wrapper'));
+  const existingPieces = new Map(); // Key: "x-y", Value: DOM Element
   
   activePieces.forEach(p => {
-    const px = parseInt(p.dataset.x);
-    const py = parseInt(p.dataset.y);
-    existingPieces.set(`${px}-${py}`, p);
+    existingPieces.set(`${p.dataset.x}-${p.dataset.y}`, p);
   });
 
-  const newPiecesMap = new Map(); // Bidak yang seharusnya ada di papan baru
   let isBoardMoved = false;
+  let isCapture = false;
 
-  // Cari yang gerak atau makan
+  // Iterasi papan baru, cari yang gerak atau promosi
   for(let by=0; by<8; by++){
     for(let bx=0; bx<8; bx++){
       const p = board[by][bx];
@@ -213,66 +207,58 @@ function chessDraw(){
       const oldP = prevChessBoard ? prevChessBoard[by][bx] : null;
       
       if(oldP === p) {
-        // Bidak sama, ngga gerak
+        // Bidak tidak berubah
         const el = existingPieces.get(`${bx}-${by}`);
-        if(el) newPiecesMap.set(`${bx}-${by}`, el);
+        if(el) {
+          existingPieces.delete(`${bx}-${by}`); // Anggap sudah di-handle
+        }
       } else {
-        // Bidak baru di sini! (Bisa jadi dia gerak ke sini, atau promosi)
-        let el = existingPieces.get(`${bx}-${by}`); // Cek kalau di posisi ini udah ada bidak (berarti ini cuma promosi)
+        // Bidak baru di sini (berarti ada yang gerak ke sini, atau promosi)
+        let el = existingPieces.get(`${bx}-${by}`); // Cek kalau posisi ini sebelumnya ada bidak (promosi)
         
         if(!el) {
-          // Cari bidak yang hilang dari tempat lain (moved piece)
+          // Cari bidak yang pindah dari tempat lain
           for(const [posKey, oldEl] of existingPieces.entries()) {
-            if(!newPiecesMap.has(posKey)) {
-              const [ox, oy] = posKey.split('-').map(Number);
-              const oldPieceType = prevChessBoard[oy][ox];
-              
-              // Kalau jenis dan warnanya sama, kemungkinan besar ini dia yang gerak
-              if(oldPieceType && chessColorOf(oldPieceType) === chessColorOf(p) && oldPieceType.toLowerCase() === p.toLowerCase()) {
-                el = oldEl;
-                // Hapus dari map sementara supaya ngga dipakai 2x
-                existingPieces.delete(posKey); 
-                isBoardMoved = true;
-                break;
-              }
+            const [ox, oy] = posKey.split('-').map(Number);
+            const oldPieceType = prevChessBoard[oy][ox];
+            
+            // Kalau jenis dan warnanya sama, ini dia bidak yang gerak
+            if(oldPieceType && chessColorOf(oldPieceType) === chessColorOf(p) && oldPieceType.toLowerCase() === p.toLowerCase()) {
+              el = oldEl;
+              existingPieces.delete(posKey); 
+              isBoardMoved = true;
+              break;
             }
           }
         }
 
         if(!el) {
-          // Bidak benar-benar baru (Promosi) atau fallback
+          // Bidak benar-benar baru (Promosi)
           el = createPieceElement(p, bx, by);
+          piecesLayer.appendChild(el);
         } else {
-          // Update posisi DOM
+          // Update posisi DOM (Ini yang memicu animasi CSS transition)
           el.dataset.x = bx;
           el.dataset.y = by;
           updatePieceTransform(el, bx, by);
         }
-        
-        newPiecesMap.set(`${bx}-${by}`, el);
       }
     }
   }
 
   // 3. Animasi Makan Bidak (Capture)
-  let isCapture = false;
   existingPieces.forEach((el, key) => {
-    // Sisa bidak di existingPieces yang tidak masuk newPiecesMap berarti dimakan
-    if(!newPiecesMap.has(key)) {
-      isCapture = true;
-      el.classList.add('capturing');
-      
-      // Spawn Partikel Ledakan
-      const [x, y] = key.split('-').map(Number);
-      spawnCaptureParticles(x, y);
-      
-      setTimeout(() => { if(el.parentNode) el.remove(); }, 350);
-    }
+    // Sisa bidak di existingPieces yang tidak masuk ke papan baru berarti dimakan
+    isCapture = true;
+    el.classList.add('capturing'); // Animasi hancur via CSS
+    
+    const [x, y] = key.split('-').map(Number);
+    spawnCaptureParticles(x, y); // Ledakan merah
+    
+    setTimeout(() => { 
+        if(el.parentNode) el.remove(); 
+    }, 350);
   });
-
-  // Bersihkan dan pasang bidak yang bertahan/baru
-  piecesLayer.innerHTML = '';
-  newPiecesMap.forEach(el => piecesLayer.appendChild(el));
 
   // 4. Efek Suara
   if(isCapture) playChessSound('capture');
@@ -289,6 +275,7 @@ function chessDraw(){
   const statusEl = document.getElementById('chessStatus');
   if(statusEl) statusEl.textContent = statusTxt;
 
+  // Simpan state papan buat frame berikutnya
   prevChessBoard = board.map(r => r.slice());
 }
 
@@ -322,7 +309,7 @@ function spawnCaptureParticles(bx, by) {
   setTimeout(() => ring.remove(), 500);
 }
 
-// --- LOGIKA LAINNYA (Tidak diubah) ---
+// --- LOGIKA LAINNYA ---
 function chessFindKing(board, color){
   const K = color === 'w' ? 'K' : 'k';
   for(let y=0;y<8;y++) for(let x=0;x<8;x++) if(board[y][x] === K) return {x,y};
