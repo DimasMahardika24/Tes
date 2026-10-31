@@ -1,5 +1,5 @@
 // ======================================================
-// Domino.js — Domino Gaple 2-4 pemain (Game Hub Realtime)
+// Domino.js — Domino Gaple 2-4 pemain (jumlah dipilih host di awal, mulai otomatis kalau penuh) (Game Hub Realtime)
 // Aturan: 28 kartu, tiap pemain 7 kartu (sisa tidak dipakai), tidak ada ambil kartu.
 // Pemain dengan balak (double) tertinggi jalan duluan dengan kartu itu.
 // Tidak bisa jalan -> pass. Habis kartu = menang ronde; kalau semua pass (blok),
@@ -117,9 +117,8 @@ function dominoApplyPass(state, role) {
 }
 
 function dominoBuildNewGame(prev, presence) {
-  presence = presence || dominoPresence || {};
-  let players = DM_ROLES.filter(r => presence[r]);
-  if (players.length < 2) players = DM_ROLES.slice(0, 2);
+  const maxP = Math.min(4, Math.max(2, (prev && prev.maxPlayers) || window.dominoSelectedMaxPlayers || 4));
+  const players = DM_ROLES.slice(0, maxP);
   const deck = dominoShuffle(DM_TILES);
   const hands = {};
   players.forEach((r, i) => { hands[r] = deck.slice(i * 7, i * 7 + 7).sort((x, y) => x.id - y.id); });
@@ -132,7 +131,7 @@ function dominoBuildNewGame(prev, presence) {
   }));
   return {
     phase: 'playing', players, hands, board: [], turn: best.r, starter: best.r, starterTile: best.id,
-    passCount: 0, lastMove: null, lastActionText: null, winner: null, reason: null, points: 0,
+    maxPlayers: maxP, passCount: 0, lastMove: null, lastActionText: null, winner: null, reason: null, points: 0,
     scores: (prev && prev.scores) || {}, handNumber: ((prev && prev.handNumber) || 0) + 1
   };
 }
@@ -220,7 +219,7 @@ function dominoName(role) { return role === myRole ? 'Kamu' : role.toUpperCase()
 
 function dominoRender(data) {
   latestDomino = data;
-  const players = data.phase === 'waiting' ? DM_ROLES.filter(r => dominoPresence[r]) : dmArr(data.players);
+  const players = data.phase === 'waiting' ? DM_ROLES.slice(0, data.maxPlayers || 4).filter(r => dominoPresence[r]) : dmArr(data.players);
   const myHand = dmArr(data.hands && data.hands[myRole]).slice().sort((x, y) => x.id - y.id);
   const iPlay = dmArr(data.players).includes(myRole);
   const myTurn = data.phase === 'playing' && data.turn === myRole;
@@ -232,8 +231,8 @@ function dominoRender(data) {
   // ---- status ----
   const st = document.getElementById('dominoStatus');
   if (data.phase === 'waiting') {
-    const n = DM_ROLES.filter(r => dominoPresence[r]).length;
-    st.textContent = '🟡 Pemain terhubung: ' + n + '/4' + (myRole === 'p1' ? (n >= 2 ? ' — tekan Mulai kapan saja' : ' — butuh minimal 2 pemain') : ' — menunggu host memulai...');
+    const mx = data.maxPlayers || 4, n = DM_ROLES.slice(0, mx).filter(r => dominoPresence[r]).length;
+    st.textContent = '🟡 Menunggu pemain bergabung (' + n + '/' + mx + ')...';
     st.style.color = '';
   } else if (data.phase === 'playing') {
     if (!iPlay) st.textContent = '👀 Ronde berjalan — kamu ikut di ronde berikutnya.';
@@ -314,9 +313,7 @@ function dominoRender(data) {
     res.innerHTML = html; res.style.display = 'block';
     nx.style.display = 'block'; nx.textContent = myRole === 'p1' ? '▶ Main Lagi' : '⏳ Menunggu host mulai lagi'; nx.disabled = myRole !== 'p1';
   } else if (data.phase === 'waiting') {
-    const n = DM_ROLES.filter(r => dominoPresence[r]).length;
-    res.style.display = 'none';
-    nx.style.display = 'block'; nx.textContent = myRole === 'p1' ? '▶ Mulai (' + n + ' pemain)' : '⏳ Menunggu host memulai'; nx.disabled = myRole !== 'p1' || n < 2;
+    res.style.display = 'none'; nx.style.display = 'none';
   } else { res.style.display = 'none'; nx.style.display = 'none'; }
 
   // ---- suara / efek ----
@@ -374,18 +371,17 @@ function initDomino() {
   document.getElementById('btnDominoBack').onclick = () => { if (activePresenceRef) activePresenceRef.remove(); clearSession(); location.reload(); };
   document.getElementById('dominoBtnNext').onclick = () => {
     if (myRole !== 'p1') return;
-    if (DM_ROLES.filter(r => dominoPresence[r]).length < 2) { showCustomAlert('Butuh minimal 2 pemain untuk mulai.'); return; }
-    dominoRef.transaction(cur => (cur && (cur.phase === 'waiting' || cur.phase === 'roundover')) ? dominoBuildNewGame(cur, dominoPresence) : cur);
+    dominoRef.transaction(cur => (cur && cur.phase === 'roundover') ? dominoBuildNewGame(cur, dominoPresence) : cur);
   };
 
   if (myRole === 'p1') {
-    dominoRef.transaction(cur => cur || { phase: 'waiting', players: [], hands: {}, board: [], scores: {}, handNumber: 0 });
+    dominoRef.transaction(cur => cur || { phase: 'waiting', maxPlayers: window.dominoSelectedMaxPlayers || 4, players: [], hands: {}, board: [], scores: {}, handNumber: 0 });
   }
 
   setupPresence('dominoConn', roomIdGlobal, (presence) => {
     dominoPresence = presence || {};
     if (latestDomino) dominoRender(latestDomino);
-    if (myRole === 'p1' && latestDomino && latestDomino.phase === 'waiting' && DM_ROLES.every(r => dominoPresence[r])) {
+    if (myRole === 'p1' && latestDomino && latestDomino.phase === 'waiting' && DM_ROLES.slice(0, latestDomino.maxPlayers || 4).every(r => dominoPresence[r])) {
       dominoRef.transaction(cur => (cur && cur.phase === 'waiting') ? dominoBuildNewGame(cur, dominoPresence) : cur);
     }
   });

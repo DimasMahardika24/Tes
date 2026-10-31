@@ -74,6 +74,10 @@ function getDeviceId(){
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  if(id === 'gamePickScreen'){
+    const snakeBtn = document.querySelector('#gamePickScreen .btn-menu[data-game="snake"]');
+    if(snakeBtn) snakeBtn.style.display = window.isBotMode ? 'none' : '';
+  }
 }
 
 let currentGame = null;
@@ -146,6 +150,8 @@ document.querySelectorAll('#gamePickScreen .btn-menu[data-game]').forEach(btn =>
       }
     } else if(currentGame === 'uno'){
       showScreen('unoPlayerCountScreen');
+    } else if(currentGame === 'domino'){
+      showScreen('dominoPlayerCountScreen');
     } else if(currentGame === 'snake'){
       showScreen('snakePlayerCountScreen');
     } else {
@@ -180,8 +186,8 @@ document.getElementById('btnCreatedBack').onclick = () => {
 // ✅ FIX: Skip popup difficulty untuk Uno & Ular Tangga
 function proceedCreateRoom(){
   if(window.isBotMode){
-    // Uno & Ular Tangga murni hoki, langsung gas tanpa pilih difficulty
-    if(currentGame === 'uno' || currentGame === 'snake') {
+    // Uno, Ular Tangga & Domino: langsung gas tanpa pilih difficulty
+    if(currentGame === 'uno' || currentGame === 'snake' || currentGame === 'domino') {
       executeCreateRoom();
       return;
     }
@@ -218,7 +224,8 @@ function executeCreateRoom(){
     const candidateRef = dbRoot.ref('rooms/' + roomId);
 
     let maxP = 2;
-    if(currentGame === 'poker' || currentGame === 'domino') maxP = 4;
+    if(currentGame === 'poker') maxP = 4;
+    if(currentGame === 'domino') maxP = window.dominoSelectedMaxPlayers || 4;
     if(currentGame === 'uno') maxP = window.unoSelectedMaxPlayers || 4;
     if(currentGame === 'snake') maxP = window.snakeSelectedMaxPlayers || 2;
 
@@ -277,6 +284,14 @@ document.querySelectorAll('#unoPlayerCountScreen .btn-menu[data-uno-players]').f
   };
 });
 document.getElementById('btnUnoCountBack').onclick = () => showScreen('gamePickScreen');
+
+document.querySelectorAll('#dominoPlayerCountScreen .btn-menu[data-domino-players]').forEach(btn => {
+  btn.onclick = () => {
+    window.dominoSelectedMaxPlayers = parseInt(btn.dataset.dominoPlayers, 10) || 4;
+    proceedCreateRoom();
+  };
+});
+document.getElementById('btnDominoCountBack').onclick = () => showScreen('gamePickScreen');
 
 document.querySelectorAll('#chessTimeScreen .btn-menu[data-time]').forEach(btn => {
   btn.onclick = () => {
@@ -386,7 +401,21 @@ function connectToRoomGlobal(targetId) {
     roomIdGlobal = targetId;
     roomRef = dbRoot.ref('rooms/' + targetId);
 
-    if(currentGame === 'poker' || currentGame === 'domino'){
+    if(currentGame === 'domino'){
+      const maxP = data.maxPlayers || 4;
+      const seatsD = ['p2', 'p3', 'p4'].slice(0, maxP - 1);
+      const tryDominoSeat = (i) => {
+        if(i >= seatsD.length){ showCustomAlert('Room Domino ini sudah penuh (' + maxP + ' pemain).'); return; }
+        roomRef.child('presence/' + seatsD[i]).transaction(
+          (current) => (current === null ? true : undefined),
+          (err, committed) => {
+            if(err || !committed){ tryDominoSeat(i + 1); return; }
+            myRole = seatsD[i]; showRoomBadge(targetId); enterGame();
+          }
+        );
+      };
+      tryDominoSeat(0);
+    } else if(currentGame === 'poker'){
       const trySeat = (seats, i) => {
         if(i >= seats.length){ showCustomAlert('Room ini sudah penuh (4 pemain).'); return; }
         roomRef.child('presence/' + seats[i]).transaction(

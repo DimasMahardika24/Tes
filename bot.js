@@ -36,7 +36,8 @@ function startBotForCurrentGame() {
   let botRoles = [];
 
   if (game === 'chess' || game === 'ttt') botRoles = ['p2'];
-  else if (game === 'poker' || game === 'domino') botRoles = ['p2', 'p3', 'p4'];
+  else if (game === 'poker') botRoles = ['p2', 'p3', 'p4'];
+  else if (game === 'domino') botRoles = ['p2', 'p3', 'p4'].slice(0, (window.dominoSelectedMaxPlayers || 4) - 1);
   else if (game === 'uno') {
     const maxP = window.unoSelectedMaxPlayers || 4;
     botRoles = ['p2','p3','p4','p5','p6'].slice(0, maxP - 1);
@@ -593,9 +594,8 @@ function pokerBotMove(pokerRef, botKey) {
 }
 
 // ============================================================
-// 🁣 DOMINO GAPLE BOT (pakai Difficulty)
-//  normal: acak (kadang salah pilih) | medium: buang kartu terberat dulu
-//  hard  : buang kartu berat + jaga agar ujung papan cocok dengan sisa kartu sendiri
+// 🁣 DOMINO GAPLE BOT (tanpa pilihan Difficulty — selalu main pintar)
+//  buang kartu berat/balak dulu + jaga agar ujung papan cocok dengan sisa kartu sendiri
 // ============================================================
 function startDominoBot() {
   const dRef = roomRef.child('domino');
@@ -613,14 +613,12 @@ function startDominoBot() {
 }
 
 function dominoBotChoose(moves, hand, board) {
-  const diff = window.botDifficulty;
-  if (diff === 'normal') return moves[Math.floor(Math.random() * moves.length)];
   const ends = dominoEnds(board);
   let best = null, bestScore = -Infinity;
   moves.forEach(m => {
     const t = m.tile;
     let score = dominoPips(t) + (t.a === t.b ? 3 : 0);          // buang kartu berat & balak dulu
-    if (diff === 'hard') {
+    {
       // ujung papan setelah langkah ini
       let nl = ends ? ends.l : t.a, nr = ends ? ends.r : t.b;
       if (!ends) { nl = t.a; nr = t.b; }
