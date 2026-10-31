@@ -8,136 +8,67 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --void: #0a0c11; 
-  --panel: #12151d;
-  --panel-2: #1a1f2a;
-  --panel-3: #212734;
-  --line: rgba(255,255,255,0.07);
-  --ink: #eef0f4;
-  --ink-dim: #838ca0;
-  --gold: #e8ac1f;
-  --gold-ink: #1a1406;
-  --blue: #3d6bf0;
-  --green: #2bb673;
-  --red: #e4574f;
+  --void: #0a0c11; --panel: #12151d; --panel-2: #1a1f2a; --panel-3: #212734;
+  --line: rgba(255,255,255,0.07); --ink: #eef0f4; --ink-dim: #838ca0;
+  --gold: #e8ac1f; --gold-ink: #1a1406; --blue: #3d6bf0; --green: #2bb673; --red: #e4574f;
 }
 * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
 html, body { height: 100%; }
 body {
   background: url('https://cdn.jsdelivr.net/gh/dikzzgans424-star/CDN-Miwa-botz@main/uploads/1788436685269.jpg') no-repeat center center fixed;
-  background-size: cover;
-  font-family: 'Inter', 'Segoe UI', Tahoma, sans-serif; color: var(--ink); display: flex; justify-content: center;
-  align-items: flex-start; min-height: 100vh; padding: 10px; overflow-x: hidden;
+  background-size: cover; font-family: 'Inter', sans-serif; color: var(--ink); display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 10px; overflow-x: hidden;
 }
-
-.card {
-  width: 100%; max-width: 680px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 18px; padding: 20px; position: relative; overflow: hidden;
-  box-shadow: 0 24px 60px rgba(0,0,0,0.5);
-  animation: cardIn .4s cubic-bezier(.2,.8,.2,1);
-}
+.card { width: 100%; max-width: 680px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; position: relative; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.5); animation: cardIn .4s cubic-bezier(.2,.8,.2,1); }
 @keyframes cardIn { from{ opacity:0; transform: translateY(10px);} to{ opacity:1; transform:none; } }
 .screen { display: none !important; }
 .screen.active { display: block !important; animation: fadeSlide .28s cubic-bezier(.2,.8,.2,1); }
 @keyframes fadeSlide { from{ opacity:0; transform: translateY(6px);} to{ opacity:1; transform:none; } }
-.btn-menu {
-  width: 100%; padding: 16px 18px; border: none; border-radius: 12px; font-weight: 700; font-size: 15px;
-  font-family: 'Space Grotesk', 'Inter', sans-serif; letter-spacing: .2px;
-  cursor: pointer; text-align: left; margin-bottom: 10px; color: var(--ink); display: flex; align-items: center; gap: 10px;
-  box-shadow: 0 2px 0 rgba(0,0,0,0.3) inset, 0 1px 0 rgba(255,255,255,0.06) inset;
-  border-bottom: 3px solid rgba(0,0,0,0.28);
-  transform: translateY(0); transition: transform .1s ease, border-bottom-width .1s ease, filter .1s ease;
-  position: relative;
-}
+.btn-menu { width: 100%; padding: 16px 18px; border: none; border-radius: 12px; font-weight: 700; font-size: 15px; font-family: 'Space Grotesk', sans-serif; cursor: pointer; text-align: left; margin-bottom: 10px; color: var(--ink); display: flex; align-items: center; gap: 10px; box-shadow: 0 2px 0 rgba(0,0,0,0.3) inset, 0 1px 0 rgba(255,255,255,0.06) inset; border-bottom: 3px solid rgba(0,0,0,0.28); transition: transform .1s ease, border-bottom-width .1s ease, filter .1s ease; position: relative; }
 .btn-menu:active { transform: translateY(2px); border-bottom-width: 1px; filter: brightness(0.96); }
 .btn-menu span.ic { font-size: 22px; }
-.btn-menu.disabled {
-  opacity: 0.55;
-  filter: grayscale(0.8);
-  cursor: not-allowed;
-  pointer-events: none;
-}
+.btn-menu.disabled { opacity: 0.55; filter: grayscale(0.8); cursor: not-allowed; pointer-events: none; }
 .g-chess { background: var(--blue); color: #fff; }
 .g-ttt { background: var(--green); color: #06251a; }
 .g-poker { background: linear-gradient(135deg, #7a1f2b, #a8283a); color: #fff; }
 .g-snake { background: linear-gradient(135deg, #d97706, #b45309); color: #fff; }
 
-.hub-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 24px; font-weight: 700; color: var(--ink); margin-bottom: 3px; display: flex; align-items: center; gap: 9px; }
+.hub-title { font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: var(--ink); margin-bottom: 3px; display: flex; align-items: center; gap: 9px; }
 .hub-title .badge-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 4px rgba(232,172,31,0.15); flex-shrink: 0; animation: pulseDot 2.4s ease-in-out infinite; }
 @keyframes pulseDot { 0%,100%{ box-shadow: 0 0 0 4px rgba(232,172,31,0.15);} 50%{ box-shadow: 0 0 0 7px rgba(232,172,31,0.05);} }
 .hub-sub { font-size: 13.5px; color: var(--ink-dim); margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
-
-/* ===== HUB HEADER (logo + judul) ===== */
 .hub-head { display:flex; flex-direction:column; align-items:center; text-align:center; padding-top:22px; margin-bottom:6px; }
 .hub-logo-wrap { position:relative; width:104px; height:104px; margin-bottom:16px; animation: logoFloat 4.5s ease-in-out infinite; }
-.hub-logo-wrap::before { /* cincin gradien berputar */
-  content:''; position:absolute; inset:-5px; border-radius:50%;
-  background: conic-gradient(from 0deg, #e8ac1f, #3d6bf0, #2bb673, #e8ac1f);
-  animation: ringSpin 6s linear infinite; filter: blur(.3px);
-}
-.hub-logo-wrap::after { /* glow lembut */
-  content:''; position:absolute; inset:-14px; border-radius:50%;
-  background: radial-gradient(circle, rgba(61,107,240,.35), transparent 65%);
-  z-index:-1; animation: glowPulse 3s ease-in-out infinite;
-}
-.hub-logo { position:relative; width:100%; height:100%; border-radius:50%; object-fit:cover; display:block;
-  border:4px solid var(--panel); background:var(--panel-2); box-shadow:0 10px 28px rgba(0,0,0,.55); user-select:none; -webkit-user-drag:none; }
-.hub-head .hub-title { justify-content:center; font-size:28px; letter-spacing:.3px; margin-bottom:6px;
-  background:linear-gradient(90deg,#fff,#c9d6ff 50%,#fff); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+.hub-logo-wrap::before { content:''; position:absolute; inset:-5px; border-radius:50%; background: conic-gradient(from 0deg, #e8ac1f, #3d6bf0, #2bb673, #e8ac1f); animation: ringSpin 6s linear infinite; filter: blur(.3px); }
+.hub-logo-wrap::after { content:''; position:absolute; inset:-14px; border-radius:50%; background: radial-gradient(circle, rgba(61,107,240,.35), transparent 65%); z-index:-1; animation: glowPulse 3s ease-in-out infinite; }
+.hub-logo { position:relative; width:100%; height:100%; border-radius:50%; object-fit:cover; display:block; border:4px solid var(--panel); background:var(--panel-2); box-shadow:0 10px 28px rgba(0,0,0,.55); user-select:none; -webkit-user-drag:none; }
+.hub-head .hub-title { justify-content:center; font-size:28px; letter-spacing:.3px; margin-bottom:6px; background:linear-gradient(90deg,#fff,#c9d6ff 50%,#fff); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
 .hub-head .hub-sub { border-bottom:none; padding-bottom:0; margin-bottom:6px; max-width:320px; line-height:1.5; }
 .hub-divider { height:1px; margin:6px 0 18px; background:linear-gradient(90deg,transparent,var(--line),transparent); }
 @keyframes logoFloat { 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-6px);} }
 @keyframes ringSpin { to{ transform:rotate(360deg);} }
 @keyframes glowPulse { 0%,100%{ opacity:.55; transform:scale(.95);} 50%{ opacity:1; transform:scale(1.08);} }
 
-/* ===== KARTU & TOMBOL: tampilan modern ===== */
 .card { background: rgba(18,21,29,0.82); -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%); border:1px solid rgba(255,255,255,0.09); }
 #startScreen .btn-menu { overflow:hidden; opacity:0; animation: btnIn .5s cubic-bezier(.2,.8,.2,1) forwards; transition: transform .18s ease, box-shadow .18s ease, filter .18s ease; }
-#startScreen .btn-menu:nth-of-type(1){ animation-delay:.15s; }
-#startScreen .btn-menu:nth-of-type(2){ animation-delay:.25s; }
-#startScreen .btn-menu:nth-of-type(3){ animation-delay:.35s; }
-#startScreen .btn-menu::after { content:''; position:absolute; top:0; left:-60%; width:40%; height:100%;
-  background:linear-gradient(100deg,transparent,rgba(255,255,255,.28),transparent); transform:skewX(-20deg); animation: sheen 5s ease-in-out infinite; }
-#startScreen .btn-menu:nth-of-type(2)::after{ animation-delay:.7s; }
-#startScreen .btn-menu:nth-of-type(3)::after{ animation-delay:1.4s; }
+#startScreen .btn-menu:nth-of-type(1){ animation-delay:.15s; } #startScreen .btn-menu:nth-of-type(2){ animation-delay:.25s; }
+#startScreen .btn-menu:nth-of-type(3){ animation-delay:.35s; } #startScreen .btn-menu:nth-of-type(4){ animation-delay:.45s; }
+#startScreen .btn-menu::after { content:''; position:absolute; top:0; left:-60%; width:40%; height:100%; background:linear-gradient(100deg,transparent,rgba(255,255,255,.28),transparent); transform:skewX(-20deg); animation: sheen 5s ease-in-out infinite; }
 @media (hover:hover){ #startScreen .btn-menu:hover { transform:translateY(-2px); filter:brightness(1.08); box-shadow:0 10px 24px rgba(0,0,0,.4); } }
 #startScreen .btn-menu:active { transform:translateY(2px); }
 @keyframes btnIn { from{ opacity:0; transform:translateY(14px) scale(.98);} to{ opacity:1; transform:none;} }
 @keyframes sheen { 0%,60%{ left:-60%;} 100%{ left:130%;} }
 .hub-foot { text-align:center; font-size:11.5px; color:var(--ink-dim); opacity:.75; margin-top:6px; }
-@media (prefers-reduced-motion: reduce){
-  .hub-logo-wrap, .hub-logo-wrap::before, .hub-logo-wrap::after, #startScreen .btn-menu::after { animation:none !important; }
-  #startScreen .btn-menu { animation:none !important; opacity:1 !important; }
-}
 
-.room-badge-wrap {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 12px;
-}
-.room-badge {
-  position: relative;
-  top: 0; left: 0; transform: none; z-index: 10;
-  background: var(--panel-3);
-  border: 1px solid var(--line);
-  color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: .5px;
-  padding: 6px 14px; border-radius: 30px; cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  display: none; align-items: center; gap: 8px;
-  transition: transform .12s ease;
-}
+.room-badge-wrap { display: flex; justify-content: center; margin-bottom: 12px; }
+.room-badge { position: relative; z-index: 10; background: var(--panel-3); border: 1px solid var(--line); color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: .5px; padding: 6px 14px; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: none; align-items: center; gap: 8px; transition: transform .12s ease; }
 .room-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
 .room-badge:active { transform: scale(0.95); }
 .room-badge.show { display: inline-flex; animation: badgeDrop .3s cubic-bezier(.2,1.2,.4,1); }
 @keyframes badgeDrop { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform: translateY(0); } }
 .room-badge .rb-copy { font-size: 11px; color: var(--ink-dim); padding-left: 8px; border-left: 1px solid var(--line); }
-.room-badge.copied { border-color: var(--green); }
-.room-badge.copied .rb-copy { color: var(--green); }
-.room-badge.copied::before { background: var(--green); }
+.room-badge.copied { border-color: var(--green); } .room-badge.copied .rb-copy { color: var(--green); } .room-badge.copied::before { background: var(--green); }
 
-#gamePickScreen .lobby-title, #joinScreen .lobby-title, #createdScreen .lobby-title, #resumeScreen .lobby-title, #onlineRoomScreen .lobby-title, #botGameScreen .lobby-title, #botLevelScreen .lobby-title, #botCountScreen .lobby-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 20px; font-weight: 700; color: var(--ink); margin-bottom: 16px; text-align: center; }
+#gamePickScreen .lobby-title, #joinScreen .lobby-title, #createdScreen .lobby-title, #resumeScreen .lobby-title, #onlineRoomScreen .lobby-title { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; color: var(--ink); margin-bottom: 16px; text-align: center; }
 #joinScreen .join-box, #createdScreen, #resumeScreen { display: flex; flex-direction: column; align-items: center; }
 #joinScreen .join-box { gap: 8px; margin-top: 4px; width: 100%; }
 #joinScreen .join-box input { width: 100%; background: var(--void); border: 1px solid var(--line); color: var(--ink); padding: 16px; border-radius: 12px; font-size: 22px; letter-spacing: 6px; text-align: center; outline: none; margin-bottom: 8px; font-weight: 700; font-family: 'Space Grotesk', monospace; transition: border-color .15s ease, box-shadow .15s ease; }
@@ -147,150 +78,114 @@ body {
 #createdScreen .status .code-big, #resumeScreen .status .code-big { display: block; font-family: 'Space Grotesk', monospace; font-size: 34px; font-weight: 700; letter-spacing: 8px; color: var(--gold); margin: 10px 0; }
 #createdScreen .status .game-name, #resumeScreen .status .game-name { color: var(--ink); font-weight: 700; }
 #createdScreen .btn-copy-code, #resumeScreen .btn-copy-code { background: var(--blue); color: #fff; width: 100%; text-align: center; justify-content: center; margin-bottom: 10px; }
-
 .btn-join-mode { background: var(--blue); color: #fff; border-bottom: 3px solid #1f3f9e; margin-top: 6px; }
-.btn-join-mode:active { background: #3560d6; }
-.btn-join-mode:disabled { background: var(--panel-3); color: var(--ink-dim); border-bottom-color: rgba(0,0,0,0.28); cursor: not-allowed; }
+.btn-join-mode:active { background: #3560d6; } .btn-join-mode:disabled { background: var(--panel-3); color: var(--ink-dim); border-bottom-color: rgba(0,0,0,0.28); cursor: not-allowed; }
 .btn-back { background: transparent; color: var(--ink-dim); border: 1px solid var(--line); text-align: center; justify-content: center; box-shadow: none; width: 100%; }
 .btn-back:active { background: rgba(255,255,255,0.04); }
 .spinner { width:18px; height:18px; border-radius:50%; border:2px solid var(--line); border-top-color: var(--gold); display:inline-block; animation: spin .7s linear infinite; margin-top: 4px; }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-.room-item-card {
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 12px 14px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: transform .1s ease, border-color .1s ease;
-  cursor: pointer;
-}
-.room-item-card:active {
-  transform: scale(0.98);
-  border-color: var(--blue);
-}
-.room-item-info {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.room-item-title {
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.room-item-sub {
-  font-size: 11px;
-  color: var(--ink-dim);
-}
-.room-item-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 20px;
-  background: var(--panel-3);
-  color: var(--gold);
-}
+.room-item-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; transition: transform .1s ease, border-color .1s ease; cursor: pointer; }
+.room-item-card:active { transform: scale(0.98); border-color: var(--blue); }
+.room-item-info { display: flex; flex-direction: column; gap: 3px; } .room-item-title { font-weight: 700; font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 6px; } .room-item-sub { font-size: 11px; color: var(--ink-dim); } .room-item-badge { font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 20px; background: var(--panel-3); color: var(--gold); }
 
 .g-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.g-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 18px; font-weight: 700; color: var(--ink); }
+.g-title { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; color: var(--ink); }
 .g-role { font-size: 12px; color: var(--ink); font-weight: 700; background: var(--panel-3); padding: 6px 12px; border-radius: 20px; border: 1px solid var(--line); }
 .g-status { font-size: 13px; color: var(--green); margin-bottom: 12px; font-weight: 600; text-align: center; background: var(--void); padding: 10px; border-radius: 10px; border: 1px solid var(--line); transition: color .2s ease; }
 
-/* STYLE ULAR TANGGA BOARD & PION */
-.snake-board-container {
-  position: relative;
-  width: 100%;
-  max-width: 480px;
-  aspect-ratio: 1/1;
-  margin: 0 auto;
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 12px 30px rgba(0,0,0,0.6);
-  border: 2px solid var(--line);
-}
-#snakeBoardBg {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.snake-pion {
-  position: absolute;
-  width: 7.5%;
-  height: 7.5%;
-  border-radius: 50%;
-  border: 2px solid #fff;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.6);
-  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-  z-index: 5;
-}
-.snake-pion-0 { background: #3d6bf0; }
-.snake-pion-1 { background: #1e3a8a; }
-.snake-pion-2 { background: #e8ac1f; }
-.snake-pion-3 { background: #e4574f; }
-.snake-pion-4 { background: #8b5cf6; }
-.snake-pion-5 { background: #2bb673; }
-.snake-pion-6 { background: #f97316; }
-
-/* ANIMASI DADU 3D */
-.dice-animation-wrap {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: 15px 0;
-  height: 60px;
-}
-.dice-box {
-  width: 50px;
-  height: 50px;
-  background: #ffffff;
-  border-radius: 10px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 28px;
-  font-weight: 800;
-  color: #1a1f2a;
-  box-shadow: 0 6px 14px rgba(0,0,0,0.4);
-}
-.dice-box.rolling {
-  animation: diceRoll 0.5s ease-in-out infinite;
-}
-@keyframes diceRoll {
-  0% { transform: rotate(0deg) scale(0.9); }
-  50% { transform: rotate(180deg) scale(1.1); }
-  100% { transform: rotate(360deg) scale(0.9); }
-}
+/* ULAR TANGGA & DADU */
+.snake-board-container { position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; border-radius: 14px; overflow: hidden; box-shadow: 0 12px 30px rgba(0,0,0,0.6); border: 2px solid var(--line); }
+#snakeBoardBg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.snake-pion { position: absolute; width: 7.5%; height: 7.5%; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 3px 8px rgba(0,0,0,0.6); transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); z-index: 5; }
+.dice-animation-wrap { display: flex; justify-content: center; align-items: center; margin: 15px 0; height: 60px; }
+.dice-box { width: 50px; height: 50px; background: #ffffff; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 28px; font-weight: 800; color: #1a1f2a; box-shadow: 0 6px 14px rgba(0,0,0,0.4); }
+.dice-box.rolling { animation: diceRoll 0.5s ease-in-out infinite; }
+@keyframes diceRoll { 0% { transform: rotate(0deg) scale(0.9); } 50% { transform: rotate(180deg) scale(1.1); } 100% { transform: rotate(360deg) scale(0.9); } }
 
 .game-wrapper { width: 100%; aspect-ratio: 16/9; background: #5c94fc; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); position: relative; box-shadow: 0 10px 26px rgba(0,0,0,0.4); }
 canvas { width: 100%; height: 100%; display: block; }
 .win-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10,12,17,0.92); backdrop-filter: blur(3px); z-index: 20; flex-direction: column; justify-content: center; align-items: center; gap: 14px; animation: fadeSlide .22s ease; }
-.win-text { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 26px; font-weight: 700; text-align: center; color: var(--gold); padding: 0 16px; animation: popIn .3s cubic-bezier(.2,1.3,.4,1); }
+.win-text { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; text-align: center; color: var(--gold); padding: 0 16px; animation: popIn .3s cubic-bezier(.2,1.3,.4,1); }
 @keyframes popIn { from{ transform: scale(.7); opacity:0; } to{ transform:scale(1); opacity:1; } }
 .win-overlay .btn-menu { width: 80%; max-width: 240px; margin: 0; }
 
-/* CATUR REALISTIS KAYU ELEGANT */
+/* ==========================================
+   CATUR MODERN & PROFESIONAL
+   ========================================== */
 #chessScreen .board-wrapper {
-  width: 100%; max-width: 500px; margin: 0 auto; aspect-ratio: 1/1; position: relative; border-radius: 12px; padding: 18px; background: #2b1f1d; box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.1); border: 2px solid #3d2b27;
+  width: 100%; max-width: 500px; margin: 0 auto; aspect-ratio: 1/1; position: relative; border-radius: 12px; padding: 18px;
+  background: #2b1f1d; box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.1); border: 2px solid #3d2b27;
+  transition: box-shadow 0.3s ease;
 }
-#chessScreen .board { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); width: 100%; height: 100%; border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
-#chessScreen .cell { display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; width: 100%; height: 100%; transition: background .1s ease; }
-#chessScreen .cell.light { background-color: #f0d9b5; color: #b58863; }
-#chessScreen .cell.dark { background-color: #b58863; color: #f0d9b5; }
-#chessScreen .cell.selected { background-color: #bbcbfb !important; box-shadow: inset 0 0 0 3px #3d6bf0; }
-#chessScreen .cell.last-move { background-color: rgba(232, 172, 31, 0.45) !important; }
-#chessScreen .piece { font-size: clamp(26px, 9vw, 46px); line-height: 1; transition: transform 0.1s ease; }
-#chessScreen .piece.white { color: #ffffff; text-shadow: 0 3px 5px rgba(0,0,0,0.4), 0 0 2px rgba(0,0,0,0.8); }
-#chessScreen .piece.black { color: #1a1a1a; text-shadow: 0 2px 4px rgba(255,255,255,0.2), 0 0 2px rgba(0,0,0,0.9); }
-#chessScreen .cell.valid::after { content: ''; width: 28%; height: 28%; background: rgba(43, 182, 115, 0.6); border-radius: 50%; position: absolute; pointer-events: none; }
-#chessScreen .cell.capture::after { content: ''; width: 86%; height: 86%; background: transparent; border: 4px solid rgba(228, 87, 79, 0.8); border-radius: 50%; position: absolute; pointer-events: none; }
-.chess-coord { position: absolute; font-family: 'Space Grotesk', monospace; font-size: 11px; font-weight: 700; color: #8c7365; pointer-events: none; }
+#chessScreen .board-wrapper.in-check { box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 0 60px rgba(228, 87, 79, 0.4); }
+#chessScreen .board { position: relative; width: 100%; height: 100%; border-radius: 4px; overflow: hidden; }
+
+/* Layer Kotak */
+#chessScreen .squares-layer { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); }
+#chessScreen .cell { position: relative; width: 100%; height: 100%; cursor: pointer; transition: background .1s ease; }
+#chessScreen .cell.light { background-color: #f0d9b5; }
+#chessScreen .cell.dark { background-color: #b58863; }
+
+/* Layer Bidak (Absolute Overlay) */
+#chessScreen .pieces-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+
+/* Animasi Bidak Bergerak (Smooth Slide) */
+.piece-wrapper {
+  position: absolute; width: 12.5%; height: 12.5%; display: flex; align-items: center; justify-content: center;
+  will-change: transform; /* Optimasi performa */
+  transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1.1); /* Efek Bouncy halus */
+  pointer-events: auto; /* Biar bisa di-klik */
+  cursor: pointer;
+}
+.piece-wrapper.selected .piece { transform: scale(1.15) translateY(-5px); filter: drop-shadow(0 8px 8px rgba(0,0,0,0.5)); }
+.piece-wrapper.capturing { animation: pieceDestroy 0.35s cubic-bezier(0.5, 0, 0.8, 0.2) forwards; z-index: 15; pointer-events: none; }
+
+@keyframes pieceDestroy {
+  0% { transform: scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: scale(0.2) rotate(45deg); opacity: 0; }
+}
+
+/* Bidak Font */
+#chessScreen .piece { font-size: clamp(26px, 9vw, 46px); line-height: 1; transition: transform 0.2s ease, filter 0.2s ease; }
+#chessScreen .piece.white { color: #ffffff; text-shadow: 0 2px 4px rgba(0,0,0,0.5), 0 0 1px rgba(0,0,0,0.8); }
+#chessScreen .piece.black { color: #1a1a1a; text-shadow: 0 2px 4px rgba(255,255,255,0.2), 0 0 1px rgba(0,0,0,0.9); }
+
+/* Efek Valid Move (Titik Hijau Modern) */
+#chessScreen .cell.valid::after {
+  content: ''; position: absolute; top: 50%; left: 50%; width: 25%; height: 25%;
+  transform: translate(-50%, -50%); background: rgba(43, 182, 115, 0.7); border-radius: 50%;
+  box-shadow: 0 0 10px rgba(43, 182, 115, 0.5); pointer-events: none;
+  animation: validPulse 1.5s infinite;
+}
+/* Efek Capture Move (Cincin Merah) */
+#chessScreen .cell.capture::after {
+  content: ''; position: absolute; inset: 8%; background: transparent; border: 4px solid rgba(228, 87, 79, 0.9);
+  border-radius: 50%; pointer-events: none; box-shadow: inset 0 0 10px rgba(228,87,79,0.5);
+  animation: validPulse 1.5s infinite;
+}
+@keyframes validPulse { 0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.7; } 50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.7; } }
+
+/* Highlight Jejak Langkah */
+#chessScreen .cell.trail {
+  background-color: rgba(232, 172, 31, 0.4) !important; box-shadow: inset 0 0 0 3px rgba(232, 172, 31, 0.6);
+}
+/* Highlight Raja Skak */
+#chessScreen .cell.king-check { background: radial-gradient(circle, rgba(228,87,79,0.8) 0%, rgba(228,87,79,0.2) 80%) !important; }
+#chessScreen .cell.king-check .piece { animation: kingPulse 1s infinite alternate; }
+@keyframes kingPulse { from { filter: drop-shadow(0 0 0px red); } to { filter: drop-shadow(0 0 15px red); } }
+
+/* Efek Ledakan Partikel (Capture) */
+.particle-ring {
+  position: absolute; width: 12.5%; height: 12.5%; border-radius: 50%; border: 3px solid #e4574f;
+  transform: scale(0.5); opacity: 1; pointer-events: none; z-index: 20;
+  animation: explodeRing 0.5s ease-out forwards;
+}
+@keyframes explodeRing {
+  0% { transform: scale(0.5); opacity: 1; border-width: 6px; }
+  100% { transform: scale(2.5); opacity: 0; border-width: 1px; }
+}
+
+/* UI Kontrol Catur */
 #chessScreen .chess-controls { display:flex; gap:8px; margin-bottom:12px; justify-content:center; }
 #chessScreen .btn-flip { flex:1; background: var(--panel-2); border:1px solid var(--line); color: var(--ink); padding:12px; border-radius:10px; font-size:13px; font-weight:700; border-bottom: 3px solid rgba(0,0,0,0.3); }
 #chessScreen .btn-flip:active { transform: translateY(2px); border-bottom-width: 1px; }
@@ -300,10 +195,10 @@ canvas { width: 100%; height: 100%; display: block; }
 #chessScreen .chess-clock.me { border-color: rgba(232,172,31,0.45); }
 #chessScreen .chess-clock span.low { color: var(--red); }
 #chessScreen .promo-choices { display:flex; gap:10px; }
-#chessScreen .promo-btn { width:60px; height:60px; border-radius:12px; background: var(--panel-2); border:1px solid var(--line); font-size:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+#chessScreen .promo-btn { width:60px; height:60px; border-radius:12px; background: var(--panel-2); border:1px solid var(--line); font-size:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition: transform 0.1s; }
 #chessScreen .promo-btn:active { transform: scale(0.92); background: var(--panel-3); }
 
-/* Tic Tac Toe */
+/* TTT, CAPSA, UNO (Sama kayak sebelumnya) */
 #tttScreen .ttt-scoreline { display:flex; justify-content:center; gap:20px; font-size:14px; color: var(--ink-dim); margin-bottom:12px; background: var(--void); padding:10px; border-radius:10px; border:1px solid var(--line); }
 #tttScreen .ttt-scoreline b { color: var(--ink); margin-left:4px; font-size: 15px; }
 #tttScreen .ttt-board-wrap { position: relative; margin-bottom: 6px; border-radius: 14px; box-shadow: 0 14px 30px rgba(0,0,0,0.4); }
@@ -319,14 +214,11 @@ canvas { width: 100%; height: 100%; display: block; }
 #tttScreen .winline-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; padding: 6px; box-sizing: border-box; }
 #tttScreen .winline { stroke: var(--green); stroke-width:.07; stroke-linecap:round; }
 
-/* CAPSA BANTING & UNO */
 .capsa-table { background: radial-gradient(120% 120% at 50% 30%, #1c4d34, #0d2e1f 70%); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 16px 12px; position: relative; box-shadow: 0 14px 30px rgba(0,0,0,0.45), inset 0 0 40px rgba(0,0,0,0.35); display: flex; flex-direction: column; gap: 10px; }
 .capsa-seat { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px; border-radius: 12px; min-width: 80px; transition: box-shadow .2s ease, background .2s ease; }
 .capsa-seat.active-turn { box-shadow: 0 0 0 2px var(--gold) inset; background: rgba(232,172,31,0.08); }
-.capsa-seat-info { font-size: 12px; font-weight: 700; color: var(--ink-dim); text-align: center; white-space: nowrap; }
-.capsa-top { align-self: center; }
-.capsa-mid-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.capsa-bottom { align-self: center; width: 100%; }
+.capsa-seat-info { font-size: 12px; font-weight: 700; color: var(--ink-dim); text-align: center; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.capsa-top { align-self: center; } .capsa-mid-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; } .capsa-bottom { align-self: center; width: 100%; }
 .capsa-hand { display: flex; justify-content: center; align-items: center; min-height: 60px; }
 .capsa-hand-me { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; min-height: 95px; padding: 8px 4px; }
 .capsa-card-img, .capsa-card-back { border-radius: 7px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
@@ -342,41 +234,32 @@ canvas { width: 100%; height: 100%; display: block; }
 .capsa-last-by { font-size: 12px; color: var(--ink-dim); font-weight: 600; text-align: center; }
 .capsa-hint { font-size: 12px; color: var(--ink-dim); text-align: center; margin-top: 10px; line-height: 1.4; }
 .capsa-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
-.capsa-act { padding: 16px 8px; border: none; border-radius: 12px; font-weight: 700; font-size: 15px; font-family: 'Space Grotesk', 'Inter', sans-serif; cursor: pointer; border-bottom: 3px solid rgba(0,0,0,0.3); transition: transform .08s ease, border-bottom-width .08s ease, opacity .15s ease; }
+.capsa-act { padding: 16px 8px; border: none; border-radius: 12px; font-weight: 700; font-size: 15px; font-family: 'Space Grotesk', sans-serif; cursor: pointer; border-bottom: 3px solid rgba(0,0,0,0.3); transition: transform .08s ease, border-bottom-width .08s ease, opacity .15s ease; }
 .capsa-act:active { transform: translateY(2px); border-bottom-width: 1px; }
 .capsa-act:disabled { opacity: .35; pointer-events: none; }
-.capsa-act.pass { background: var(--blue); color: #fff; }
-.capsa-act.play { background: var(--gold); color: var(--gold-ink); }
+.capsa-act.pass { background: var(--blue); color: #fff; } .capsa-act.play { background: var(--gold); color: var(--gold-ink); }
 .capsa-result { margin-top: 12px; text-align: center; font-size: 16px; font-weight: 800; color: var(--gold); background: var(--void); border: 1px solid var(--line); border-radius: 12px; padding: 14px; line-height: 1.6; }
 .capsa-seat-done { opacity: .55; }
 .capsa-rankbar { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 10px; }
 .capsa-rank-chip { background: var(--panel-3); border: 1px solid var(--line); color: var(--ink); font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 20px; white-space: nowrap; }
-
-.capsa-seat-info { display: flex; align-items: center; justify-content: center; gap: 6px; }
 .capsa-edit-name-btn { background: var(--panel-3); border: 1px solid var(--line); color: var(--ink); font-size: 12px; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; }
 .capsa-edit-name-btn:active { transform: scale(0.9); }
 .capsa-name-overlay { position: fixed; inset: 0; background: rgba(10,12,17,0.82); backdrop-filter: blur(3px); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeSlide .2s ease; }
 .capsa-name-box { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px; width: 100%; max-width: 360px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-.capsa-name-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-weight: 700; font-size: 16px; margin-bottom: 14px; text-align: center; }
+.capsa-name-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; margin-bottom: 14px; text-align: center; }
 .capsa-name-box input { width: 100%; background: var(--void); border: 1px solid var(--line); color: var(--ink); padding: 14px; border-radius: 10px; font-size: 16px; text-align: center; outline: none; margin-bottom: 14px; font-family: 'Inter', sans-serif; }
 .capsa-name-box input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(61,107,240,0.18); }
 .capsa-name-actions { display: flex; gap: 10px; }
 .capsa-name-btn { flex: 1; padding: 12px; border: none; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; border-bottom: 3px solid rgba(0,0,0,0.3); font-family: 'Inter', sans-serif; }
 .capsa-name-btn:active { transform: translateY(2px); border-bottom-width: 1px; }
-.capsa-name-btn.cancel { background: var(--panel-3); color: var(--ink); }
-.capsa-name-btn.save { background: var(--gold); color: var(--gold-ink); }
-
+.capsa-name-btn.cancel { background: var(--panel-3); color: var(--ink); } .capsa-name-btn.save { background: var(--gold); color: var(--gold-ink); }
 .capsa-deal-overlay { position: absolute; inset: 0; z-index: 30; pointer-events: none; display: flex; align-items: center; justify-content: center; }
 .capsa-deal-card { position: absolute; top: 50%; left: 50%; width: 44px; height: 62px; object-fit: contain; border-radius: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); opacity: 0; transform: translate(-50%, -50%) scale(.6); }
-.capsa-deal-card.deal-top { animation: dealToTop .6s ease-out forwards; }
-.capsa-deal-card.deal-bottom { animation: dealToBottom .6s ease-out forwards; }
-.capsa-deal-card.deal-left { animation: dealToLeft .6s ease-out forwards; }
-.capsa-deal-card.deal-right { animation: dealToRight .6s ease-out forwards; }
+.capsa-deal-card.deal-top { animation: dealToTop .6s ease-out forwards; } .capsa-deal-card.deal-bottom { animation: dealToBottom .6s ease-out forwards; } .capsa-deal-card.deal-left { animation: dealToLeft .6s ease-out forwards; } .capsa-deal-card.deal-right { animation: dealToRight .6s ease-out forwards; }
 @keyframes dealToTop { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(-50%,-230%) scale(.9); } }
 @keyframes dealToBottom { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(-50%,190%) scale(.9); } }
 @keyframes dealToLeft { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(-190%,-50%) scale(.9); } }
 @keyframes dealToRight { 0%{ opacity:0; transform: translate(-50%,-50%) scale(.6); } 20%{ opacity:1; } 100%{ opacity:0; transform: translate(190%,-50%) scale(.9); } }
-
 #unoTopCardImg { width: 64px !important; height: 90px !important; }
 </style>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -400,40 +283,11 @@ canvas { width: 100%; height: 100%; display: block; }
       <div class="hub-sub">Main bareng temen secara online, tinggal share kode room</div>
     </div>
     <div class="hub-divider"></div>
+    <button class="btn-menu g-poker" id="btnGoBot" style="justify-content:center;text-align:center;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;">🤖 MAIN VS BOT</button>
     <button class="btn-menu g-chess" id="btnGoCreate" style="justify-content:center;text-align:center">🎮 BUAT ROOM</button>
     <button class="btn-menu g-ttt" id="btnGoJoin" style="justify-content:center;text-align:center">🔗 GABUNG ROOM</button>
     <button class="btn-menu g-chess" id="btnGoOnlineRooms" style="justify-content:center;text-align:center; background:#3d6bf0; color:#fff;">🌐 ONLINE ROOMS (PUBLIC)</button>
-    <button class="btn-menu g-ttt" id="btnGoBot" style="justify-content:center;text-align:center; background:#e8ac1f; color:#2a1d00;">🤖 LAWAN BOT (SOLO)</button>
     <div class="hub-foot">🧹 Room otomatis dibersihkan setelah 24 jam</div>
-  </div>
-
-  <!-- BOT: PILIH GAME -->
-  <div class="screen" id="botGameScreen">
-    <div class="lobby-title">🤖 Lawan Bot — Pilih Game</div>
-    <button class="btn-menu g-chess" data-bot-game="chess"><span class="ic">♟</span> Catur</button>
-    <button class="btn-menu g-ttt" data-bot-game="ttt"><span class="ic">⭕</span> Tic-Tac-Toe</button>
-    <button class="btn-menu g-poker" data-bot-game="poker"><span class="ic">🃏</span> Poker Capsa (kamu + 3 bot)</button>
-    <button class="btn-menu g-poker" data-bot-game="uno" style="background: #e4574f; color:#fff;"><span class="ic">🎴</span> Uno (1–3 bot)</button>
-    <div style="text-align:center; font-size:12px; color:var(--ink-dim); margin:4px 0 10px;">Ular Tangga &amp; Monopoli menyusul</div>
-    <button class="btn-menu btn-back" id="btnBotGameBack">‹ Kembali</button>
-  </div>
-
-  <!-- BOT: JUMLAH BOT (UNO) -->
-  <div class="screen" id="botCountScreen">
-    <div class="lobby-title">Jumlah Bot Uno</div>
-    <button class="btn-menu g-chess" data-bot-count="1" style="justify-content:center;text-align:center">🤖 1 Bot (2 pemain)</button>
-    <button class="btn-menu g-chess" data-bot-count="2" style="justify-content:center;text-align:center">🤖🤖 2 Bot (3 pemain)</button>
-    <button class="btn-menu g-chess" data-bot-count="3" style="justify-content:center;text-align:center">🤖🤖🤖 3 Bot (4 pemain)</button>
-    <button class="btn-menu btn-back" id="btnBotCountBack">‹ Kembali</button>
-  </div>
-
-  <!-- BOT: PILIH LEVEL -->
-  <div class="screen" id="botLevelScreen">
-    <div class="lobby-title">Tingkat Kesulitan</div>
-    <div id="botLevelGameName" style="text-align:center; font-size:14px; color:var(--ink-dim); margin:-8px 0 12px;"></div>
-    <button class="btn-menu g-ttt" data-bot-level="normal" style="justify-content:center;text-align:center">🙂 Normal<br><span style="font-size:11px;font-weight:500;">Bot masih bisa kalah</span></button>
-    <button class="btn-menu" data-bot-level="hard" style="justify-content:center;text-align:center; background:#e4574f; color:#fff;">😈 Hard<br><span style="font-size:11px;font-weight:500;">Bot sangat sulit dikalahkan</span></button>
-    <button class="btn-menu btn-back" id="btnBotLevelBack">‹ Kembali</button>
   </div>
 
   <!-- ONLINE ROOMS SCREEN -->
@@ -449,14 +303,25 @@ canvas { width: 100%; height: 100%; display: block; }
   <div class="capsa-name-overlay" id="createPassOverlay" style="display:none">
     <div class="capsa-name-box">
       <div class="capsa-name-title">🔑 Set Password Room</div>
-      <div style="font-size: 12px; color: var(--ink-dim); text-align: center; margin-bottom: 12px;">
-        Kosongkan jika ingin room Publik (Bebas Masuk)
-      </div>
+      <div style="font-size: 12px; color: var(--ink-dim); text-align: center; margin-bottom: 12px;">Kosongkan jika ingin room Publik (Bebas Masuk)</div>
       <input type="password" id="createPassInput" placeholder="Password (opsional)...">
       <div class="capsa-name-actions">
         <button class="capsa-name-btn cancel" id="btnCreatePassCancel">Batal</button>
         <button class="capsa-name-btn save" id="btnCreatePassSubmit">Buat Room</button>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL CUSTOM: PILIH KESULITAN BOT -->
+  <div class="capsa-name-overlay" id="botDifficultyOverlay" style="display:none">
+    <div class="capsa-name-box" style="text-align:center;">
+      <div class="capsa-name-title">🤖 Pilih Tingkat Kesulitan Bot</div>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+        <button class="capsa-name-btn save bot-diff-btn" data-diff="normal" style="background:#3d6bf0; color:#fff; padding:15px;">🟢 Normal (Santai)</button>
+        <button class="capsa-name-btn save bot-diff-btn" data-diff="medium" style="background:#e8ac1f; color:#000; padding:15px;">🟡 Medium (Menantang)</button>
+        <button class="capsa-name-btn save bot-diff-btn" data-diff="hard" style="background:#e4574f; color:#fff; padding:15px;">🔴 Hard (Sulit)</button>
+      </div>
+      <button class="capsa-name-btn cancel" id="btnBotDiffCancel" style="width:100%; margin-top:14px;">Batal</button>
     </div>
   </div>
 
@@ -502,49 +367,11 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu g-poker" data-game="uno" style="background: #e4574f; color:#fff;"><span class="ic">🎴</span> Uno Battle Arena (2-6 Player)</button>
     <button class="btn-menu g-snake" data-game="snake"><span class="ic">🐍</span> Ular Tangga Board (2-7 Player)</button>
 
-    <!-- TOMBOL MONOPOLI TERKUNCI / MAINTENANCE -->
     <button class="btn-menu disabled" style="background: #334155; color: #94a3b8; border-bottom-color: #1e293b;" title="Game sedang dalam pemeliharaan">
       <span class="ic">🔒</span> Monopoli Klasik <span style="margin-left: auto; font-size: 11px; background: #0f172a; padding: 3px 8px; border-radius: 6px; color: #ef4444;">MAINTENANCE</span>
     </button>
 
     <button class="btn-menu btn-back" id="btnGamePickBack">‹ Kembali</button>
-  </div>
-
-  <!-- MONOPOLI PLAYER COUNT SCREEN -->
-  <div class="screen" id="monopoliPlayerCountScreen">
-    <div class="lobby-title">Pilih Jumlah Pemain Monopoli</div>
-    <button class="btn-menu g-chess" data-mp-players="3">👥 3 Pemain</button>
-    <button class="btn-menu g-chess" data-mp-players="4">👥 4 Pemain</button>
-    <button class="btn-menu g-chess" data-mp-players="5">👥 5 Pemain</button>
-    <button class="btn-menu g-chess" data-mp-players="6">👥 6 Pemain</button>
-    <button class="btn-menu btn-back" id="btnMpCountBack">‹ Kembali</button>
-  </div>
-
-  <!-- MONOPOLI SCREEN -->
-  <div class="screen" id="monopoliScreen">
-    <div class="g-header">
-      <div class="g-title">🎩 Monopoli Klasik</div>
-      <div class="g-role" id="mpRoleTag">-</div>
-    </div>
-    <div class="g-status" id="mpStatus">-</div>
-
-    <div class="capsa-table" style="background: #111827; padding: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-      <div style="width:100%; aspect-ratio:1/1; position:relative; margin:0 auto; max-width:480px; display:flex; justify-content:center; align-items:center;">
-        <canvas id="mpBoardCanvas" style="width:100%; height:100%; border-radius:12px; border:2px solid var(--line); display:block; margin:0 auto; background: url('https://c.termai.cc/i125/ypq.jpeg') no-repeat center/cover;"></canvas>
-      </div>
-      <div id="mpPlayerListWrap" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px; width:100%;"></div>
-    </div>
-
-    <div class="capsa-actions" id="mpActions" style="display:none; margin-top:10px;">
-      <button class="capsa-act play" id="mpBtnRoll" style="grid-column: span 2; background:var(--gold); color:#000;">🎲 Lempar Dadu</button>
-      <button class="capsa-act pass" id="mpBtnPayJail" style="display:none; background:var(--blue); color:#fff;">💵 Bayar Denda Penjara ($50)</button>
-      <button class="capsa-act play" id="mpBtnBuy" style="display:none; background:var(--green); color:#fff;">🏠 Beli Properti</button>
-      <button class="capsa-act play" id="mpBtnHouse" style="display:none; background:#8b5cf6; color:#fff;">🏠+ Beli Rumah/Hotel</button>
-      <button class="capsa-act pass" id="mpBtnEndTurn" style="display:none;">⏭️ Selesai Giliran</button>
-    </div>
-
-    <div class="capsa-result" id="mpResult" style="display:none; margin-top:10px;"></div>
-    <button class="btn-menu btn-back" id="btnMpBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
   </div>
 
   <!-- SNAKE PLAYER COUNT SCREEN -->
@@ -567,28 +394,17 @@ canvas { width: 100%; height: 100%; display: block; }
     </div>
     <div class="g-status" id="snakeStatus">-</div>
 
-    <!-- KONTAINER PAPAN GAMBAR & CANVAS PION -->
     <div class="snake-board-container" id="snakeBoardArea" style="position: relative; width: 100%; max-width: 480px; aspect-ratio: 1/1; margin: 0 auto; border-radius: 14px; overflow: hidden; border: 2px solid var(--line);">
-      <!-- Background Gambar Asli Papan Ular Tangga -->
       <img id="snakeBoardBg" src="https://i.pinimg.com/originals/2f/68/a7/2f68a7e1eee18556b055418f7305b3c0.jpg" alt="Board Ular Tangga" style="position: absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:1;">
-      
-      <!-- Canvas Layer Khusus Pion -->
       <canvas id="snakeCanvas" width="800" height="800" style="position: absolute; top:0; left:0; width: 100%; height: 100%; display: block; z-index:2;"></canvas>
     </div>
 
-    <div class="dice-animation-wrap">
-      <div class="dice-box" id="snakeDiceBox">🎲</div>
-    </div>
-
+    <div class="dice-animation-wrap"><div class="dice-box" id="snakeDiceBox">🎲</div></div>
     <div id="snakePlayersList" style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:12px;"></div>
-
     <div class="capsa-actions" id="snakeActions">
       <button class="capsa-act play" id="snakeBtnRoll" style="grid-column: span 2; background: var(--gold); color: #000;">🎲 Kocok Dadu!</button>
     </div>
-
     <div class="capsa-result" id="snakeResult" style="display:none;"></div>
-    
-    <!-- TOMBOL KEMBALI KEMBALI AKTIF -->
     <button class="btn-menu btn-back" id="btnSnakeBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
   </div>
 
@@ -651,8 +467,14 @@ canvas { width: 100%; height: 100%; display: block; }
       <button class="btn-flip" id="btnChessFlip">🔄 Flip Papan</button>
       <button class="btn-flip" id="btnChessBack">‹ Menu Utama</button>
     </div>
-    <div class="board-wrapper">
-      <div class="board" id="chessBoard"></div>
+    
+    <!-- PAPAN CATUR STRUKTUR BARU -->
+    <div class="board-wrapper" id="chessWrapper">
+      <div class="board" id="chessBoard">
+        <div class="squares-layer" id="chessSquares"></div>
+        <div class="pieces-layer" id="chessPiecesLayer"></div>
+      </div>
+      
       <div class="win-overlay" id="chessPromoOverlay" style="display:none">
         <div class="win-text" style="font-size:18px">Pilih Promosi Pion</div>
         <div class="promo-choices" id="chessPromoChoices"></div>
@@ -666,56 +488,29 @@ canvas { width: 100%; height: 100%; display: block; }
 
   <!-- TTT SCREEN -->
   <div class="screen" id="tttScreen">
-    <div class="g-header">
-      <div class="g-title">⭕ Tic-Tac-Toe 2P</div>
-      <div class="g-role" id="tttRoleTag">-</div>
-    </div>
+    <div class="g-header"><div class="g-title">⭕ Tic-Tac-Toe 2P</div><div class="g-role" id="tttRoleTag">-</div></div>
     <div class="g-status" id="tttStatus">-</div>
     <div class="ttt-scoreline">Kamu<b id="tttScoreYou">0</b>Seri<b id="tttScoreDraw">0</b>Lawan<b id="tttScoreOpp">0</b></div>
-    <div class="ttt-board-wrap" id="tttBoardWrap">
-      <div class="ttt-board" id="tttBoard"></div>
-    </div>
+    <div class="ttt-board-wrap" id="tttBoardWrap"><div class="ttt-board" id="tttBoard"></div></div>
     <button class="btn-menu btn-back" id="btnTttBack" style="margin-top:12px;text-align:center;justify-content:center">‹ Menu Utama</button>
   </div>
 
   <!-- POKER SCREEN -->
   <div class="screen" id="pokerScreen">
-    <div class="g-header">
-      <div class="g-title">🃏 Capsa Banting 4P</div>
-      <div class="g-role" id="pokerRoleTag">-</div>
-    </div>
+    <div class="g-header"><div class="g-title">🃏 Capsa Banting 4P</div><div class="g-role" id="pokerRoleTag">-</div></div>
     <div class="g-status" id="pokerStatus">-</div>
     <div class="capsa-rankbar" id="capsaRankBar" style="display:none"></div>
 
     <div class="capsa-table">
-      <div class="capsa-seat capsa-top" id="capsaSeatTop">
-        <div class="capsa-seat-info" id="capsaNameTop">P?</div>
-        <div class="capsa-hand" id="capsaHandTop"></div>
-      </div>
-
+      <div class="capsa-seat capsa-top" id="capsaSeatTop"><div class="capsa-seat-info" id="capsaNameTop">P?</div><div class="capsa-hand" id="capsaHandTop"></div></div>
       <div class="capsa-mid-row">
-        <div class="capsa-seat capsa-left" id="capsaSeatLeft">
-          <div class="capsa-seat-info" id="capsaNameLeft">P?</div>
-          <div class="capsa-hand" id="capsaHandLeft"></div>
-        </div>
-
-        <div class="capsa-center" id="capsaCenter">
-          <div class="capsa-lastplay" id="capsaLastPlay"></div>
-          <div class="capsa-last-by" id="capsaLastBy"></div>
-        </div>
-
-        <div class="capsa-seat capsa-right" id="capsaSeatRight">
-          <div class="capsa-seat-info" id="capsaNameRight">P?</div>
-          <div class="capsa-hand" id="capsaHandRight"></div>
-        </div>
+        <div class="capsa-seat capsa-left" id="capsaSeatLeft"><div class="capsa-seat-info" id="capsaNameLeft">P?</div><div class="capsa-hand" id="capsaHandLeft"></div></div>
+        <div class="capsa-center" id="capsaCenter"><div class="capsa-lastplay" id="capsaLastPlay"></div><div class="capsa-last-by" id="capsaLastBy"></div></div>
+        <div class="capsa-seat capsa-right" id="capsaSeatRight"><div class="capsa-seat-info" id="capsaNameRight">P?</div><div class="capsa-hand" id="capsaHandRight"></div></div>
       </div>
-
       <div class="capsa-seat capsa-bottom" id="capsaSeatBottom">
         <div class="capsa-hand-me" id="capsaHandMe"></div>
-        <div class="capsa-seat-info">
-          <span id="capsaMyNameLabel">Kamu</span>
-          <button class="capsa-edit-name-btn" id="capsaBtnEditName" title="Ganti nama">✏️</button>
-        </div>
+        <div class="capsa-seat-info"><span id="capsaMyNameLabel">Kamu</span><button class="capsa-edit-name-btn" id="capsaBtnEditName" title="Ganti nama">✏️</button></div>
       </div>
     </div>
 
@@ -723,15 +518,11 @@ canvas { width: 100%; height: 100%; display: block; }
       <div class="capsa-name-box">
         <div class="capsa-name-title">✏️ Ganti Nama Kamu</div>
         <input type="text" id="capsaNameInput" maxlength="14" placeholder="Nama panggilan...">
-        <div class="capsa-name-actions">
-          <button class="capsa-name-btn cancel" id="capsaNameCancel">Batal</button>
-          <button class="capsa-name-btn save" id="capsaNameSave">Simpan</button>
-        </div>
+        <div class="capsa-name-actions"><button class="capsa-name-btn cancel" id="capsaNameCancel">Batal</button><button class="capsa-name-btn save" id="capsaNameSave">Simpan</button></div>
       </div>
     </div>
 
     <div class="capsa-hint">Ketuk kartu untuk pilih, lalu tekan "Banting!" atau "Pass".</div>
-
     <div class="capsa-actions" id="capsaActions" style="display:none">
       <button class="capsa-act pass" id="capsaBtnPass">Pass</button>
       <button class="capsa-act play" id="capsaBtnPlay">🔥 Banting!</button>
@@ -742,7 +533,7 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnPokerBack" style="margin-top:12px;text-align:center;justify-content:center">‹ Menu Utama</button>
   </div>
 
-  <!-- UNO SCREEN -->
+  <!-- UNO PLAYER COUNT SCREEN -->
   <div class="screen" id="unoPlayerCountScreen">
     <div class="lobby-title">Pilih Jumlah Pemain Uno</div>
     <button class="btn-menu g-chess" data-uno-players="2">👥 2 Pemain</button>
@@ -753,31 +544,22 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu btn-back" id="btnUnoCountBack">‹ Kembali</button>
   </div>
 
+  <!-- UNO SCREEN -->
   <div class="screen" id="unoScreen">
-    <div class="g-header">
-      <div class="g-title">🃏 Uno Battle Arena</div>
-      <div class="g-role" id="unoRoleTag">-</div>
-    </div>
+    <div class="g-header"><div class="g-title">🃏 Uno Battle Arena</div><div class="g-role" id="unoRoleTag">-</div></div>
     <div class="g-status" id="unoStatus">-</div>
-
     <div class="capsa-table">
       <div id="unoOpponentsWrap" style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap;"></div>
-
       <div class="capsa-center" style="margin: 10px 0;">
         <div style="font-size:12px; color:var(--ink-dim); font-weight:600;">Kartu Meja</div>
         <img id="unoTopCardImg" class="capsa-card-img" src="" style="cursor:default;">
       </div>
-
-      <div class="capsa-seat capsa-bottom">
-        <div class="capsa-hand-me" id="unoHandMe"></div>
-      </div>
+      <div class="capsa-seat capsa-bottom"><div class="capsa-hand-me" id="unoHandMe"></div></div>
     </div>
-
     <div class="capsa-actions" id="unoActions" style="display:none; margin-top:12px;">
       <button class="capsa-act pass" id="unoBtnDraw">📥 Ambil Kartu</button>
       <button class="capsa-act play" id="unoBtnPlay">🔥 Buang!</button>
     </div>
-
     <div class="capsa-name-overlay" id="unoColorPickerOverlay" style="display:none;">
       <div class="capsa-name-box" style="text-align:center;">
         <div class="capsa-name-title">🌈 Pilih Warna Kartu</div>
@@ -789,13 +571,12 @@ canvas { width: 100%; height: 100%; display: block; }
         </div>
       </div>
     </div>
-
     <div class="capsa-result" id="unoResult" style="display:none;"></div>
     <button class="btn-menu btn-copy-code" id="unoBtnNext" style="display:none; margin-top:12px; justify-content:center;">▶ Main Lagi</button>
     <button class="btn-menu btn-back" id="btnUnoBack" style="margin-top:12px; text-align:center; justify-content:center">‹ Menu Utama</button>
   </div>
 
-</div> 
+</div>
 
 <script src="shared.js"></script>
 <script src="Catur.js"></script>
@@ -804,7 +585,6 @@ canvas { width: 100%; height: 100%; display: block; }
 <script src="Uno.js"></script>
 <script src="monopoli.js"></script>
 <script src="snake.js"></script>
-<script src="bot-ai.js"></script>
 <script src="bot.js"></script>
 </body>
 </html>
