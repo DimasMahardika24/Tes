@@ -273,6 +273,7 @@ function dominoRender(data) {
   myHand.forEach(t => {
     const cls = (myTurn ? (playableIds.has(t.id) ? 'ok' : 'dim') : '') + (dominoSelected === t.id ? ' sel' : '');
     const el = dominoTileEl(t.a, t.b, true, cls.trim());
+    el.dataset.id = t.id;
     el.onclick = () => dominoTapTile(t.id);
     hd.appendChild(el);
   });

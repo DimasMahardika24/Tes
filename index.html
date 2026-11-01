@@ -294,7 +294,7 @@ canvas { width: 100%; height: 100%; display: block; }
     <button class="btn-menu g-poker" data-game="poker"><span class="ic">🃏</span> Poker Capsa (4 Pemain)</button>
     <button class="btn-menu g-poker" data-game="domino" style="background: linear-gradient(135deg, #0f766e, #115e59); color:#fff;"><span class="ic">🁣</span> Domino Gaple (2-4 Pemain)</button>
     <button class="btn-menu g-poker" data-game="uno" style="background: #e4574f; color:#fff;"><span class="ic">🎴</span> Uno Battle Arena (2-6 Player)</button>
-    <button class="btn-menu g-snake disabled" data-game="snake" style="background:#334155; color:#94a3b8; border-bottom-color:#1e293b;" title="Sedang maintenance"><span class="ic">🐍</span> Ular Tangga Board ( Maintance )</button>
+    <button class="btn-menu g-snake" data-game="snake"><span class="ic">🐍</span> Ular Tangga Board (2-7 Pemain)</button>
     <button class="btn-menu btn-back" id="btnGamePickBack">‹ Kembali</button>
   </div>
 
@@ -417,7 +417,7 @@ canvas { width: 100%; height: 100%; display: block; }
     <div class="capsa-name-overlay" id="capsaNameOverlay" style="display:none">
       <div class="capsa-name-box"><div class="capsa-name-title">✏️ Ganti Nama Kamu</div><input type="text" id="capsaNameInput" maxlength="14" placeholder="Nama panggilan..."><div class="capsa-name-actions"><button class="capsa-name-btn cancel" id="capsaNameCancel">Batal</button><button class="capsa-name-btn save" id="capsaNameSave">Simpan</button></div></div>
     </div>
-    <div class="capsa-hint">Ketuk kartu untuk pilih, lalu tekan "Banting!" atau "Pass".</div>
+    <div class="capsa-hint">Ketuk kartu untuk pilih · geser kartu ke atas / ke meja untuk langsung banting · geser menyamping untuk pilih banyak · tahan untuk perbesar.</div>
     <div class="capsa-actions" id="capsaActions" style="display:none">
       <button class="capsa-act pass" id="capsaBtnPass">Pass</button>
       <button class="capsa-act play" id="capsaBtnPlay">🔥 Banting!</button>
@@ -496,5 +496,6 @@ canvas { width: 100%; height: 100%; display: block; }
 <script src="Domino.js"></script>
 <script src="snake.js"></script>
 <script src="bot.js"></script>
+<script src="touch.js"></script>
 </body>
 </html>

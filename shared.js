@@ -75,8 +75,9 @@ function showScreen(id){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   if(id === 'gamePickScreen'){
+    // Ular Tangga sekarang terbuka di semua mode (online & lawan bot)
     const snakeBtn = document.querySelector('#gamePickScreen .btn-menu[data-game="snake"]');
-    if(snakeBtn) snakeBtn.style.display = window.isBotMode ? 'none' : '';
+    if(snakeBtn){ snakeBtn.style.display = ''; snakeBtn.classList.remove('disabled'); }
   }
 }
 
