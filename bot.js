@@ -836,32 +836,12 @@ function startSnakeBot() {
 
 function snakeBotRoll(snakeRef, botKey) {
   snakeRef.transaction(cur => {
-    if (!cur || cur.status === 'ended' || cur.isRolling) return cur;
+    if (!cur || !cur.players || cur.status === 'ended' || cur.isRolling) return cur;
     const keys = Object.keys(cur.players);
     if (keys[cur.turnIndex] !== botKey) return cur;
-
     const state = JSON.parse(JSON.stringify(cur));
-    const dice = Math.floor(Math.random() * 6) + 1;
-    let pos = (state.players[botKey].pos || 1) + dice;
-    if (pos > 100) pos = 100;
-
-    const event = SNAKES_AND_LADDERS.find(s => s.start === pos);
-    if (event) pos = event.end;
-
-    keys.forEach(k => { if (k !== botKey && state.players[k].pos === pos && pos < 100 && !state.players[k].rank) state.players[k].pos = 1; });
-    state.players[botKey].pos = pos;
-    if (pos >= 100 && !state.players[botKey].rank) state.players[botKey].rank = keys.filter(k => state.players[k].rank > 0).length + 1;
-
-    const finishedNow = keys.filter(k => state.players[k].rank > 0);
-    if (finishedNow.length >= keys.length - 1) state.status = 'ended';
-    else {
-      let nextIdx = state.turnIndex;
-      if (dice !== 6 || pos >= 100) {
-        do { nextIdx = (nextIdx + 1) % keys.length; } while (state.players[keys[nextIdx]].rank > 0);
-        state.turnIndex = nextIdx;
-      }
-    }
-    state.lastDice = dice;
+    // aturan SAMA dengan pemain manusia (snake.js) -> tidak ada lagi selisih hasil
+    snakeComputeRoll(state, botKey, Math.floor(Math.random() * 6) + 1);
     return state;
   });
 }
@@ -1020,9 +1000,9 @@ function startPokerBot() {
 
 // Mode HARD: bot boleh MEMBUKA ronde dengan kombo (5/4/3/2 kartu), tidak harus menunggu player.
 // Prioritas: kombo terbanyak kartu, lalu yang paling lemah (biar kartu kuat disimpan).
-// mustHave3d = true saat langkah pertama ronde (wajib memuat 3♦).
+// mustHave3d = true saat langkah pertama ronde (wajib memuat 3♣).
 function pokerBotPickLead(hand, mustHave3d) {
-  const has3d = c => c.rank === '03' && c.suit === 'd';
+  const has3d = c => c.rank === '03' && c.suit === 'c';
   for (const k of [5, 4, 3, 2]) {
     if (hand.length < k) continue;
     let best = null;
@@ -1034,7 +1014,7 @@ function pokerBotPickLead(hand, mustHave3d) {
     }
     if (best) return best;
   }
-  // tidak ada kombo: single terkecil (atau 3♦ kalau wajib)
+  // tidak ada kombo: single terkecil (atau 3♣ kalau wajib)
   const single = mustHave3d ? hand.find(has3d) : sortCards(hand)[0];
   return single ? { cards: [single], combo: detectCombo([single]) } : null;
 }
@@ -1048,7 +1028,7 @@ function pokerBotMove(pokerRef, botKey) {
     if (!Array.isArray(hand)) hand = Object.values(hand); 
 
     if (s.isFirstPlay) {
-      const threeD = hand.find(c => c.rank === '03' && c.suit === 'd');
+      const threeD = hand.find(c => c.rank === '03' && c.suit === 'c');
       if (!threeD) {
         if (hand.length > 0) {
           const sorted = sortCards(hand);

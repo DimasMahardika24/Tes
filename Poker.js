@@ -461,20 +461,30 @@ function pokerBuildNewGame(prev, presence){
   if(players.length < 2) players = ROLES.slice(0, 2);
   const deck = shuffleDeck(makeDeck());
 
-  // Kalau pemain < 4, pastikan 3♦ ikut terbagi (bukan di sisa dek) supaya ada yang bisa memulai
+  // ATURAN JALAN PERTAMA
+  //  - Ronde 1 (room baru): pemegang 3♣ (3 Keriting, 3 terendah) jalan duluan dan WAJIB memulai dengan 3♣.
+  //  - Ronde 2 dst (Main Lagi di room yang sama): Juara 1 ronde sebelumnya jalan duluan, bebas (tanpa wajib 3).
+  //  - Kalau Juara 1 sebelumnya sudah tidak ada di room: kembali ke aturan 3♣.
+  const prevWinner = prev && prev.winner;
+  const useWinner = !!(prev && prev.handNumber >= 1 && prevWinner && players.includes(prevWinner));
+
+  // Kalau aturan 3♣ dipakai dan pemain < 4, pastikan 3♣ ikut terbagi (bukan di sisa dek)
   const dealCount = players.length * 13;
-  const idx3d = deck.findIndex(c => c.rank === '03' && c.suit === 'd');
-  if(idx3d >= dealCount){
-    const j = Math.floor(Math.random() * dealCount);
-    [deck[idx3d], deck[j]] = [deck[j], deck[idx3d]];
+  if(!useWinner){
+    const idx3 = deck.findIndex(c => c.rank === '03' && c.suit === 'c');
+    if(idx3 >= dealCount){
+      const j = Math.floor(Math.random() * dealCount);
+      [deck[idx3], deck[j]] = [deck[j], deck[idx3]];
+    }
   }
 
   const hands = {};
   players.forEach((r, i) => { hands[r] = deck.slice(i * 13, i * 13 + 13); });
   let starter = players[0];
-  players.forEach(r => { if(hands[r].some(c => c.rank === '03' && c.suit === 'd')) starter = r; });
+  if(useWinner) starter = prevWinner;
+  else players.forEach(r => { if(hands[r].some(c => c.rank === '03' && c.suit === 'c')) starter = r; });
   return {
-    phase: 'playing', players, hands, turn: starter, starter, isFirstPlay: true, lastPlay: null, lastPlayer: null, passCount: 0,
+    phase: 'playing', players, hands, turn: starter, starter, isFirstPlay: !useWinner, lastPlay: null, lastPlayer: null, passCount: 0,
     finished: [], dead: [], bomb: null, bombSeq: 0, loser: null, winner: null, lastActionText: null, handNumber: ((prev && prev.handNumber) || 0) + 1, names: (prev && prev.names) || {}
   };
 }
@@ -492,7 +502,7 @@ function pokerDoPlay(){
 
   const combo = detectCombo(selected);
   if(!combo.valid){ pokerSfx('bad'); showCustomAlert('Kombinasi kartu tidak valid.'); return; }
-  if(data.isFirstPlay && !selected.some(c => c.rank === '03' && c.suit === 'd')){ pokerSfx('bad'); showCustomAlert('Wajib jalan dengan kartu 3♦ (3 Wajik) di kartu pertama!'); return; }
+  if(data.isFirstPlay && !selected.some(c => c.rank === '03' && c.suit === 'c')){ pokerSfx('bad'); showCustomAlert('Wajib jalan dengan kartu 3♣ (3 Keriting) di kartu pertama!'); return; }
 
   if(!data.isFirstPlay && data.lastPlay){
     if(combo.count !== data.lastPlay.combo.count){
@@ -523,7 +533,7 @@ function pokerDoPlay(){
 
     const c2 = detectCombo(selected);
     if(!c2.valid) return cur;
-    if(state.isFirstPlay && !selected.some(c => c.rank === '03' && c.suit === 'd')) return cur;
+    if(state.isFirstPlay && !selected.some(c => c.rank === '03' && c.suit === 'c')) return cur;
     if(!state.isFirstPlay && state.lastPlay){
       if(c2.count !== state.lastPlay.combo.count || isBlockedBeat(state.lastPlay, c2, selected) || compareCombo(c2, state.lastPlay.combo) <= 0) return cur;
     }
@@ -862,7 +872,7 @@ function pokerRenderStatus(data){
     statusEl.textContent = '🟡 Pemain terhubung: ' + onlineCount + '/4' + (myRole === 'p1' ? (onlineCount >= 2 ? ' — tekan Mulai kapan saja' : ' — butuh minimal 2 pemain') : ' — menunggu host memulai...');
   } else if(data.phase === 'playing'){
     if(!pokerPlayers(data).includes(myRole)) statusEl.textContent = '👀 Ronde berjalan — kamu ikut di ronde berikutnya.';
-    else if(data.turn === myRole) statusEl.textContent = data.isFirstPlay ? '🟢 Giliranmu! Wajib jalan dengan 3♦ (3 Wajik).' : '🟢 Giliranmu!';
+    else if(data.turn === myRole) statusEl.textContent = data.isFirstPlay ? '🟢 Giliranmu! Wajib jalan dengan 3♣ (3 Keriting).' : '🟢 Giliranmu!';
     else statusEl.textContent = '🟡 Menunggu ' + displayName(data.turn) + '...';
   } else if(data.phase === 'roundover'){
     statusEl.textContent = '🏁 Ronde selesai.';
@@ -918,7 +928,7 @@ function pokerUpdatePreview(data){
 
   if(sel.length === 0){
     el.className = 'capsa-preview';
-    el.textContent = data.lastPlay ? ('Pilih ' + data.lastPlay.combo.count + ' kartu yang lebih tinggi, atau Pass') : (data.isFirstPlay ? 'Mulai dengan kombinasi yang berisi 3♦' : 'Meja kosong — bebas pilih kombinasi');
+    el.textContent = data.lastPlay ? ('Pilih ' + data.lastPlay.combo.count + ' kartu yang lebih tinggi, atau Pass') : (data.isFirstPlay ? 'Mulai dengan kombinasi yang berisi 3♣' : 'Meja kosong — bebas pilih kombinasi');
     return;
   }
 
@@ -930,7 +940,7 @@ function pokerUpdatePreview(data){
   }
 
   let ok = true, why = '';
-  if(data.isFirstPlay && !sel.some(c => c.rank === '03' && c.suit === 'd')){ ok = false; why = 'wajib ada 3♦'; }
+  if(data.isFirstPlay && !sel.some(c => c.rank === '03' && c.suit === 'c')){ ok = false; why = 'wajib ada 3♣'; }
   else if(!data.isFirstPlay && data.lastPlay){
     if(combo.count !== data.lastPlay.combo.count){ ok = false; why = 'harus ' + data.lastPlay.combo.count + ' kartu'; }
     else if(isBlockedBeat(data.lastPlay, combo, sel)){ ok = false; why = 'tidak bisa dibantai'; }
