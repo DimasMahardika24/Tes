@@ -144,6 +144,28 @@ unoStyleEl.innerHTML = `
   /* Tombol UNO / DOR */
   #unoChallengeBox .uno-chal-btn { animation: unoPulse .55s ease-in-out infinite alternate; }
 
+  /* Riwayat putaran */
+  #unoScreen .uno-hist-btn {
+    position: absolute; top: 6px; right: 6px; z-index: 30; width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; padding: 0;
+    background: rgba(0,0,0,.5); color: var(--gold); border: 1px solid rgba(232,172,31,.7);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #unoScreen .uno-hist-btn.on { background: var(--gold); color: #1a1a1a; }
+  #unoScreen .uno-hist-panel {
+    position: absolute; top: 46px; left: 8px; right: 8px; max-height: 70%; overflow-y: auto; z-index: 50; display: none;
+    background: rgba(6,20,13,.97); border: 1px solid rgba(232,172,31,.6); border-radius: 12px; padding: 8px 10px;
+    box-shadow: 0 10px 26px rgba(0,0,0,.6); -webkit-overflow-scrolling: touch;
+  }
+  #unoScreen .uh-title { font-size: 12px; font-weight: 800; color: var(--gold); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  #unoScreen .uh-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+  #unoScreen .uh-who { flex: 0 0 52px; font-size: 12px; font-weight: 800; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #unoScreen .uh-row.me .uh-who { color: var(--gold); }
+  #unoScreen .uh-row img { width: 28px; height: 40px; border-radius: 3px; box-shadow: 0 1px 3px rgba(0,0,0,.6); background: #fff; }
+  #unoScreen .uh-txt { flex: 1; min-width: 0; font-size: 12px; font-weight: 700; color: #fff; opacity: .9; }
+  #unoScreen .uh-sep { text-align: center; font-size: 10px; letter-spacing: .5px; color: var(--ink-dim); padding: 6px 0 2px; opacity: .8; }
+  #unoScreen .uh-empty { font-size: 12px; color: var(--ink-dim); padding: 6px 0; }
+
   @media (prefers-reduced-motion: reduce) {
     #unoScreen *, #unoScreen *::after, .uno-toast, .uno-bubble, .uno-confetti-box i { animation-duration: .01ms !important; animation-delay: 0s !important; }
   }
@@ -767,27 +789,124 @@ function unoAnimateDeal(done) {
   if (!table || !latestUnoData) { done(); return; }
   const overlay = document.createElement('div'); overlay.className = 'capsa-deal-overlay'; table.appendChild(overlay);
 
-  const activeRoles = getUnoRoles(latestUnoData.maxPlayers || 4);
-  let dealTargets = ['bottom'];
-  activeRoles.forEach(role => {
-    if (role === myRole) return;
-    if (activeRoles.length === 2) dealTargets.push('top');
-    else if (activeRoles.length === 3) dealTargets.push('right', 'left');
-    else if (activeRoles.length === 4) dealTargets.push('right', 'top', 'left');
-    else { const dirs = ['right', 'right', 'top', 'left', 'left']; dealTargets.push(dirs[dealTargets.length - 1] || 'top'); }
-  });
+  const tRect = table.getBoundingClientRect();
+  const cx = tRect.width / 2, cy = tRect.height / 2;               // titik awal: tengah meja
+  const roles = getUnoRoles(latestUnoData.maxPlayers || 4);
+  const others = roles.filter(r => r !== myRole);
 
-  const cardsPerPlayer = 7, perCardDelay = 300, animDuration = 550;
-  let cardIndex = 0;
-  dealTargets.forEach(dir => {
+  // Tujuan tiap pemain = posisi aslinya di layar: lawan di atas (kursi masing-masing), diri sendiri di bawah
+  const centerOf = (el) => {
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height) return null;
+    return { x: r.left + r.width / 2 - tRect.left, y: r.top + r.height / 2 - tRect.top };
+  };
+  const targetFor = (role, idx) => {
+    if (role === myRole) {
+      const p = centerOf(document.getElementById('unoHandMe')) || { x: cx, y: tRect.height };
+      return { x: p.x, y: Math.min(p.y, tRect.height - 30) };
+    }
+    const o = unoOppEls[role];
+    const p = o && centerOf(o.seat);
+    if (p) return p;
+    return { x: tRect.width * (idx + 1) / (others.length + 1), y: 60 };   // cadangan: deret atas
+  };
+
+  const targets = [{ role: myRole, pos: targetFor(myRole, 0) }];
+  others.forEach((r, i) => targets.push({ role: r, pos: targetFor(r, i) }));
+
+  // SEMUA kartu keluar sekaligus dari tengah menuju pemainnya masing-masing
+  const cardsPerPlayer = 7, duration = 640;
+  targets.forEach(t => {
     for (let c = 0; c < cardsPerPlayer; c++) {
       const img = document.createElement('img');
-      img.src = UNO_CARD_URLS.back; img.className = 'capsa-deal-card deal-' + dir; img.style.animationDelay = (cardIndex * perCardDelay) + 'ms';
-      overlay.appendChild(img); cardIndex++;
+      img.src = UNO_CARD_URLS.back; img.className = 'capsa-deal-card';
+      overlay.appendChild(img);
+      const sp = c - (cardsPerPlayer - 1) / 2;
+      const dx = t.pos.x - cx + sp * 5, dy = t.pos.y - cy + Math.abs(sp) * 1.5;
+      img.animate([
+        { opacity: 0, transform: 'translate(-50%,-50%) scale(.6) rotate(0deg)' },
+        { opacity: 1, offset: 0.15 },
+        { opacity: 1, offset: 0.8 },
+        { opacity: 0, transform: 'translate(calc(-50% + ' + dx + 'px), calc(-50% + ' + dy + 'px)) scale(.9) rotate(' + (sp * 5) + 'deg)' }
+      ], { duration, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' });
     }
   });
-  const totalDuration = (cardIndex - 1) * perCardDelay + animDuration + 150;
-  setTimeout(() => { overlay.remove(); done(); }, totalDuration);
+  try { if (typeof pokerSfx === 'function') pokerSfx('dealall'); } catch (e) {}
+  setTimeout(() => { overlay.remove(); done(); }, duration + 80);
+}
+
+// ======================================================
+// RIWAYAT PUTARAN (dicatat di sisi klien dari perubahan state; tidak mengubah data game)
+// ======================================================
+let unoHistory = [];
+let unoHistHand = null;
+let unoHistOpen = false;
+
+function unoHistEnsureUI() {
+  const table = document.querySelector('#unoScreen .capsa-table'); if (!table) return null;
+  let btn = table.querySelector('.uno-hist-btn');
+  if (!btn) {
+    btn = document.createElement('button'); btn.type = 'button'; btn.className = 'uno-hist-btn';
+    btn.textContent = '\uD83D\uDCDC'; btn.title = 'Riwayat putaran';
+    const panel = document.createElement('div'); panel.className = 'uno-hist-panel';
+    table.appendChild(btn); table.appendChild(panel);
+    btn.addEventListener('click', e => { e.stopPropagation(); unoHistOpen = !unoHistOpen; unoHistRender(); });
+    panel.addEventListener('click', () => { unoHistOpen = false; unoHistRender(); });
+  }
+  return { btn, panel: table.querySelector('.uno-hist-panel') };
+}
+
+function unoHistRender() {
+  const ui = unoHistEnsureUI(); if (!ui) return;
+  ui.btn.classList.toggle('on', unoHistOpen);
+  ui.panel.style.display = unoHistOpen ? 'block' : 'none';
+  if (!unoHistOpen) return;
+
+  const who = r => r === myRole ? 'Kamu' : unoName(r);
+  let html = '<div class="uh-title"><span>\uD83D\uDCDC Riwayat putaran</span><span>ketuk untuk tutup</span></div>';
+  if (!unoHistory.length) html += '<div class="uh-empty">Belum ada kartu yang dimainkan.</div>';
+  unoHistory.slice(-50).reverse().forEach(h => {
+    if (h.type === 'sep') { html += '<div class="uh-sep">\u2014 RONDE BARU \u2014</div>'; return; }
+    const me = h.by === myRole ? ' me' : '';
+    if (h.type === 'play') {
+      const extra = h.card.color === 'wild' && h.card.chosenColor ? ' \u2192 ' + (UNO_COLOR_EMOJI[h.card.chosenColor] || '') + ' ' + h.card.chosenColor.toUpperCase() : '';
+      html += '<div class="uh-row' + me + '"><span class="uh-who">' + who(h.by) + '</span><img src="' + getUnoCardImgUrl(h.card) + '" alt=""><span class="uh-txt">Buang kartu' + extra + '</span></div>';
+    } else if (h.type === 'draw') {
+      html += '<div class="uh-row' + me + '"><span class="uh-who">' + who(h.by) + '</span><span class="uh-txt">\uD83D\uDCE5 Ambil ' + h.n + ' kartu</span></div>';
+    } else if (h.type === 'pass') {
+      html += '<div class="uh-row' + me + '"><span class="uh-who">' + who(h.by) + '</span><span class="uh-txt" style="color:#7fa2ff">PASS</span></div>';
+    } else if (h.type === 'dor') {
+      html += '<div class="uh-row"><span class="uh-txt">' + h.text + '</span></div>';
+    }
+  });
+  ui.panel.innerHTML = html;
+}
+
+function unoHistPush(entry) {
+  unoHistory.push(entry);
+  if (unoHistory.length > 80) unoHistory.splice(0, unoHistory.length - 80);
+}
+
+function unoHistUpdate(data, first, topKey) {
+  if (unoHistHand !== data.handNumber) { unoHistory = []; unoHistHand = data.handNumber; }   // ronde baru -> riwayat bersih
+  if (!first && data.handNumber === unoPrev.handNumber) {
+    const actor = unoPrev.turn, top = data.currentCard, txt = data.lastActionText;
+    if (top && topKey !== unoPrev.topKey && actor) {
+      unoHistPush({ type: 'play', by: actor, card: Object.assign({}, top) });
+    } else if (txt && txt !== unoPrev.text) {
+      if (txt.indexOf('\uD83D\uDCE5') === 0 && actor) {
+        const c = data.hands && data.hands[actor] ? ensureArray(data.hands[actor]).length : 0;
+        const p = unoPrev.counts[actor];
+        unoHistPush({ type: 'draw', by: actor, n: (p !== undefined && c > p) ? (c - p) : 1 });
+      } else if (txt.indexOf('\u23ED') === 0 && actor) {
+        unoHistPush({ type: 'pass', by: actor });
+      } else if (txt.indexOf('\uD83D\uDCA5') === 0) {
+        unoHistPush({ type: 'dor', text: txt.replace(/</g, '&lt;') });
+      }
+    }
+  }
+  unoHistRender();
 }
 
 // ======================================================
@@ -927,6 +1046,9 @@ function renderUnoUICore(data) {
     }
   }
 
+  // ---------- Riwayat ----------
+  unoHistUpdate(data, first, topKey);
+
   // ---------- Simpan state sebelumnya ----------
   unoPrev.init = true;
   unoPrev.topKey = topKey;
@@ -958,6 +1080,7 @@ function initUno() {
   unoRef = roomRef.child('uno');
   unoPrev = { init: false, topKey: null, counts: {}, turn: null, phase: null, challengeStart: null, text: null, finished: 0, handNumber: null };
   unoHasRenderedOnce = false; unoLastAnimatedHand = null; unoOppKey = ''; unoOppEls = {};
+  unoHistory = []; unoHistHand = null; unoHistOpen = false;
   selectedUnoKeys.clear();
   document.getElementById('unoRoleTag').textContent = myRole.toUpperCase();
 

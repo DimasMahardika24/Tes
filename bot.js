@@ -1058,8 +1058,7 @@ function pokerBotMove(pokerRef, botKey) {
           s.lastPlay = { by: botKey, cards: [chosenCard], combo };
           s.lastPlayer = botKey; s.passCount = 0; s.isFirstPlay = false;
           s.lastActionText = comboDisplayName(combo);
-          s.turn = nextActiveRole(botKey, s.finished || [], pokerPlayers(s));
-          return s;
+          return pokerFinishPlay(s, botKey, combo);
         }
         return cur;
       }
@@ -1074,8 +1073,7 @@ function pokerBotMove(pokerRef, botKey) {
       s.lastPlay = { by: botKey, cards: firstCards, combo };
       s.lastPlayer = botKey; s.passCount = 0; s.isFirstPlay = false;
       s.lastActionText = comboDisplayName(combo);
-      s.turn = nextActiveRole(botKey, s.finished || [], pokerPlayers(s));
-      return s;
+      return pokerFinishPlay(s, botKey, combo);
     }
 
     let targetCount = s.lastPlay ? s.lastPlay.combo.count : 1;
@@ -1122,7 +1120,7 @@ function pokerBotMove(pokerRef, botKey) {
       if (!s.lastPlay) return cur;
       s.passCount = (s.passCount || 0) + 1;
       s.lastActionText = 'pass';
-      const finished = s.finished || [];
+      const finished = pokerOutList(s);
       const pl = pokerPlayers(s), threshold = pokerPassThreshold(s);
       if (s.passCount >= threshold) {
         s.lastPlay = null; s.passCount = 0;
@@ -1141,17 +1139,7 @@ function pokerBotMove(pokerRef, botKey) {
     s.lastPlayer = botKey; s.passCount = 0;
     s.lastActionText = comboDisplayName(candidate.combo);
 
-    const finished = s.finished || [];
-    if (remain.length === 0 && !finished.includes(botKey)) {
-      finished.push(botKey); s.finished = finished;
-      const pl = pokerPlayers(s);
-      if (finished.length >= pl.length - 1) {
-        s.phase = 'roundover'; s.loser = pl.find(r => !finished.includes(r)) || null; s.winner = finished[0];
-        return s;
-      }
-    }
-    s.turn = nextActiveRole(botKey, s.finished || [], pokerPlayers(s));
-    return s;
+    return pokerFinishPlay(s, botKey, candidate.combo);
   });
 }
 
