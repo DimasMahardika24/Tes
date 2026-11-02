@@ -355,6 +355,9 @@ function displayName(role){
   return (n && n.trim()) ? n.trim() : role.toUpperCase();
 }
 
+// ATURAN LOGO: kombo seri wajib 1 logo yang sama (kriting/wajik/lope/sekop)
+function allSameSuit(cards){ return cards.length > 0 && cards.every(c => c.suit === cards[0].suit); }
+
 // TIEBREAK CUMA PAKE ANGKA (TANPA SUIT)
 function detectCombo(cards){
   const n = cards.length;
@@ -378,7 +381,7 @@ function detectCombo(cards){
     const sorted = cards.slice().sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
     const idxs = sorted.map(c => RANK_ORDER[c.rank]);
     const uniq = [...new Set(idxs)];
-    if(uniq.length === 3 && (uniq[0] - uniq[2] === 2)) {
+    if(uniq.length === 3 && (uniq[0] - uniq[2] === 2) && allSameSuit(cards)) {
       return { valid: true, type: 'run3', count: 3, level: 0, tiebreak: [idxs[0]] };
     }
     return { valid: false };
@@ -392,7 +395,7 @@ function detectCombo(cards){
     const sorted = cards.slice().sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
     const idxs = sorted.map(c => RANK_ORDER[c.rank]);
     const uniq = [...new Set(idxs)];
-    if(uniq.length === 4 && (uniq[0] - uniq[3] === 3)) {
+    if(uniq.length === 4 && (uniq[0] - uniq[3] === 3) && allSameSuit(cards)) {
       return { valid: true, type: 'run4', count: 4, level: 1, tiebreak: [idxs[0]] };
     }
     return { valid: false };
@@ -416,12 +419,13 @@ function detectFiveCombo(cards){
 
   if(isStraight && isFlush) return { valid: true, type: 'straightflush', count: 5, level: 6, tiebreak: [idxs[0]] };
   if(groups[0].c === 4) return { valid: true, type: 'four', count: 5, level: 5, tiebreak: [groups[0].i] };
-  if(groups[0].c === 3 && groups[1] && groups[1].c === 2) return { valid: true, type: 'fullhouse', count: 5, level: 4, tiebreak: [groups[0].i] };
+  if(groups[0].c === 3 && groups[1] && groups[1].c === 2 && allSameSuit(cards.filter(c => RANK_ORDER[c.rank] === groups[0].i))) return { valid: true, type: 'fullhouse', count: 5, level: 4, tiebreak: [groups[0].i] };
   if(groups.length === 4 && groups[0].c === 2 && groups.slice(1).every(g => g.c === 1)){
     const singleRanks = groups.slice(1).map(g => g.i).sort((a, b) => a - b);
-    if(singleRanks[2] - singleRanks[0] === 2) return { valid: true, type: 'seripolo', count: 5, level: 2, tiebreak: [singleRanks[2], groups[0].i] };
+    const runCards = cards.filter(c => singleRanks.indexOf(RANK_ORDER[c.rank]) !== -1);
+    if(singleRanks[2] - singleRanks[0] === 2 && allSameSuit(runCards)) return { valid: true, type: 'seripolo', count: 5, level: 2, tiebreak: [singleRanks[2], groups[0].i] };
   }
-  if(isStraight) return { valid: true, type: 'straight', count: 5, level: 1, tiebreak: [idxs[0]] };
+  // Straight campur logo TIDAK sah lagi: seri 5 kartu wajib 1 logo (= Straight Flush)
   return { valid: false };
 }
 
