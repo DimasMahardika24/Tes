@@ -418,7 +418,7 @@ function detectFiveCombo(cards){
   const groups = Object.entries(counts).map(([i, c]) => ({ i: +i, c })).sort((a, b) => b.c - a.c || b.i - a.i);
 
   if(isStraight && isFlush) return { valid: true, type: 'straightflush', count: 5, level: 6, tiebreak: [idxs[0]] };
-  if(groups[0].c === 4) return { valid: true, type: 'four', count: 5, level: 5, tiebreak: [groups[0].i] };
+  // Poker 4 angka sama + 1 kartu tambahan TIDAK sah lagi. Poker = 4 kartu angka sama saja (four_pure).
   if(groups[0].c === 3 && groups[1] && groups[1].c === 2 && allSameSuit(cards.filter(c => RANK_ORDER[c.rank] === groups[0].i))) return { valid: true, type: 'fullhouse', count: 5, level: 4, tiebreak: [groups[0].i] };
   if(groups.length === 4 && groups[0].c === 2 && groups.slice(1).every(g => g.c === 1)){
     const singleRanks = groups.slice(1).map(g => g.i).sort((a, b) => a - b);
