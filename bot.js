@@ -1000,9 +1000,9 @@ function startPokerBot() {
 
 // Mode HARD: bot boleh MEMBUKA ronde dengan kombo (5/4/3/2 kartu), tidak harus menunggu player.
 // Prioritas: kombo terbanyak kartu, lalu yang paling lemah (biar kartu kuat disimpan).
-// mustHave3d = true saat langkah pertama ronde (wajib memuat 3♣).
+// mustHave3d = true saat langkah pertama ronde (wajib memuat 3♠).
 function pokerBotPickLead(hand, mustHave3d) {
-  const has3d = c => c.rank === '03' && c.suit === 'c';
+  const has3d = c => c.rank === '03' && c.suit === 's';
   for (const k of [5, 4, 3, 2]) {
     if (hand.length < k) continue;
     let best = null;
@@ -1014,7 +1014,7 @@ function pokerBotPickLead(hand, mustHave3d) {
     }
     if (best) return best;
   }
-  // tidak ada kombo: single terkecil (atau 3♣ kalau wajib)
+  // tidak ada kombo: single terkecil (atau 3♠ kalau wajib)
   const single = mustHave3d ? hand.find(has3d) : sortCards(hand)[0];
   return single ? { cards: [single], combo: detectCombo([single]) } : null;
 }
@@ -1028,7 +1028,7 @@ function pokerBotMove(pokerRef, botKey) {
     if (!Array.isArray(hand)) hand = Object.values(hand); 
 
     if (s.isFirstPlay) {
-      const threeD = hand.find(c => c.rank === '03' && c.suit === 'c');
+      const threeD = hand.find(c => c.rank === '03' && c.suit === 's');
       if (!threeD) {
         if (hand.length > 0) {
           const sorted = sortCards(hand);
