@@ -998,8 +998,14 @@ function startPokerBot() {
   pokerRef.on('value', pokerBotHandler);
 }
 
+// Sisa kartu setelah main = hanya angka 2 (Poker jadi kartu terakhir) -> dilarang, bot menghindari.
+function pokerBotLeavesOnlyTwos(hand, cards) {
+  return pokerOnlyTwosLeft(removeCards(hand, cards));
+}
+
 // Mode HARD: bot boleh MEMBUKA ronde dengan kombo (5/4/3/2 kartu), tidak harus menunggu player.
 // Prioritas: kombo terbanyak kartu, lalu yang paling lemah (biar kartu kuat disimpan).
+// Bom Mati disimpan untuk membantai Poker (kecuali itu kartu terakhir bot).
 // mustHave3d = true saat langkah pertama ronde (wajib memuat 3♠).
 function pokerBotPickLead(hand, mustHave3d) {
   const has3d = c => c.rank === '03' && c.suit === 's';
@@ -1010,12 +1016,15 @@ function pokerBotPickLead(hand, mustHave3d) {
       if (mustHave3d && !cards.some(has3d)) continue;
       const combo = detectCombo(cards);
       if (!combo.valid) continue;
+      if (isBomMati(combo) && hand.length > k) continue;     // simpan bom untuk bantai Poker
+      if (pokerBotLeavesOnlyTwos(hand, cards)) continue;      // jangan sisakan Poker sebagai kartu terakhir
       if (!best || compareCombo(combo, best.combo) < 0) best = { cards, combo };
     }
     if (best) return best;
   }
-  // tidak ada kombo: single terkecil (atau 3♠ kalau wajib)
-  const single = mustHave3d ? hand.find(has3d) : sortCards(hand)[0];
+  // tidak ada kombo: single terkecil yang aman (atau 3♠ kalau wajib)
+  const singles = mustHave3d ? hand.filter(has3d) : sortCards(hand);
+  const single = singles.find(c => !pokerBotLeavesOnlyTwos(hand, [c])) || singles[0];
   return single ? { cards: [single], combo: detectCombo([single]) } : null;
 }
 
@@ -1023,9 +1032,10 @@ function pokerBotMove(pokerRef, botKey) {
   pokerRef.transaction(cur => {
     if (!cur || cur.phase !== 'playing' || cur.turn !== botKey) return cur;
     const s = JSON.parse(JSON.stringify(cur));
-    
+    pokerTwoLow = !!s.twoLow;
+
     let hand = s.hands[botKey] || [];
-    if (!Array.isArray(hand)) hand = Object.values(hand); 
+    if (!Array.isArray(hand)) hand = Object.values(hand);
 
     if (s.isFirstPlay) {
       const threeD = hand.find(c => c.rank === '03' && c.suit === 's');
@@ -1038,45 +1048,57 @@ function pokerBotMove(pokerRef, botKey) {
           s.lastPlay = { by: botKey, cards: [chosenCard], combo };
           s.lastPlayer = botKey; s.passCount = 0; s.isFirstPlay = false;
           s.lastActionText = comboDisplayName(combo);
-          return pokerFinishPlay(s, botKey, combo);
+          return pokerFinishPlay(s, botKey, combo, { lead: true });
         }
         return cur;
       }
-      
+
       let firstCards = [threeD];
       if (window.botDifficulty === 'hard') {
         const pick = pokerBotPickLead(hand, true);
         if (pick) firstCards = pick.cards;
       }
-      const combo = detectCombo(firstCards);
-      s.hands[botKey] = removeCards(hand, firstCards);
-      s.lastPlay = { by: botKey, cards: firstCards, combo };
-      s.lastPlayer = botKey; s.passCount = 0; s.isFirstPlay = false;
-      s.lastActionText = comboDisplayName(combo);
-      return pokerFinishPlay(s, botKey, combo);
+      return pokerApplyPlay(s, botKey, firstCards) || cur;
+    }
+
+    // 💥 Ada Poker (angka 2) di meja -> bantai pakai Bom Mati kalau punya (ronde langsung selesai, bot menang)
+    if (s.lastPlay && isPokerPlay(s.lastPlay)) {
+      let bom = null;
+      for (const k of [4, 5]) {
+        if (hand.length < k) continue;
+        for (const cards of pokerCombinations(hand, k)) {
+          const chk = pokerCheckPlay(s, cards);
+          if (!chk.ok || !chk.chop) continue;
+          if (!bom || compareCombo(chk.combo, bom.combo) < 0) bom = { cards, combo: chk.combo };
+        }
+      }
+      const skipChop = window.botDifficulty === 'normal' && Math.random() < 0.4;
+      if (bom && !skipChop) {
+        const res = pokerApplyPlay(s, botKey, bom.cards);
+        if (res) return res;
+      }
     }
 
     let targetCount = s.lastPlay ? s.lastPlay.combo.count : 1;
     let candidate = null;
 
     if (!s.lastPlay) {
-      const sorted = sortCards(hand);
       if (window.botDifficulty === 'hard') {
         candidate = pokerBotPickLead(hand, false);
-      } else if (sorted.length) {
-        const combo = detectCombo([sorted[0]]);
-        candidate = { cards: [sorted[0]], combo };
+      } else {
+        const sorted = sortCards(hand);
+        const single = sorted.find(c => !pokerBotLeavesOnlyTwos(hand, [c])) || sorted[0];
+        if (single) candidate = { cards: [single], combo: detectCombo([single]) };
       }
     } else {
       const allCombos = pokerCombinations(hand, targetCount);
-      
+
       let validMoves = [];
       for (const cards of allCombos) {
-        const combo = detectCombo(cards);
-        if (!combo.valid) continue;
-        if (isBlockedBeat(s.lastPlay, combo, cards)) continue;
-        if (compareCombo(combo, s.lastPlay.combo) <= 0) continue;
-        validMoves.push({ cards, combo });
+        const chk = pokerCheckPlay(s, cards);
+        if (!chk.ok) continue;
+        if (pokerBotLeavesOnlyTwos(hand, cards)) continue;    // jangan sisakan Poker sebagai kartu terakhir
+        validMoves.push({ cards, combo: chk.combo });
       }
 
       if (validMoves.length > 0) {
@@ -1113,13 +1135,7 @@ function pokerBotMove(pokerRef, botKey) {
       return s;
     }
 
-    const remain = removeCards(hand, candidate.cards);
-    s.hands[botKey] = remain;
-    s.lastPlay = { by: botKey, cards: candidate.cards, combo: candidate.combo };
-    s.lastPlayer = botKey; s.passCount = 0;
-    s.lastActionText = comboDisplayName(candidate.combo);
-
-    return pokerFinishPlay(s, botKey, candidate.combo);
+    return pokerApplyPlay(s, botKey, candidate.cards) || cur;
   });
 }
 

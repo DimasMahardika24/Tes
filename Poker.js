@@ -30,6 +30,12 @@ const SUIT_TO_API = { c:'C', d:'D', h:'H', s:'S' };
 const RANK_ORDER = { '03':0,'04':1,'05':2,'06':3,'07':4,'08':5,'09':6,'10':7,'J':8,'Q':9,'K':10,'A':11,'02':12 };
 const SUIT_ORDER = { c:0, d:1, h:2, s:3 }; // Cuma buat sort di tangan biar rapi
 
+// ATURAN POKER = KARTU 2 (kartu tertinggi). Kalau ada Bom Mati dikeluarkan di giliran sendiri
+// (meja kosong), angka 2 jadi KARTU TERKECIL sampai ronde selesai (state.twoLow = true).
+// pokerTwoLow selalu disinkronkan dari state sebelum menghitung kombinasi.
+let pokerTwoLow = false;
+function rk(rank){ return (pokerTwoLow && rank === '02') ? -1 : RANK_ORDER[rank]; }
+
 // ======================================================
 // CSS (diinjeksi, menimpa style lama di index.html)
 // ======================================================
@@ -250,7 +256,7 @@ function cardKey(c){ return c.rank + '|' + c.suit; }
 // tapi kalkulasi menang/kalah HANYA pakai RANK_ORDER.
 function sortCards(hand){
   hand = ensureArray(hand);
-  return hand.slice().sort((a, b) => RANK_ORDER[a.rank] - RANK_ORDER[b.rank] || SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit]);
+  return hand.slice().sort((a, b) => rk(a.rank) - rk(b.rank) || SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit]);
 }
 
 // Daftar pemain yang ikut ronde ini (2-4). Data lama tanpa `players` dianggap 4 pemain.
@@ -278,40 +284,56 @@ function nextActiveRole(current, finished, players){
 function pokerOutList(state){ return ensureArray(state && state.finished).concat(ensureArray(state && state.dead)); }
 
 // Dipanggil SETELAH kartu dibuang (tangan sudah dikurangi, lastPlay sudah diisi).
-// Mengurus: habis kartu, efek Seri 4 / Poker (lawan berikutnya skip 1x), Seri 5 (lawan berikutnya MATI = juara terakhir), pindah giliran, akhir ronde.
-function pokerFinishPlay(state, actor, combo){
+// Mengurus: habis kartu, Bom Mati (bantai Poker / angka 2 jadi terkecil), Poker jadi kartu terakhir,
+// Bom Stop Seri 4 (lawan berikutnya skip 1x), pindah giliran, akhir ronde.
+function pokerFinishPlay(state, actor, combo, opts){
+  opts = opts || {};
   const pl = pokerPlayers(state);
   const finished = ensureArray(state.finished), dead = ensureArray(state.dead);
   state.finished = finished; state.dead = dead;
+  state.bomb = null;
+  const bombEvent = (type, target) => {
+    state.bombSeq = (state.bombSeq || 0) + 1;
+    state.bomb = { seq: state.bombSeq, type, by: actor, target };
+  };
+
+  // 1) BOM MATI membantai POKER (kartu 2) => ronde langsung selesai, penaruh bom menang
+  if(opts.chop){
+    const victim = (opts.victim && opts.victim !== actor) ? opts.victim : null;
+    bombEvent('chop', victim || actor);
+    return pokerEndNow(state, actor, victim, 'bom');
+  }
+
   if(ensureArray(state.hands[actor]).length === 0 && !finished.includes(actor)) finished.push(actor);
 
+  // 2) BOM MATI di giliran sendiri (meja kosong) => angka 2 jadi TERKECIL
+  if(opts.lead && isBomMati(combo) && !state.twoLow){
+    state.twoLow = true;
+    pokerTwoLow = true;
+    if(state.lastPlay) state.lastPlay.combo = detectCombo(ensureArray(state.lastPlay.cards));  // hitung ulang urutan
+    bombEvent('twolow', actor);
+  }
+
+  // 3) POKER DILARANG JADI KARTU TERAKHIR: sisa kartu hanya angka 2 => ronde selesai, dia yang terakhir
+  if(pokerOnlyTwosLeft(state.hands[actor])){
+    return pokerEndNow(state, null, actor, 'poker');
+  }
+
   const nextOf = from => nextActiveRole(from, finished.concat(dead), pl);
-  const isKill = combo.type === 'straight' || combo.type === 'straightflush';   // Seri 5 urut
-  const isSkip = combo.type === 'run4' || combo.type === 'four';                // Seri 4 / Poker
+  const isSkip = combo.type === 'run4' || combo.type === 'four';                // Bom Stop Seri 4 kartu
   let target = null;
-  if(isKill || isSkip){
+  if(isSkip){
     const nx = nextOf(actor);
     if(nx && nx !== actor && !finished.includes(nx) && !dead.includes(nx)) target = nx;
   }
-  state.bomb = null;
-  if(target && isKill){
-    dead.push(target);
-    state.bomb = { seq: ((state.bombSeq || 0) + 1), type: 'dead', by: actor, target };
-    state.bombSeq = state.bomb.seq;
-  } else if(target && isSkip){
-    state.bomb = { seq: ((state.bombSeq || 0) + 1), type: 'skip', by: actor, target };
-    state.bombSeq = state.bomb.seq;
+  if(target && isSkip){
+    bombEvent('skip', target);
   }
 
   // Akhir ronde kalau pemain aktif tinggal <= 1
   const active = pl.filter(r => !finished.includes(r) && !dead.includes(r));
   if(active.length <= 1){
-    if(dead.length > 0){
-      if(active.length === 1) finished.push(active[0]);   // yang selamat
-      state.loser = dead[0];                              // yang mati duluan = juara terakhir
-    } else {
-      state.loser = active[0] || null;
-    }
+    state.loser = active[0] || null;
     state.phase = 'roundover'; state.winner = finished[0] || null;
     return state;
   }
@@ -364,22 +386,22 @@ function detectCombo(cards){
 
   // 1 Kartu (Single)
   if(n === 1) {
-    return { valid: true, type: 'single', count: 1, level: 0, tiebreak: [RANK_ORDER[cards[0].rank]] };
+    return { valid: true, type: 'single', count: 1, level: 0, tiebreak: [rk(cards[0].rank)] };
   }
 
   // 2 Kartu (Pair)
   if(n === 2){
     if(cards[0].rank !== cards[1].rank) return { valid: false };
-    return { valid: true, type: 'pair', count: 2, level: 0, tiebreak: [RANK_ORDER[cards[0].rank]] };
+    return { valid: true, type: 'pair', count: 2, level: 0, tiebreak: [rk(cards[0].rank)] };
   }
 
   // 3 Kartu (Triss atau Seri 3)
   if(n === 3){
     if(cards.every(c => c.rank === cards[0].rank)) {
-      return { valid: true, type: 'triple', count: 3, level: 1, tiebreak: [RANK_ORDER[cards[0].rank]] };
+      return { valid: true, type: 'triple', count: 3, level: 1, tiebreak: [rk(cards[0].rank)] };
     }
-    const sorted = cards.slice().sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
-    const idxs = sorted.map(c => RANK_ORDER[c.rank]);
+    const sorted = cards.slice().sort((a, b) => rk(b.rank) - rk(a.rank));
+    const idxs = sorted.map(c => rk(c.rank));
     const uniq = [...new Set(idxs)];
     if(uniq.length === 3 && (uniq[0] - uniq[2] === 2) && allSameSuit(cards)) {
       return { valid: true, type: 'run3', count: 3, level: 0, tiebreak: [idxs[0]] };
@@ -390,10 +412,10 @@ function detectCombo(cards){
   // 4 Kartu (Bom 4 Angka Sama atau Bom Seri 4)
   if(n === 4){
     if(cards.every(c => c.rank === cards[0].rank)) {
-      return { valid: true, type: 'four_pure', count: 4, level: 2, tiebreak: [RANK_ORDER[cards[0].rank]] };
+      return { valid: true, type: 'four_pure', count: 4, level: 2, tiebreak: [rk(cards[0].rank)] };
     }
-    const sorted = cards.slice().sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
-    const idxs = sorted.map(c => RANK_ORDER[c.rank]);
+    const sorted = cards.slice().sort((a, b) => rk(b.rank) - rk(a.rank));
+    const idxs = sorted.map(c => rk(c.rank));
     const uniq = [...new Set(idxs)];
     if(uniq.length === 4 && (uniq[0] - uniq[3] === 3) && allSameSuit(cards)) {
       return { valid: true, type: 'run4', count: 4, level: 1, tiebreak: [idxs[0]] };
@@ -408,8 +430,8 @@ function detectCombo(cards){
 }
 
 function detectFiveCombo(cards){
-  const sorted = cards.slice().sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
-  const idxs = sorted.map(c => RANK_ORDER[c.rank]);
+  const sorted = cards.slice().sort((a, b) => rk(b.rank) - rk(a.rank));
+  const idxs = sorted.map(c => rk(c.rank));
   const isFlush = cards.every(c => c.suit === cards[0].suit);
   const uniqueIdx = [...new Set(idxs)];
   const isStraight = uniqueIdx.length === 5 && (uniqueIdx[0] - uniqueIdx[4] === 4);
@@ -419,10 +441,10 @@ function detectFiveCombo(cards){
 
   if(isStraight && isFlush) return { valid: true, type: 'straightflush', count: 5, level: 6, tiebreak: [idxs[0]] };
   // Poker 4 angka sama + 1 kartu tambahan TIDAK sah lagi. Poker = 4 kartu angka sama saja (four_pure).
-  if(groups[0].c === 3 && groups[1] && groups[1].c === 2 && allSameSuit(cards.filter(c => RANK_ORDER[c.rank] === groups[0].i))) return { valid: true, type: 'fullhouse', count: 5, level: 4, tiebreak: [groups[0].i] };
+  if(groups[0].c === 3 && groups[1] && groups[1].c === 2) return { valid: true, type: 'fullhouse', count: 5, level: 4, tiebreak: [groups[0].i] };
   if(groups.length === 4 && groups[0].c === 2 && groups.slice(1).every(g => g.c === 1)){
     const singleRanks = groups.slice(1).map(g => g.i).sort((a, b) => a - b);
-    const runCards = cards.filter(c => singleRanks.indexOf(RANK_ORDER[c.rank]) !== -1);
+    const runCards = cards.filter(c => singleRanks.indexOf(rk(c.rank)) !== -1);
     if(singleRanks[2] - singleRanks[0] === 2 && allSameSuit(runCards)) return { valid: true, type: 'seripolo', count: 5, level: 2, tiebreak: [singleRanks[2], groups[0].i] };
   }
   // Straight campur logo TIDAK sah lagi: seri 5 kartu wajib 1 logo (= Straight Flush)
@@ -441,8 +463,8 @@ function compareCombo(a, b){
 }
 
 function comboDisplayName(combo){
-  const map = { single: 'Single', pair: 'Pair', triple: 'Triss', run3: 'Seri (3 Kartu)', run4: 'Bom Seri (4 Kartu)', four_pure: 'Bom 4 Angka Sama', straight: 'Seri 5 Kartu (Straight)', seripolo: 'Polo Seri (Seri + Pair)', fullhouse: 'Polo (Full House)', four: 'Poker (Four of a Kind + Kicker)' };
-  if (combo.type === 'straightflush') return combo.tiebreak[0] === RANK_ORDER['02'] ? 'Royal Flush' : 'Straight Flush';
+  const map = { single: 'Single', pair: 'Pair', triple: 'Triss', run3: 'Seri (3 Kartu)', run4: 'Bom Stop Seri (4 Kartu)', four_pure: 'Bom Mati (4 Angka Sama)', straight: 'Seri 5 Kartu (Straight)', seripolo: 'Polo Seri (Seri + Pair)', fullhouse: 'Polo (Triss + Pair)', four: 'Poker (Four of a Kind + Kicker)' };
+  if (combo.type === 'straightflush') return (!pokerTwoLow && combo.tiebreak[0] === RANK_ORDER['02']) ? 'Bom Mati Seri (Royal)' : 'Bom Mati Seri (5 Kartu)';
   return map[combo.type] || '-';
 }
 
@@ -454,6 +476,88 @@ function isBlockedBeat(lastPlay, newCombo, newCards){
   if(lastPlay.combo.type === 'four' && newCombo.type === 'four') return 'poker';
   return false;
 }
+// ======================================================
+// ATURAN BARU: BOM MATI / BOM STOP / POKER (KARTU 2)
+//  - Poker = kartu 2 (single / pair / triss angka 2). Poker tertinggi di meja.
+//  - Bom Mati = 4 angka sama (termasuk J Q K A) ATAU 5 kartu seri 1 logo (termasuk J Q K A).
+//      * Dikeluarkan di atas Poker (kapan pun gilirannya, jumlah kartu bebas) =>
+//        ronde LANGSUNG SELESAI, penaruh bom jadi pemenang, pemilik Poker jadi buncit.
+//      * Dikeluarkan di giliran sendiri (meja kosong) => angka 2 jadi TERKECIL.
+//  - Bom Stop = seri 4 kartu 1 logo => pemain berikutnya skip (tidak berubah).
+//  - Poker dilarang jadi kartu terakhir: kalau sisa kartu pemain hanya angka 2
+//    (1-3 kartu), ronde langsung selesai dan pemain itu jadi yang terakhir.
+// ======================================================
+function isBomMati(combo){ return !!combo && (combo.type === 'four_pure' || combo.type === 'straightflush'); }
+function isPokerCards(cards, combo){
+  cards = ensureArray(cards);
+  if(pokerTwoLow || cards.length < 1 || cards.length > 3) return false;
+  if(combo && ['single','pair','triple'].indexOf(combo.type) === -1) return false;
+  return cards.every(c => c.rank === '02');
+}
+function isPokerPlay(lp){ return !!lp && isPokerCards(lp.cards, lp.combo); }
+// sisa kartu hanya angka 2 (1-3 kartu) = Poker jadi kartu terakhir (dilarang)
+function pokerOnlyTwosLeft(hand){
+  hand = ensureArray(hand);
+  return !pokerTwoLow && hand.length >= 1 && hand.length <= 3 && hand.every(c => c.rank === '02');
+}
+
+// Satu pintu validasi untuk UI, transaksi, dan bot.
+function pokerCheckPlay(state, cards){
+  pokerTwoLow = !!(state && state.twoLow);
+  const combo = detectCombo(cards);
+  if(!combo.valid) return { ok: false, msg: 'Kombinasi kartu tidak valid.', why: 'tidak valid' };
+  if(state.isFirstPlay && !cards.some(c => c.rank === '03' && c.suit === 's'))
+    return { ok: false, combo, msg: 'Wajib jalan dengan kartu 3♠ (3 Sekop) di kartu pertama!', why: 'wajib ada 3♠' };
+  const lp = state.lastPlay;
+  if(!state.isFirstPlay && lp){
+    // Bom Mati membantai Poker: jumlah kartu bebas
+    if(isBomMati(combo) && isPokerPlay(lp)) return { ok: true, combo, chop: true };
+    if(combo.count !== lp.combo.count)
+      return { ok: false, combo, msg: 'Jumlah kartu harus sama dengan yang di meja (' + lp.combo.count + ' kartu).', why: 'harus ' + lp.combo.count + ' kartu' };
+    if(isBlockedBeat(lp, combo, cards))
+      return { ok: false, combo, msg: blockedBeatMessage(isBlockedBeat(lp, combo, cards)), why: 'tidak bisa dibantai' };
+    if(compareCombo(combo, lp.combo) <= 0)
+      return { ok: false, combo, msg: 'Kombinasi kamu harus LEBIH TINGGI dari kartu terakhir di meja.', why: 'kalah dari meja' };
+  }
+  return { ok: true, combo, chop: false, lead: !lp };
+}
+
+// Akhiri ronde sekarang. winner = pemenang paksa (atau null), loser = juara terakhir.
+function pokerEndNow(state, winner, loser, reason){
+  const pl = pokerPlayers(state);
+  const len = r => ensureArray(state.hands && state.hands[r]).length;
+  const others = pl.filter(r => r !== winner);
+  if(!loser || loser === winner){
+    const cand = others.filter(r => !ensureArray(state.finished).includes(r)).sort((a, b) => len(b) - len(a));
+    loser = cand[0] || null;
+  }
+  let order = ensureArray(state.finished).filter(r => r !== loser);
+  if(winner) order = [winner].concat(order.filter(r => r !== winner));
+  const rest = pl.filter(r => !order.includes(r) && r !== loser).sort((a, b) => len(a) - len(b));
+  state.finished = order.concat(rest);
+  state.dead = [];
+  state.loser = loser;
+  state.winner = state.finished[0] || null;
+  state.phase = 'roundover';
+  state.endReason = reason;
+  return state;
+}
+
+// Terapkan satu langkah main (dipakai pemain & bot). Return state baru, atau null kalau tidak sah.
+function pokerApplyPlay(s, actor, cards){
+  const chk = pokerCheckPlay(s, cards);
+  if(!chk.ok) return null;
+  const hand = ensureArray(s.hands[actor]);
+  const remain = removeCards(hand, cards);
+  if(remain.length !== hand.length - cards.length) return null;
+  const prevLP = s.lastPlay;
+  s.hands[actor] = remain;
+  s.lastPlay = { by: actor, cards, combo: chk.combo };
+  s.lastPlayer = actor; s.passCount = 0; s.isFirstPlay = false;
+  s.lastActionText = comboDisplayName(chk.combo);
+  return pokerFinishPlay(s, actor, chk.combo, { chop: !!chk.chop, victim: prevLP ? prevLP.by : null, lead: !prevLP });
+}
+
 function blockedBeatMessage(reason){
   if(reason === 'poker') return 'Poker (4 Angka Sama + 1) gak bisa dibantai sesama Poker!';
   return 'Kombinasi tidak diperbolehkan.';
@@ -489,7 +593,7 @@ function pokerBuildNewGame(prev, presence){
   else players.forEach(r => { if(hands[r].some(c => c.rank === '03' && c.suit === 's')) starter = r; });
   return {
     phase: 'playing', players, hands, turn: starter, starter, isFirstPlay: !useWinner, lastPlay: null, lastPlayer: null, passCount: 0,
-    finished: [], dead: [], bomb: null, bombSeq: 0, loser: null, winner: null, lastActionText: null, handNumber: ((prev && prev.handNumber) || 0) + 1, names: (prev && prev.names) || {}
+    finished: [], dead: [], bomb: null, bombSeq: 0, twoLow: false, endReason: null, loser: null, winner: null, lastActionText: null, handNumber: ((prev && prev.handNumber) || 0) + 1, names: (prev && prev.names) || {}
   };
 }
 
@@ -499,55 +603,20 @@ function pokerBuildNewGame(prev, presence){
 function pokerDoPlay(){
   const data = latestPokerData;
   if(!data || data.phase !== 'playing' || data.turn !== myRole) return;
+  pokerTwoLow = !!data.twoLow;
 
   const hand = sortCards(data.hands && data.hands[myRole]);
   const selected = hand.filter(c => selectedKeys.has(cardKey(c)));
   if(selected.length === 0){ pokerSfx('bad'); showCustomAlert('Pilih kartu dulu.'); return; }
 
-  const combo = detectCombo(selected);
-  if(!combo.valid){ pokerSfx('bad'); showCustomAlert('Kombinasi kartu tidak valid.'); return; }
-  if(data.isFirstPlay && !selected.some(c => c.rank === '03' && c.suit === 's')){ pokerSfx('bad'); showCustomAlert('Wajib jalan dengan kartu 3♠ (3 Sekop) di kartu pertama!'); return; }
-
-  if(!data.isFirstPlay && data.lastPlay){
-    if(combo.count !== data.lastPlay.combo.count){
-      pokerSfx('bad');
-      showCustomAlert('Jumlah kartu harus sama dengan yang di meja (' + data.lastPlay.combo.count + ' kartu).');
-      return;
-    }
-    if(isBlockedBeat(data.lastPlay, combo, selected)){
-      pokerSfx('bad');
-      showCustomAlert(blockedBeatMessage(isBlockedBeat(data.lastPlay, combo, selected)));
-      return;
-    }
-    // Harus LEBIH BESAR (> 0), kalau sama (0) ditolak
-    if(compareCombo(combo, data.lastPlay.combo) <= 0){
-      pokerSfx('bad');
-      showCustomAlert('Kombinasi kamu harus LEBIH TINGGI dari kartu terakhir di meja.');
-      return;
-    }
-  }
+  const chk = pokerCheckPlay(data, selected);
+  if(!chk.ok){ pokerSfx('bad'); showCustomAlert(chk.msg); return; }
 
   pokerRef.transaction(cur => {
     if(!cur || cur.phase !== 'playing' || cur.turn !== myRole) return cur;
     const state = JSON.parse(JSON.stringify(cur));
-
-    const curHand = ensureArray(state.hands[myRole]);
-    const remain = removeCards(curHand, selected);
-    if(remain.length !== curHand.length - selected.length) return cur;
-
-    const c2 = detectCombo(selected);
-    if(!c2.valid) return cur;
-    if(state.isFirstPlay && !selected.some(c => c.rank === '03' && c.suit === 's')) return cur;
-    if(!state.isFirstPlay && state.lastPlay){
-      if(c2.count !== state.lastPlay.combo.count || isBlockedBeat(state.lastPlay, c2, selected) || compareCombo(c2, state.lastPlay.combo) <= 0) return cur;
-    }
-
-    state.hands[myRole] = remain;
-    state.lastPlay = { by: myRole, cards: selected, combo: c2 };
-    state.lastPlayer = myRole; state.passCount = 0; state.isFirstPlay = false;
-    state.lastActionText = comboDisplayName(c2);
-
-    return pokerFinishPlay(state, myRole, c2);
+    const res = pokerApplyPlay(state, myRole, selected);
+    return res || cur;
   }, () => { selectedKeys.clear(); });
 }
 
@@ -878,6 +947,7 @@ function pokerRenderStatus(data){
     if(!pokerPlayers(data).includes(myRole)) statusEl.textContent = '👀 Ronde berjalan — kamu ikut di ronde berikutnya.';
     else if(data.turn === myRole) statusEl.textContent = data.isFirstPlay ? '🟢 Giliranmu! Wajib jalan dengan 3♠ (3 Sekop).' : '🟢 Giliranmu!';
     else statusEl.textContent = '🟡 Menunggu ' + displayName(data.turn) + '...';
+    if(data.twoLow) statusEl.textContent += ' · ⬇️ Angka 2 = terkecil';
   } else if(data.phase === 'roundover'){
     statusEl.textContent = '🏁 Ronde selesai.';
   }
@@ -936,22 +1006,19 @@ function pokerUpdatePreview(data){
     return;
   }
 
-  const combo = detectCombo(sel);
-  if(!combo.valid){
+  pokerTwoLow = !!data.twoLow;
+  const chk = pokerCheckPlay(data, sel);
+  if(!chk.combo || !chk.combo.valid){
     el.className = 'capsa-preview bad';
     el.textContent = '❌ Bukan kombinasi valid (' + sel.length + ' kartu)';
     return;
   }
-
-  let ok = true, why = '';
-  if(data.isFirstPlay && !sel.some(c => c.rank === '03' && c.suit === 's')){ ok = false; why = 'wajib ada 3♠'; }
-  else if(!data.isFirstPlay && data.lastPlay){
-    if(combo.count !== data.lastPlay.combo.count){ ok = false; why = 'harus ' + data.lastPlay.combo.count + ' kartu'; }
-    else if(isBlockedBeat(data.lastPlay, combo, sel)){ ok = false; why = 'tidak bisa dibantai'; }
-    else if(compareCombo(combo, data.lastPlay.combo) <= 0){ ok = false; why = 'kalah dari meja'; }
-  }
-  el.className = 'capsa-preview ' + (ok ? 'ok' : 'bad');
-  el.textContent = (ok ? '✅ ' : '❌ ') + comboDisplayName(combo) + (why ? (' — ' + why) : '');
+  let txt = (chk.ok ? '✅ ' : '❌ ') + comboDisplayName(chk.combo);
+  if(!chk.ok) txt += ' — ' + chk.why;
+  else if(chk.chop) txt += ' — bantai Poker, ronde langsung selesai & kamu menang!';
+  else if(chk.lead && isBomMati(chk.combo) && !data.twoLow) txt += ' — angka 2 jadi terkecil';
+  el.className = 'capsa-preview ' + (chk.ok ? 'ok' : 'bad');
+  el.textContent = txt;
 }
 
 // ======================================================
@@ -1045,7 +1112,10 @@ function pokerDetectEvents(data, first){
 
     if(data.bomb && data.bomb.seq !== pokerPrev.bombSeq){
       const tn = data.bomb.target === myRole ? 'Kamu' : displayName(data.bomb.target);
-      if(data.bomb.type === 'dead'){ pokerToast('💀 ' + tn + ' MATI!', true); pokerSfx('bomb'); pokerTableShake(); }
+      const bn = data.bomb.by === myRole ? 'Kamu' : displayName(data.bomb.by);
+      if(data.bomb.type === 'chop'){ pokerToast('💥 BOM MATI! ' + bn + ' menang!', true); pokerSfx('bomb'); pokerTableShake(); if(data.bomb.target && data.bomb.target !== data.bomb.by) pokerBubble(data.bomb.target, 'KENA BOM'); }
+      else if(data.bomb.type === 'twolow'){ pokerToast('⬇️ Angka 2 jadi terkecil!', true); }
+      else if(data.bomb.type === 'dead'){ pokerToast('💀 ' + tn + ' MATI!', true); pokerSfx('bomb'); pokerTableShake(); }
       else { pokerToast('⛔ ' + tn + ' kena skip!', true); pokerBubble(data.bomb.target, 'SKIP'); }
     }
 
@@ -1060,6 +1130,7 @@ function pokerDetectEvents(data, first){
     }
 
     if(data.phase === 'roundover' && pokerPrev.phase !== 'roundover'){
+      if(data.endReason === 'poker') pokerToast('🂡 Poker (2) jadi kartu terakhir! ' + (data.loser === myRole ? 'Kamu' : displayName(data.loser)) + ' terakhir', true);
       if(finished[0] === myRole){ pokerSfx('win'); pokerConfetti(); }
       else if(finished.includes(myRole)) pokerSfx('finish');
       else pokerSfx('lose');
@@ -1080,6 +1151,7 @@ function pokerDetectEvents(data, first){
 // ======================================================
 function pokerRenderCore(data){
   latestPokerData = data;
+  pokerTwoLow = !!data.twoLow;
   const first = !pokerPrev.init;
   const newDeal = pokerPrev.init && data.handNumber !== pokerPrev.hand;
   if(data.turn !== myRole || data.phase !== 'playing') selectedKeys.clear();
@@ -1136,7 +1208,10 @@ function pokerRenderCore(data){
   const resultEl = document.getElementById('capsaResult'), nextBtn = document.getElementById('capsaBtnNext');
   if(data.phase === 'roundover'){
     const medals = ['🥇 Juara 1', '🥈 Juara 2', '🥉 Juara 3'];
-    let html = finished.map((r, i) => (medals[i] || '🏅') + ': ' + displayName(r) + (r === myRole ? ' (Kamu)' : '')).join('<br>');
+    let html = '';
+    if(data.endReason === 'bom') html += '💥 <b>Bom Mati!</b> Ronde langsung selesai.<br>';
+    else if(data.endReason === 'poker') html += '🂡 <b>Poker (2) jadi kartu terakhir!</b> Ronde langsung selesai.<br>';
+    html += finished.map((r, i) => (medals[i] || '🏅') + ': ' + displayName(r) + (r === myRole ? ' (Kamu)' : '')).join('<br>');
     ensureArray(data.dead).slice().reverse().forEach(r => { html += '<br>💀 Mati kena Seri 5: ' + displayName(r) + (r === myRole ? ' (Kamu)' : ''); });
     if(data.loser) html += '<br>💀 Buncit: ' + displayName(data.loser) + (data.loser === myRole ? ' (Kamu)' : '');
     resultEl.innerHTML = html; resultEl.style.display = 'block';
@@ -1178,6 +1253,7 @@ function pokerAnimateDeal(done){
 }
 
 function pokerRender(data){
+  pokerTwoLow = !!data.twoLow;
   const freshHand = data.phase === 'playing' && !!data.handNumber && data.handNumber !== pokerLastAnimatedHand;
   const shouldAnimate = freshHand && pokerHasRenderedOnce;
   if(freshHand) pokerLastAnimatedHand = data.handNumber;
@@ -1250,7 +1326,7 @@ function initPoker(){
   if(myRole === 'p1'){
     pokerRef.transaction(cur => cur || {
       phase: 'waiting', hands: null, turn: null, starter: null, isFirstPlay: true, lastPlay: null, lastPlayer: null,
-      passCount: 0, finished: [], dead: [], bomb: null, bombSeq: 0, loser: null, winner: null, lastActionText: null, handNumber: 0, names: {}
+      passCount: 0, finished: [], dead: [], bomb: null, bombSeq: 0, twoLow: false, endReason: null, loser: null, winner: null, lastActionText: null, handNumber: 0, names: {}
     });
   }
 
