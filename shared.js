@@ -502,6 +502,10 @@ function enterGame(){
     if(window.isBotMode && typeof startBotForCurrentGame === 'function'){
       setTimeout(() => startBotForCurrentGame(), 2000);
     }
+    // Room online: host bisa mengisi kursi kosong dengan bot (tombol "Isi kursi kosong dengan Bot")
+    if(!window.isBotMode && myRole === 'p1' && typeof setupBotFillUI === 'function'){
+      setTimeout(() => setupBotFillUI(), 1200);
+    }
   }, 50);
 }
 

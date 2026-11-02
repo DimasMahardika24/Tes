@@ -1175,3 +1175,115 @@ function dominoBotMove(dRef, botKey) {
     return dominoApplyPlay(s, botKey, m.tile.id, m.side) ? s : cur;
   });
 }
+
+
+// ============================================================
+// 🤖 ISI KURSI KOSONG DENGAN BOT (room online, mis. 2 manusia + 2 bot)
+// - Tombol hanya muncul untuk HOST (p1) dan hanya kalau masih ada kursi kosong
+// - Bot yang mengisi SELALU mode Hard (window.botDifficulty = 'hard')
+// - Bot dijalankan di perangkat host; kalau host keluar, bot ikut hilang
+// - Catur & Tic-Tac-Toe hanya 2 pemain (tidak ada kursi kosong) -> tidak ada tombol,
+//   untuk itu tetap pakai menu "MAIN VS BOT"
+// ============================================================
+const BOT_FILL_CFG = {
+  poker:  { max: 4, back: 'btnPokerBack',  phasePath: 'poker/phase',  names: 'poker/names' },
+  uno:    { max: 4, back: 'btnUnoBack',    phasePath: 'uno/phase',    names: 'uno/names' },
+  domino: { max: 4, back: 'btnDominoBack', phasePath: 'domino/phase', names: null },
+  snake:  { max: 2, back: 'btnSnakeBack',  phasePath: null,           names: null }
+};
+const BOT_ALL_ROLES = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7'];
+let botFillBtn = null;
+let botFillMax = 0;
+let botFillEmpty = [];
+
+function botStartHandlersFor(game) {
+  if (game === 'snake')  startSnakeBot();
+  if (game === 'uno')    startUnoBot();
+  if (game === 'poker')  startPokerBot();
+  if (game === 'domino') startDominoBot();
+}
+
+function botFillRefresh() {
+  if (!botFillBtn || !roomRef) return;
+  const cfg = BOT_FILL_CFG[currentGame];
+  if (!cfg) return;
+  Promise.all([
+    roomRef.child('presence').once('value'),
+    cfg.phasePath ? roomRef.child(cfg.phasePath).once('value') : Promise.resolve(null)
+  ]).then(([ps, ph]) => {
+    const pres = ps.val() || {};
+    const phase = ph ? ph.val() : 'playing-snake';
+    const empty = BOT_ALL_ROLES.slice(0, botFillMax).filter(r => !pres[r]);
+    botFillEmpty = empty;
+    // Ronde yang sedang jalan tidak boleh disisipi pemain baru (kecuali Ular Tangga yang kursinya sudah ada sejak awal)
+    const phaseOk = cfg.phasePath ? (phase && phase !== 'playing') : true;
+    const show = empty.length > 0 && phaseOk;
+    botFillBtn.style.display = show ? 'flex' : 'none';
+    if (show) botFillBtn.textContent = '🤖 Isi ' + empty.length + ' kursi kosong dengan Bot (Hard)';
+  }).catch(() => {});
+}
+
+function botFillRun() {
+  if (myRole !== 'p1' || !roomRef || !botFillBtn) return;
+  const empty = botFillEmpty.slice();
+  if (!empty.length) { botFillRefresh(); return; }
+  botFillBtn.disabled = true;
+
+  const claimed = [];
+  const finish = () => {
+    botFillBtn.disabled = false;
+    if (!claimed.length) {
+      showCustomAlert('Kursi barusan terisi pemain lain.', '🤖 Bot');
+      botFillRefresh();
+      return;
+    }
+    window.botDifficulty = 'hard';                       // bot pengisi selalu pintar
+    botActiveRoles = Array.from(new Set(botActiveRoles.concat(claimed)));
+    const cfg = BOT_FILL_CFG[currentGame];
+    if (cfg && cfg.names) {
+      claimed.forEach(r => { roomRef.child(cfg.names + '/' + r).set('🤖 Bot ' + r.slice(1)); });
+    }
+    cleanupBotListeners();
+    botStartHandlersFor(currentGame);
+    botFillRefresh();
+    showCustomAlert(claimed.length + ' bot (Hard) bergabung: ' + claimed.map(r => r.toUpperCase()).join(', ') + '.', '🤖 Bot ditambahkan');
+  };
+
+  const claimNext = (i) => {
+    if (i >= empty.length) { finish(); return; }
+    const r = empty[i];
+    const pRef = roomRef.child('presence/' + r);
+    pRef.transaction(cur => (cur === null ? true : undefined), (err, committed) => {
+      if (!err && committed) {
+        pRef.onDisconnect().remove();                    // host keluar -> bot ikut keluar
+        botPresenceRefs[r] = pRef;
+        claimed.push(r);
+      }
+      claimNext(i + 1);
+    });
+  };
+  claimNext(0);
+}
+
+function setupBotFillUI() {
+  if (window.isBotMode || myRole !== 'p1' || !roomRef) return;
+  const cfg = BOT_FILL_CFG[currentGame];
+  if (!cfg || document.getElementById('btnFillBots')) return;
+  const back = document.getElementById(cfg.back);
+  if (!back || !back.parentNode) return;
+
+  roomRef.child('maxPlayers').once('value').then(snap => {
+    botFillMax = snap.val() || cfg.max;
+    const btn = document.createElement('button');
+    btn.id = 'btnFillBots';
+    btn.type = 'button';
+    btn.className = 'btn-menu';
+    btn.style.cssText = 'margin-top:12px; justify-content:center; text-align:center; background:linear-gradient(135deg,#7c3aed,#a855f7); color:#fff; display:none;';
+    btn.onclick = botFillRun;
+    back.parentNode.insertBefore(btn, back);
+    botFillBtn = btn;
+    roomRef.child('presence').on('value', botFillRefresh);
+    if (cfg.phasePath) roomRef.child(cfg.phasePath).on('value', botFillRefresh);
+    botFillRefresh();
+  }).catch(() => {});
+}
